@@ -1,0 +1,53 @@
+{
+  "document_types": {
+    "شهادة ثانوية": {
+      "name_ar": "شهادة ثانوية عامة",
+      "name_en": "High School Certificate",
+      "code": "HS",
+      "required": true,
+      "order": 1
+    },
+    "شهادة ميلاد": {
+      "name_ar": "شهادة ميلاد",
+      "name_en": "Birth Certificate",
+      "code": "BC",
+      "required": true,
+      "order": 2
+    },
+    "صورة هوية": {
+      "name_ar": "صورة هوية",
+      "name_en": "ID Card",
+      "code": "ID",
+      "required": true,
+      "order": 3
+    },
+    "صور شخصية": {
+      "name_ar": "صور شخصية",
+      "name_en": "Personal Photos",
+      "code": "PH",
+      "required": true,
+      "order": 4
+    },
+    "كشف علامات": {
+      "name_ar": "كشف علامات",
+      "name_en": "Transcript",
+      "code": "TR",
+      "required": true,
+      "order": 5
+    },
+    "أوراق أخرى": {
+      "name_ar": "أوراق أخرى",
+      "name_en": "Other Documents",
+      "code": "OTHER",
+      "required": false,
+      "order": 6
+    },
+    "شهادة صحية": {
+      "name_ar": "شهادة صحية",
+      "name_en": "Medical Health",
+      "code": "HC",
+      "required": false,
+      "order": 7
+    }
+  }
+}
