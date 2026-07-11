@@ -1,0 +1,240 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <title>نظام أرشيف الطلاب - إدارة الوثائق</title>
+    <style>
+        :root { --navy:#123b5d; --blue:#1d6fa5; --mint:#1f9d79; --ink:#152536; --muted:#66788a; --line:#dce6ee; --surface:#fff; --soft:#f4f8fb; --shadow:0 14px 34px rgba(22, 55, 80, .10); }
+        * { margin:0; padding:0; box-sizing:border-box; }
+        body { min-height:100vh; font-family:'Segoe UI', Tahoma, sans-serif; color:var(--ink); background:radial-gradient(circle at top right,#dceefa 0,transparent 34%), #f4f7fa; line-height:1.55; }
+        .header { max-width:1240px; margin:22px auto 0; padding:26px 32px; border-radius:20px; background:linear-gradient(125deg,#123b5d,#1d6fa5); color:#fff; display:flex; justify-content:space-between; align-items:center; gap:22px; box-shadow:var(--shadow); }
+        .header h1 { font-size:1.55rem; letter-spacing:-.3px; }
+        .header-info { display:flex; gap:10px; flex-wrap:wrap; }
+        .header-info span { display:block; padding:7px 11px; font-size:.78rem; border:1px solid rgba(255,255,255,.23); border-radius:9px; background:rgba(255,255,255,.10); direction:rtl; overflow-wrap:anywhere; }
+        .settings-bar { max-width:1240px; margin:16px auto 0; padding:24px 28px; background:var(--surface); border:1px solid var(--line); border-radius:18px; box-shadow:0 8px 22px rgba(22,55,80,.05); }
+        .settings-row { display:flex; gap:12px; align-items:center; flex-wrap:wrap; padding:11px 0; border-bottom:1px solid #edf2f6; }
+        .settings-row:last-of-type { border-bottom:0; }
+        .settings-bar label { min-width:142px; font-weight:700; font-size:.9rem; color:#334d63; }
+        .settings-bar input[type="text"] { flex:1 1 360px; min-width:220px; padding:11px 13px; border:1px solid #cbd9e4; outline:0; border-radius:10px; background:#fbfdff; color:#27445c; font-family:Consolas, monospace; transition:.2s; }
+        .settings-bar input[type="text"]:focus, .search-input:focus { border-color:#2a8aca; box-shadow:0 0 0 4px rgba(42,138,202,.12); }
+        .btn { min-height:40px; padding:9px 16px; border:1px solid transparent; border-radius:10px; font-family:inherit; font-weight:700; cursor:pointer; transition:transform .18s, box-shadow .18s, filter .18s; }
+        .btn:hover { transform:translateY(-1px); filter:brightness(1.03); box-shadow:0 6px 14px rgba(18,59,93,.16); }
+        .btn:disabled { cursor:wait; transform:none; opacity:.7; }
+        .btn-save { background:linear-gradient(135deg,#1f9d79,#167f66); color:#fff; }
+        .btn-sync-columns { background:#6652a6; color:#fff; }
+        .btn-sync-all { background:linear-gradient(135deg,#f28b35,#d75b22); color:#fff; }
+        .btn-outline { background:#fff; border-color:#b8cad8; color:#24516e; }
+        .btn-edit-json { background:#f4efff; color:#6545a1; border-color:#d8c9f6; }
+        .status-msg { font-size:.8rem; padding:5px 10px; border-radius:8px; }
+        .status-ok { background:#e4f8f0; color:#117355; }.status-warn { background:#fff6dc; color:#986a06; }.status-error { background:#fff0f0; color:#bc3b3b; }
+        .help-text { margin:12px 0 0; padding:10px 13px; background:#f2f7fb; border-radius:9px; color:#63798b; font-size:.79rem; }
+        .action-bar,.search-container,.sync-report,.results-container { max-width:1120px; }
+        .action-bar { margin:20px auto; padding:20px 24px; border:1px solid #f2c69a; border-radius:16px; background:linear-gradient(100deg,#fffaf4,#fff); display:flex; justify-content:space-between; align-items:center; gap:16px; box-shadow:0 8px 22px rgba(125,78,25,.06); }
+        .action-bar h3 { color:#9b4a16; }.action-bar p { margin-top:3px; color:var(--muted); }
+        .search-container { margin:20px auto; padding:24px; background:var(--surface); border:1px solid var(--line); border-radius:16px; box-shadow:var(--shadow); }
+        .search-input { width:100%; padding:12px 15px; border:1px solid #cbd9e4; outline:0; border-radius:10px; font:1rem inherit; transition:.2s; }
+        .suggestions { background:#fff; border:1px solid #cddbe5; border-radius:10px; max-height:240px; overflow-y:auto; display:none; position:absolute; z-index:10; width:100%; margin-top:5px; box-shadow:0 12px 28px rgba(22,55,80,.16); }
+        .suggestions.active { display:block; }.suggestion-item { padding:11px 14px; cursor:pointer; border-bottom:1px solid #edf2f6; }.suggestion-item:hover { background:#eff8fc; color:#155b87; }
+        .student-card { background:#fff; border:1px solid var(--line); border-radius:16px; margin:0 0 18px; overflow:hidden; box-shadow:0 8px 24px rgba(22,55,80,.07); }
+        .student-info { padding:21px 24px; border-bottom:1px solid #dce7ee; background:linear-gradient(100deg,#f9fcfe,#fff); display:flex; justify-content:space-between; align-items:center; gap:15px; flex-wrap:wrap; }.student-info h2 { font-size:1.2rem; color:#173e5b; }.student-info span { font-size:.88rem; color:#5d7487; }
+        .summary-badge { padding:7px 12px; border-radius:999px; font-size:.85rem; font-weight:700; white-space:nowrap; }.summary-complete { background:#e4f8f0; color:#117355; }.summary-incomplete { background:#fff6dc; color:#986a06; }.summary-none { background:#fff0f0; color:#bc3b3b; }.summary-optional { background:#e8f3fc; color:#176b9e; }
+        .doc-card { margin:10px 18px; padding:13px 15px; border:1px solid #e0e9ef; border-radius:11px; background:#fff; display:flex; align-items:center; gap:14px; transition:.18s; }.doc-card:hover { transform:translateX(-2px); box-shadow:0 5px 14px rgba(22,55,80,.07); }.doc-card.delivered { border-right:4px solid #1f9d79; }.doc-card.missing { border-right:4px solid #e65a5a; }.doc-card.optional { border-right:4px solid #2a8aca; }
+        .file-tag { background:#edf6fc; color:#24618a; padding:5px 9px; border-radius:7px; cursor:pointer; display:inline-block; margin:2px; font-size:.83rem; }.file-tag:hover { background:#dceefa; }
+        .modal { display:none; position:fixed; inset:0; background:rgba(10,28,42,.78); justify-content:center; align-items:center; z-index:1000; padding:20px; }.modal.active { display:flex; }.modal-content { background:#fff; width:min(1100px,100%); height:min(90vh,900px); border-radius:16px; overflow:hidden; display:flex; flex-direction:column; box-shadow:0 20px 55px rgba(0,0,0,.3); }.modal-header { padding:14px 20px; background:linear-gradient(135deg,#123b5d,#1d6fa5); color:#fff; display:flex; justify-content:space-between; align-items:center; }.modal-body { flex:1; overflow:auto; padding:16px; text-align:center; }
+        .sync-report { padding:22px; margin:20px auto; border:1px solid #f2c69a; border-radius:16px; background:#fffdf9; box-shadow:var(--shadow); overflow:auto; }.sync-report h3 { color:#9b4a16; }.no-results,.loading { margin:20px auto; padding:38px 20px; max-width:720px; text-align:center; color:#6e8292; background:#fff; border:1px dashed #cbd9e4; border-radius:15px; }.btn-close { background:transparent; border:0; color:white; font-size:1.8rem; cursor:pointer; }.btn-folder { background:#244f70; color:#fff; padding:9px 14px; border-radius:9px; border:0; font-family:inherit; font-weight:700; cursor:pointer; }
+        .json-modal-content { width:min(900px,100%); height:min(88vh,780px); }.json-editor-body { display:flex; flex-direction:column; gap:12px; text-align:right; }.json-editor-body p { color:#60768a; font-size:.88rem; }.json-editor { width:100%; flex:1; min-height:400px; resize:vertical; padding:14px; direction:ltr; text-align:left; color:#203d53; background:#f7fafc; border:1px solid #cbd9e4; border-radius:10px; outline:0; font:13px/1.55 Consolas,'Courier New',monospace; }.json-editor:focus { border-color:#2a8aca; box-shadow:0 0 0 4px rgba(42,138,202,.12); }.json-editor-actions { display:flex; gap:10px; justify-content:flex-end; align-items:center; flex-wrap:wrap; }.json-editor-status { margin-left:auto; font-size:.85rem; }
+        .doc-types-form-body { text-align:right; }.doc-types-table-wrap { overflow:auto; border:1px solid #dce6ee; border-radius:10px; }.doc-types-table { min-width:780px; margin:0; }.doc-types-table th { white-space:nowrap; }.doc-types-table td { padding:7px; }.doc-types-table input[type="text"],.doc-types-table input[type="number"] { width:100%; min-width:95px; padding:8px; border:1px solid #cbd9e4; border-radius:7px; color:#27445c; font:inherit; }.doc-types-table input[type="text"]:focus,.doc-types-table input[type="number"]:focus { outline:0; border-color:#2a8aca; box-shadow:0 0 0 3px rgba(42,138,202,.10); }.doc-types-table .doc-code-input { direction:ltr; text-transform:uppercase; }.doc-required-cell { text-align:center !important; }.btn-remove-doc { min-height:auto; padding:6px 9px; color:#b73737; background:#fff0f0; border:1px solid #f1c2c2; border-radius:7px; cursor:pointer; }.add-doc-type-btn { align-self:flex-start; }
+        table { width:100%; border-collapse:collapse; margin-top:15px; overflow:hidden; border-radius:10px; } th,td { border-bottom:1px solid #e5edf3; padding:11px; text-align:right; } th { background:#edf5fa; color:#28516d; } tr:hover td { background:#fbfdfe; }
+        @media (max-width:1260px) { .header,.settings-bar { margin-right:16px; margin-left:16px; }.action-bar,.search-container,.sync-report,.results-container { margin-right:16px !important; margin-left:16px !important; } }
+        @media (max-width:700px) { .header { padding:20px; }.header-info { width:100%; }.header-info span { width:100%; }.settings-bar { padding:17px; }.settings-row { align-items:stretch; }.settings-bar label { min-width:0; }.settings-bar input[type="text"] { min-width:100%; }.settings-row .btn { flex:1; }.action-bar,.search-container { padding:18px; }.action-bar { align-items:stretch; }.action-bar .btn { width:100%; }.student-info { padding:17px; }.student-info > div:first-child { width:100%; }.doc-card { margin:8px 10px; align-items:flex-start; flex-direction:column; gap:6px; } .doc-card > div { min-width:0 !important; width:100%; } .search-container > div { flex-wrap:wrap; } .search-container .btn { flex:1; } }
+    </style>
+</head>
+<body>
+<div class="header">
+    <h1>📁 نظام أرشيف الطلاب</h1>
+    <div class="header-info">
+        <span>📂 الأرشيف: <strong id="archivePathDisplay">{{ archive_path or 'غير محدد' }}</strong></span>
+        <span>📊 الإكسل: <strong id="excelPathDisplay">{{ excel_file or 'غير محدد' }}</strong></span>
+        <span>📋 عدد الطلاب: <strong id="studentCount">0</strong></span>
+    </div>
+</div>
+
+<div class="settings-bar">
+    <div class="settings-row">
+        <label>📂 مسار الأرشيف:</label>
+        <input type="text" id="archivePathInput" value="{{ archive_path }}" placeholder="E:\\\\Archive" dir="ltr">
+        <button class="btn btn-save" onclick="saveArchivePath()">💾 حفظ</button>
+        <span id="archiveStatus"></span>
+    </div>
+    <div class="settings-row">
+        <label>📊 مسار ملف الإكسل:</label>
+        <input type="text" id="excelPathInput" value="{{ excel_file }}" placeholder="E:\\\\Archive\\\\Stud_Data\\\\Student_Index.xlsx" dir="ltr">
+        <button class="btn btn-save" onclick="saveExcelPath()">💾 حفظ</button>
+        <button class="btn btn-outline" onclick="downloadSampleExcel()" style="font-size:0.8rem;">⬇️ نموذج</button>
+        <span id="excelStatus"></span>
+    </div>
+    <div class="settings-row">
+        <label>📝 أنواع الوثائق:</label>
+        <input type="text" id="docTypesPath" value="{{ doc_types_path }}" readonly dir="ltr" style="background:#f8f9fa;">
+        <button class="btn btn-edit-json" onclick="openDocTypesEditor()">✏️ عرض وتعديل</button>
+        <button class="btn btn-sync-columns" onclick="syncColumns()">🔄 مزامنة أعمدة الإكسل</button>
+        <label style="min-width:auto; margin-right:10px;">
+            <input type="checkbox" id="allowDeleteCheckbox"> السماح بحذف الأعمدة غير المستخدمة
+        </label>
+        <span id="syncColumnsStatus"></span>
+    </div>
+    <div class="help-text">💡 عند تغيير required أو حذف نوع، استخدم المزامنة. التحديث الشامل يملأ folder_path ويحدث الحالات.</div>
+</div>
+
+<div class="action-bar" id="actionBar" style="display: {{ 'none' if not archive_path else '' }};">
+    <div><h3>🔄 تحديث شامل</h3><p style="font-size:0.8rem;">مزامنة + ملء folder_path + تحديث حالات التسليم</p></div>
+    <button class="btn btn-sync-all" id="btnSyncAll" onclick="syncAll()">🔄 تحديث شامل</button>
+</div>
+
+<div id="syncReport" class="sync-report" style="display:none;"></div>
+
+<div class="search-container" id="searchContainer" style="display: {{ 'none' if not archive_path else '' }};">
+    <div style="display:flex;gap:10px;">
+        <div style="position:relative;flex:2;" class="input-wrapper">
+            <input type="text" id="searchInput" class="search-input" placeholder="🔍 اكتب الرقم الجامعي أو اسم الطالب..." autocomplete="off">
+            <div id="suggestions" class="suggestions"></div>
+        </div>
+        <button class="btn btn-save" onclick="search()">🔍 بحث</button>
+        <button class="btn btn-outline" onclick="clearResults()">🗑️ مسح</button>
+    </div>
+</div>
+
+<div id="results" class="results-container" style="max-width:1000px; margin: 0 auto 50px auto;"></div>
+
+<div id="viewerModal" class="modal">
+    <div class="modal-content">
+        <div class="modal-header"><h3 id="modalTitle">عرض الوثيقة</h3><button class="btn-close" onclick="closeViewer()">&times;</button></div>
+        <div class="modal-body" id="modalBody"></div>
+    </div>
+</div>
+
+<div id="docTypesModal" class="modal">
+    <div class="modal-content json-modal-content">
+        <div class="modal-header"><h3>تعديل أنواع الوثائق</h3><button class="btn-close" onclick="closeDocTypesEditor()">&times;</button></div>
+        <div class="modal-body json-editor-body doc-types-form-body">
+            <p>أدخل بيانات كل وثيقة من الحقول التالية. الاسم الداخلي هو اسم العمود الذي سيُستخدم في ملف Excel.</p>
+            <div class="doc-types-table-wrap">
+                <table class="doc-types-table">
+                    <thead><tr><th>الاسم الداخلي</th><th>الاسم بالعربية</th><th>الاسم بالإنجليزية</th><th>الرمز</th><th>الترتيب</th><th>إلزامية</th><th></th></tr></thead>
+                    <tbody id="docTypesRows"></tbody>
+                </table>
+            </div>
+            <button class="btn btn-outline add-doc-type-btn" type="button" onclick="addDocTypeRow()">＋ إضافة نوع وثيقة</button>
+            <div class="json-editor-actions">
+                <span id="docTypesEditorStatus" class="json-editor-status"></span>
+                <button class="btn btn-outline" onclick="closeDocTypesEditor()">إلغاء</button>
+                <button class="btn btn-save" onclick="saveDocTypesEditor()">💾 حفظ التعديلات</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    let archivePath = "{{ archive_path or '' }}";
+    let excelPath = "{{ excel_file or '' }}";
+    window.onload = () => { updateUI(); if(archivePath) { document.getElementById('searchContainer').style.display = ''; document.getElementById('actionBar').style.display = ''; loadStats(); } };
+    function updateUI() { document.getElementById('archivePathDisplay').textContent = archivePath || 'غير محدد'; document.getElementById('excelPathDisplay').textContent = excelPath || 'غير محدد'; }
+    function downloadSampleExcel() { window.location.assign('/api/download-sample-excel'); }
+    function closeDocTypesEditor() { document.getElementById('docTypesModal').classList.remove('active'); }
+    function escapeDocTypeValue(value) { return String(value ?? '').replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); }
+    function addDocTypeRow(columnName = '', info = {}) {
+        const rows = document.getElementById('docTypesRows');
+        const order = info.order ?? (rows.children.length + 1);
+        rows.insertAdjacentHTML('beforeend', `<tr><td><input class="doc-column-input" type="text" value="${escapeDocTypeValue(columnName)}"></td><td><input class="doc-name-ar-input" type="text" value="${escapeDocTypeValue(info.name_ar || columnName)}"></td><td><input class="doc-name-en-input" type="text" value="${escapeDocTypeValue(info.name_en || '')}" dir="ltr"></td><td><input class="doc-code-input" type="text" value="${escapeDocTypeValue(info.code || '')}" dir="ltr"></td><td><input class="doc-order-input" type="number" value="${escapeDocTypeValue(order)}"></td><td class="doc-required-cell"><input class="doc-required-input" type="checkbox" ${info.required !== false ? 'checked' : ''}></td><td><button type="button" class="btn-remove-doc" onclick="this.closest('tr').remove()">حذف</button></td></tr>`);
+    }
+    async function openDocTypesEditor() {
+        const modal = document.getElementById('docTypesModal'); const rows = document.getElementById('docTypesRows'); const status = document.getElementById('docTypesEditorStatus');
+        modal.classList.add('active'); rows.innerHTML = ''; status.className = 'json-editor-status'; status.textContent = 'جاري التحميل...';
+        try {
+            const response = await fetch('/api/doc-types'); const data = await response.json(); if (!response.ok) throw new Error(data.message);
+            const types = data.document_types || {}; Object.entries(types).sort((a, b) => (Number(a[1].order) || 999) - (Number(b[1].order) || 999)).forEach(([column, info]) => addDocTypeRow(column, info));
+            if (!rows.children.length) addDocTypeRow(); status.className = 'json-editor-status status-ok'; status.textContent = 'تم تحميل أنواع الوثائق.';
+        } catch (error) { status.className = 'json-editor-status status-error'; status.textContent = 'تعذر تحميل الملف.'; }
+    }
+    async function saveDocTypesEditor() {
+        const status = document.getElementById('docTypesEditorStatus'); const documentTypes = {}; const rows = [...document.querySelectorAll('#docTypesRows tr')];
+        try {
+            if (!rows.length) throw new Error('أضف نوع وثيقة واحدًا على الأقل.');
+            rows.forEach((row, index) => {
+                const column = row.querySelector('.doc-column-input').value.trim(); const nameAr = row.querySelector('.doc-name-ar-input').value.trim(); const nameEn = row.querySelector('.doc-name-en-input').value.trim(); const code = row.querySelector('.doc-code-input').value.trim().toUpperCase(); const order = Number(row.querySelector('.doc-order-input').value) || (index + 1); const required = row.querySelector('.doc-required-input').checked;
+                if (!column || !nameAr) throw new Error('أدخل البيانات الأساسية.'); documentTypes[column] = { name_ar: nameAr, name_en: nameEn, code, required, order };
+            });
+        } catch (error) { status.className = 'json-editor-status status-error'; status.textContent = error.message; return; }
+        try {
+            const response = await fetch('/api/doc-types', { method: 'PUT', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({document_types: documentTypes}) });
+            if (!response.ok) throw new Error(); status.className = 'json-editor-status status-ok'; status.textContent = 'تم الحفظ بنجاح.';
+        } catch (error) { status.className = 'json-editor-status status-error'; status.textContent = 'تعذر الحفظ.'; }
+    }
+    async function saveArchivePath() {
+        const path = document.getElementById('archivePathInput').value.trim(); const s = document.getElementById('archiveStatus'); if(!path) return; s.textContent='⏳...';
+        try {
+            const r = await fetch('/api/set-archive-path',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({archive_path:path})}); const d = await r.json();
+            if(d.status==='ok') { archivePath=path; updateUI(); s.className='status-msg status-ok'; s.textContent='✅ تم الربط'; document.getElementById('searchContainer').style.display=''; document.getElementById('actionBar').style.display=''; loadStats(); }
+        } catch(e){}
+    }
+    async function saveExcelPath() {
+        const path = document.getElementById('excelPathInput').value.trim(); const s = document.getElementById('excelStatus'); s.textContent='⏳...';
+        try {
+            const r = await fetch('/api/set-excel-path',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({excel_file:path})}); const d = await r.json();
+            excelPath=path; updateUI(); s.className = 'status-msg status-ok'; s.textContent = '✅ تم الحفظ'; loadStats();
+        } catch(e){}
+    }
+    async function syncColumns() {
+        const statusEl = document.getElementById('syncColumnsStatus'); statusEl.textContent='⏳...';
+        try {
+            const r = await fetch('/api/sync-columns', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({allow_delete: document.getElementById('allowDeleteCheckbox').checked}) });
+            const d = await r.json(); if(d.status==='ok') { statusEl.className='status-msg status-ok'; statusEl.textContent = '✅ متطابق'; loadStats(); }
+        } catch(e){}
+    }
+    async function syncAll() {
+        const btn = document.getElementById('btnSyncAll'); const reportDiv = document.getElementById('syncReport');
+        btn.disabled = true; reportDiv.style.display = 'block'; reportDiv.innerHTML = '⏳ جاري التحديث...';
+        try {
+            const r = await fetch('/api/sync-all', { method: 'POST' }); const d = await r.json();
+            if(d.status === 'ok') { reportDiv.innerHTML = `<h3>✅ اكتمل التحديث الشامل بنجاح</h3><p>عدد الطلاب المحدثين: ${d.updated_count}</p>`; }
+        } catch(e){} finally { btn.disabled = false; loadStats(); }
+    }
+    async function loadStats() { try { const r = await fetch('/api/stats'); const d = await r.json(); document.getElementById('studentCount').textContent = d.student_count || 0; } catch(e){} }
+    async function search() {
+        const q = document.getElementById('searchInput').value.trim(); if(!q) return;
+        const div = document.getElementById('results'); div.innerHTML='⏳...';
+        try {
+            const r = await fetch(`/api/search?q=${encodeURIComponent(q)}`); const data = await r.json();
+            if(!data.length) { div.innerHTML='📭 لا توجد نتائج'; return; }
+            let html = '';
+            data.forEach(s=>{
+                const sum = s.summary; let sc='summary-none', st=`لم يسلم (0/${sum.total_required})`;
+                if(sum && sum.is_complete) { sc='summary-complete'; st=`مكتمل (${sum.delivered}/${sum.total_required})`; }
+                else if(sum && sum.delivered>0) { sc='summary-incomplete'; st=`ناقص (${sum.delivered}/${sum.total_required})`; }
+                html += `<div class="student-card"><div class="student-info"><div><h2>${s.full_name}</h2><span>📌 الرقم: ${s.student_id}</span></div><span class="summary-badge ${sc}">${st}</span><button class="btn-folder" onclick="openFolder('${s.student_id}')">📂 المجلد</button></div><div style="padding:10px 20px;">`;
+                if(s.documents) s.documents.forEach(d=>{
+                    html += `<div class="doc-card ${d.card_class}"><div style="min-width:140px; font-weight:bold;">${d.status_display}</div><div style="flex:1;">${d.doc_name}</div><div>${d.files&&d.files.length?d.files.map(f=>`<span class="file-tag" onclick="viewDocument('${s.student_id}','${f.filename}')">👁️ ${f.filename}</span>`).join(''):''}</div></div>`;
+                });
+                html += '</div></div>';
+            });
+            div.innerHTML = html;
+        } catch(e){}
+    }
+    function clearResults() { document.getElementById('searchInput').value=''; document.getElementById('results').innerHTML=''; }
+    function viewDocument(sid, fn) {
+        const modal = document.getElementById('viewerModal'); const url = `/api/view/${sid}/${encodeURIComponent(fn)}`; const ext = fn.split('.').pop().toLowerCase(); const body = document.getElementById('modalBody');
+        if(['jpg','jpeg','png','gif'].includes(ext)) body.innerHTML = `<img src="${url}" style="max-width:100%; max-height: 75vh;">`;
+        else if(ext==='pdf') body.innerHTML = `<iframe src="${url}" style="width:100%;height:75vh; border:none;"></iframe>`;
+        else body.innerHTML = `<a href="${url}" class="btn btn-save" download>⬇️ تحميل الملف</a>`;
+        modal.classList.add('active');
+    }
+    function closeViewer() { document.getElementById('viewerModal').classList.remove('active'); }
+    async function openFolder(id) { fetch(`/api/open-folder/${encodeURIComponent(id)}`); }
+    let st; document.getElementById('searchInput').addEventListener('input', function(){ clearTimeout(st); const q = this.value.trim(); if(q.length<1) return; st = setTimeout(async ()=>{
+        const r = await fetch(`/api/suggest?q=${encodeURIComponent(q)}`); const d = await r.json(); const div = document.getElementById('suggestions');
+        if(!d.length) return; div.innerHTML = d.map(i=>`<div class="suggestion-item" onclick="selectSuggestion('${i.student_id}')">${i.full_name}</div>`).join(''); div.classList.add('active');
+    }, 300); });
+    function selectSuggestion(id) { document.getElementById('searchInput').value=id; document.getElementById('suggestions').classList.remove('active'); search(); }
+</script>
+</body>
+</html>
