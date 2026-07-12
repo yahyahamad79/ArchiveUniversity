@@ -35,10 +35,10 @@
       "required": true,
       "order": 5
     },
-    "أوراق أخرى": {
-      "name_ar": "أوراق أخرى",
-      "name_en": "Other Documents",
-      "code": "OTHER",
+    "احتساب المقررات": {
+      "name_ar": "احتساب المقررات",
+      "name_en": "HSC",
+      "code": "HSC",
       "required": false,
       "order": 6
     },
