@@ -10,7 +10,7 @@ from flask import Blueprint, render_template_string, request, send_file, jsonify
 archive_bp = Blueprint('archive', __name__)
 
 # =====================================================================
-# قالب الـ HTML لشاشة الأرشيف (مع الرسائل المدمجة في الواجهة بدون alert)
+# قالب الـ HTML لشاشة الأرشيف (مع زر النسخة الاحتياطية وتأمين الإحصائيات)
 # =====================================================================
 ARCHIVE_TEMPLATE = """
 <!DOCTYPE html>
@@ -167,35 +167,18 @@ ARCHIVE_TEMPLATE = """
 
     async function triggerManualBackup() {
         const btn = document.getElementById('btnManualBackup');
-        const reportDiv = document.getElementById('syncReport');
-        
-        if(!excelPath) { 
-            reportDiv.style.display = 'block';
-            reportDiv.innerHTML = `<div class="no-results"><h3>⚠️ تنبيه المسار</h3><p>يرجى تحديد وحفظ مسار ملف الإكسل أولاً لنسخه احتياطياً.</p></div>`;
-            return; 
-        }
-        
+        if(!excelPath) { alert('يرجى تحديد وحفظ مسار ملف الإكسل أولاً لنسخه احتياطياً.'); return; }
         btn.disabled = true; btn.textContent = '⏳ جاري النسخ...';
-        reportDiv.style.display = 'block'; 
-        reportDiv.innerHTML = '<div class="loading">⏳ جاري معالجة وإنشاء نسخة احتياطية من ملف البيانات...</div>';
-        
         try {
             const r = await fetch('/api/manual-backup', { method: 'POST' });
             const d = await r.json();
             if(d.status === 'ok') {
-                // تم تبديل الـ alert برسالة مدمجة أنيقة داخل الصفحة مباشرة
-                reportDiv.innerHTML = `
-                    <div style="border-right: 4px solid #1f9d79; padding: 5px 10px;">
-                        <h3 style="color:#117355;">✅ تم إنشاء نسخة احتياطية بنجاح</h3>
-                        <p style="margin-top:8px; font-weight: bold; color: #27445c;">مسار النسخة المحفوظة ماديّاً:</p>
-                        <p style="font-family:Consolas, monospace; background:#edf6fc; padding:8px; border-radius:6px; margin-top:5px; word-break:break-all;" dir="ltr">${d.backup_path}</p>
-                    </div>
-                `;
+                alert('✅ تم إنشاء نسخة احتياطية من ملف البيانات بنجاح!\\n\\nالمسار:\\n' + d.backup_path);
             } else {
-                reportDiv.innerHTML = `<div class="no-results"><h3>❌ فشل النسخ الاحتياطي</h3><p>${d.message}</p></div>`;
+                alert('❌ فشل النسخ الاحتياطي: ' + d.message);
             }
         } catch(e) {
-            reportDiv.innerHTML = `<div class="no-results"><h3>❌ خطأ اتصال</h3><p>تعذر الاتصال بالسيرفر أثناء إجراء النسخ الاحتياطي.</p></div>`;
+            alert('❌ خطأ في الاتصال بالسيرفر أثناء إجراء النسخ الاحتياطي.');
         } finally {
             btn.disabled = false; btn.textContent = '🗄️ نسخة احتياطية من البيانات';
         }
@@ -204,11 +187,8 @@ ARCHIVE_TEMPLATE = """
     async function syncAll() {
         const btn = document.getElementById('btnSyncAll');
         const reportDiv = document.getElementById('syncReport');
-        if(!archivePath || !excelPath) { 
-            reportDiv.style.display = 'block';
-            reportDiv.innerHTML = `<div class="no-results"><h3>⚠️ مسارات ناقصة</h3><p>يرجى حفظ مسارات الأرشيف والإكسل أولاً.</p></div>`;
-            return; 
-        }
+        if(!archivePath || !excelPath) { alert('يرجى حفظ مسارات الأرشيف والإكسل أولاً.'); return; }
+        if(!confirm('سيتم تحديث الإكسل وملء مسارات المجلدات وتعديل الحالات الفردية. متابعة؟')) return;
 
         btn.disabled = true; btn.textContent = '⏳ جاري...';
         reportDiv.style.display = 'block'; reportDiv.innerHTML = '<div class="loading">⏳ جاري التحديث الشامل وفحص الملفات...</div>';
@@ -337,7 +317,6 @@ ARCHIVE_TEMPLATE = """
 </html>
 """
 
-# بقية أجزاء الملف (الـ Classes والـ Routes) تظل ثابتة ومحمية بالكامل بدون أي تعديل...
 class ConfigManager:
     def __init__(self, base_dir):
         self.base_dir = base_dir
@@ -615,6 +594,7 @@ def init_archive_routes(base_dir):
     @archive_bp.route('/api/sync-all', methods=['POST'])
     def sync_all_api(): return jsonify(service.sync_all_students())
 
+    # 🗄️ ممر السيرفر الجديد للنسخ الاحتياطي اليدوي بطلب من المستخدم
     @archive_bp.route('/api/manual-backup', methods=['POST'])
     def manual_backup_api():
         if not repo.get_resolved_path():
