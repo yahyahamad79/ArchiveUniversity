@@ -1,0 +1,364 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>مطابقة وفحص الأرشيف - نظام الأرشفة</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@300;400;600;700&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Cairo', sans-serif; }
+    </style>
+</head>
+<body class="bg-slate-50 min-h-screen flex flex-col justify-between">
+
+    <header class="bg-slate-900 text-white px-8 py-5 shadow-md">
+        <div class="max-w-7xl mx-auto flex justify-between items-center">
+            <div class="flex items-center gap-3">
+                <span class="text-2xl">⚡</span>
+                <div>
+                    <h1 class="text-lg font-bold">شاشة فحص ومطابقة وثائق الطلاب</h1>
+                    <p class="text-xs text-slate-400">المطابقة اللحظية بين الأرشيف الفيزيائي وقاعدة بيانات الإكسل</p>
+                </div>
+            </div>
+            <a href="/" class="bg-slate-800 hover:bg-slate-750 text-slate-200 text-xs font-bold px-4 py-2 rounded-lg border border-slate-700 transition-all">
+                🏠 العودة للبوابة الرئيسية
+            </a>
+        </div>
+    </header>
+
+    <main class="flex-grow p-6 max-w-7xl mx-auto w-full space-y-6">
+
+        <div id="alert_box" class="hidden p-4 rounded-xl text-xs font-semibold shadow-xs transition-all"></div>
+
+        <div class="bg-white p-4 rounded-2xl shadow-xs border border-slate-100 grid grid-cols-1 md:grid-cols-3 gap-4 text-xs">
+            <div class="flex items-center gap-2 p-2 bg-slate-50 rounded-lg border">
+                <span class="text-lg">📁</span>
+                <div>
+                    <div class="text-[10px] text-slate-400 font-bold">مجلد العمل المؤقت:</div>
+                    <div id="path_work_display" class="font-mono text-slate-700 truncate max-w-[250px]">غير محدد</div>
+                </div>
+            </div>
+            <div class="flex items-center gap-2 p-2 bg-slate-50 rounded-lg border">
+                <span class="text-lg">📦</span>
+                <div>
+                    <div class="text-[10px] text-slate-400 font-bold">مستودع الأرشيف النهائي:</div>
+                    <div id="path_archive_display" class="font-mono text-slate-700 truncate max-w-[250px]">غير محدد</div>
+                </div>
+            </div>
+            <div class="flex items-center gap-2 p-2 bg-slate-50 rounded-lg border">
+                <span class="text-lg">📊</span>
+                <div>
+                    <div class="text-[10px] text-slate-400 font-bold">ملف قاعدة البيانات (Excel):</div>
+                    <div id="path_excel_display" class="font-mono text-slate-700 truncate max-w-[250px]">غير محدد</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="grid grid-cols-2 lg:grid-cols-4 gap-4">
+            <div class="bg-white p-5 rounded-2xl border border-slate-150 shadow-xs flex flex-col justify-between">
+                <span class="text-slate-400 text-[10px] font-bold block mb-1">إجمالي سجلات الطلاب</span>
+                <span id="stat_total" class="text-2xl font-bold text-slate-800">0</span>
+            </div>
+            <div class="bg-emerald-50/50 p-5 rounded-2xl border border-emerald-150 shadow-xs flex flex-col justify-between">
+                <span class="text-emerald-600 text-[10px] font-bold block mb-1">ملفات مكتملة (100%)</span>
+                <span id="stat_complete" class="text-2xl font-bold text-emerald-700">0</span>
+            </div>
+            <div class="bg-rose-50/50 p-5 rounded-2xl border border-rose-150 shadow-xs flex flex-col justify-between">
+                <span class="text-rose-600 text-[10px] font-bold block mb-1">ملفات ناقصة</span>
+                <span id="stat_incomplete" class="text-2xl font-bold text-rose-700">0</span>
+            </div>
+            <div class="bg-blue-50/50 p-5 rounded-2xl border border-blue-150 shadow-xs flex flex-col justify-between">
+                <span class="text-blue-600 text-[10px] font-bold block mb-1">نسبة الإنجاز العامة</span>
+                <span id="stat_ratio" class="text-2xl font-bold text-blue-700">0%</span>
+            </div>
+        </div>
+
+        <div class="bg-white p-5 rounded-2xl shadow-sm border border-slate-100 flex flex-col md:flex-row justify-between gap-4 items-center">
+            
+            <div class="flex gap-3 w-full md:w-auto">
+                <button onclick="loadDataFromServer()" class="flex-1 md:flex-none bg-slate-800 hover:bg-slate-700 text-white text-xs font-bold px-5 py-3 rounded-xl transition-all shadow-xs flex items-center justify-center gap-2">
+                    🔄 جلب البيانات الحالية
+                </button>
+                <button onclick="startSyncAndVerification()" class="flex-1 md:flex-none bg-amber-500 hover:bg-amber-600 text-white text-xs font-bold px-6 py-3 rounded-xl transition-all shadow-md flex items-center justify-center gap-2">
+                    ⚡ بدء الفحص والمطابقة اللحظية
+                </button>
+            </div>
+
+            <div class="flex gap-3 w-full md:w-auto justify-end">
+                <input type="text" id="search_input" oninput="filterTable()" placeholder="ابحث برقم الطالب أو الاسم..." 
+                       class="w-full md:w-64 text-xs px-4 py-2.5 border border-slate-300 rounded-xl outline-none focus:ring-2 focus:ring-amber-500">
+                
+                <select id="status_filter" onchange="filterTable()" class="text-xs px-4 py-2.5 border border-slate-300 rounded-xl outline-none focus:ring-2 focus:ring-amber-500 bg-white">
+                    <option value="ALL">عرض الكل</option>
+                    <option value="COMPLETE">الملفات المكتملة</option>
+                    <option value="INCOMPLETE">الملفات غير المكتملة</option>
+                </select>
+            </div>
+        </div>
+
+        <div class="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
+            <div class="overflow-x-auto">
+                <table class="w-full text-right text-xs">
+                    <thead class="bg-slate-900 text-white text-[11px] font-bold uppercase tracking-wider">
+                        <tr id="table_headers">
+                            <th class="p-4">الرقم الجامعي (ID)</th>
+                            <th class="p-4">اسم الطالب</th>
+                        </tr>
+                    </thead>
+                    <tbody id="table_body" class="divide-y divide-slate-100">
+                        <tr>
+                            <td colspan="10" class="p-8 text-center text-slate-400">الرجاء جلب البيانات الحالية أو بدء عملية الفحص لإظهار السجلات...</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+    </main>
+
+    <footer class="bg-white border-t border-gray-200 py-4 text-center text-[10px] text-slate-400">
+        شاشة فحص ومطابقة الطلاب والمستندات - نظام الأرشفة الذكي للجامعة
+    </footer>
+
+    <script>
+        let studentData = []; // تخزين السجلات محلياً في الصفحة للبحث والفلترة السريعة
+        let docConstants = {}; // لتخزين أنواع المستندات الحالية لبناء الأعمدة ديناميكياً
+
+        window.addEventListener('DOMContentLoaded', async () => {
+            loadPathsFromLocalStorage();
+            await fetchDocConstants();
+            loadDataFromServer();
+        });
+
+        // 1. عرض المسارات المخزنة بمتصفح الموظف
+        function loadPathsFromLocalStorage() {
+            document.getElementById('path_work_display').innerText = localStorage.getItem('workspace_path') || 'غير محدد';
+            document.getElementById('path_archive_display').innerText = localStorage.getItem('archive_path') || 'غير محدد';
+            document.getElementById('path_excel_display').innerText = localStorage.getItem('excel_path') || 'غير محدد';
+        }
+
+        // 2. جلب إعدادات وثائق النظام الحالية لبناء جدول ديناميكي مرن
+        async function fetchDocConstants() {
+            try {
+                const response = await fetch('/api/get-constants');
+                const result = await response.json();
+                if (result.success) {
+                    docConstants = result.document_types;
+                    buildTableHeaders();
+                }
+            } catch (err) {
+                console.error("خطأ في جلب ثوابت المستندات: ", err);
+            }
+        }
+
+        // 3. رسم أعمدة الجدول ديناميكياً بناءً على الوثائق المعرفة بالسيستم
+        function buildTableHeaders() {
+            const headerRow = document.getElementById('table_headers');
+            // تفريغ الأعمدة وإعادة ضبط الرأس الأساسي للجدول
+            headerRow.innerHTML = `
+                <th class="p-4 font-bold">الرقم الجامعي (ID)</th>
+                <th class="p-4 font-bold">اسم الطالب</th>
+            `;
+
+            // إضافة عمود خاص لكل رمز وثيقة معرفة (مثل HS، BC، إلخ...)
+            Object.keys(docConstants).forEach(key => {
+                const code = docConstants[key].code;
+                headerRow.innerHTML += `
+                    <th class="p-4 font-bold text-center">${docConstants[key].name_ar} (${code})</th>
+                `;
+            });
+
+            // إضافة أعمدة الحالة والنسبة الإجمالية في نهاية الجدول
+            headerRow.innerHTML += `
+                <th class="p-4 font-bold text-center">نسبة الاكتمال</th>
+                <th class="p-4 font-bold text-center">حالة الملف</th>
+            `;
+        }
+
+        // 4. جلب البيانات الخام من ملف الإكسل عبر الـ API
+        async function loadDataFromServer() {
+            const excelPath = localStorage.getItem('excel_path');
+            if (!excelPath) {
+                showAlert("⚠️ يرجى ضبط وتحديد مسار ملف قاعدة بيانات الإكسل أولاً في صفحة المسارات.", false);
+                return;
+            }
+
+            try {
+                const response = await fetch('/api/load-data', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ excel_path: excelPath })
+                });
+                const result = await response.json();
+
+                if (result.success) {
+                    studentData = result.students;
+                    renderTable(studentData);
+                    calculateStats(studentData);
+                    showAlert("✅ تم تحميل بيانات الطلاب الحالية من ملف الإكسل بنجاح.", true);
+                } else {
+                    showAlert(result.message, false);
+                }
+            } catch (err) {
+                showAlert("حدث خطأ أثناء محاولة الاتصال بالخادم لجلب البيانات.", false);
+            }
+        }
+
+        // 5. بدء عملية المطابقة والمزامنة الكلية والفحص الفيزيائي للملفات
+        async function startSyncAndVerification() {
+            const workspacePath = localStorage.getItem('workspace_path');
+            const archivePath = localStorage.getItem('archive_path');
+            const excelPath = localStorage.getItem('excel_path');
+
+            if (!workspacePath || !archivePath || !excelPath) {
+                showAlert("❌ يرجى تهيئة وضبط جميع المسارات الثلاثة أولاً لتتمكن من فحص ومطابقة الملفات.", false);
+                return;
+            }
+
+            showAlert("⚡ جاري تشغيل محرك الأرشفة ومسح مجلدات المستندات محلياً ومطابقتها... يرجى الانتظار...", true);
+
+            try {
+                const response = await fetch('/api/sync', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        workspace_path: workspacePath,
+                        archive_path: archivePath,
+                        excel_path: excelPath
+                    })
+                });
+                const result = await response.json();
+
+                if (result.success) {
+                    studentData = result.students;
+                    renderTable(studentData);
+                    calculateStats(studentData);
+                    showAlert(result.message, true);
+                } else {
+                    showAlert(result.message, false);
+                }
+            } catch (err) {
+                showAlert("حدث فشل في الاتصال بخادم المعالجة أثناء تشغيل المطابقة.", false);
+            }
+        }
+
+        // 6. رسم محتويات الجدول بالكامل مع المعالجة الذكية والموثوقة لاسم الطالب
+        function renderTable(data) {
+            const tbody = document.getElementById('table_body');
+            tbody.innerHTML = '';
+
+            if (data.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="12" class="p-8 text-center text-slate-400">لا يوجد سجلات تطابق شروط البحث الحالية.</td></tr>`;
+                return;
+            }
+
+            data.forEach(row => {
+                const tr = document.createElement('tr');
+                tr.className = "hover:bg-slate-50 transition-all text-slate-700";
+
+                // فحص ذكي لاستنباط حقل اسم الطالب بأكثر من صيغة محتملة في ملف الإكسل لتجنب ظهور حقول فارغة
+                const studentName = row['الاسم'] || 
+                                    row['اسم الطالب'] || 
+                                    row['Name'] || 
+                                    row['name'] || 
+                                    row['NAME'] || 
+                                    row['Student Name'] || 
+                                    row['student_name'] || 
+                                    'غير معروف';
+
+                // إضافة الخلايا الأساسية (ID والاسم المستخلص ذكياً)
+                let rowHtml = `
+                    <td class="p-4 font-mono font-bold text-slate-900">${row.ID || ''}</td>
+                    <td class="p-4 font-semibold text-slate-800">${studentName}</td>
+                `;
+
+                // إضافة حالة الوثائق ديناميكياً بناءً على ما هو معرف في ثوابت النظام
+                Object.keys(docConstants).forEach(key => {
+                    const code = docConstants[key].code;
+                    const status = row[code] || "لا";
+                    const badgeClass = status === "نعم" 
+                        ? "bg-emerald-50 text-emerald-700 border border-emerald-200" 
+                        : "bg-rose-50 text-rose-700 border border-rose-200";
+                    
+                    rowHtml += `
+                        <td class="p-4 text-center">
+                            <span class="${badgeClass} px-2.5 py-1 rounded-md text-[10px] font-bold">${status}</span>
+                        </td>
+                    `;
+                });
+
+                // جلب نسبة الاكتمال وحالة الملف الكلية
+                const ratio = row['نسبة الاكتمال'] || '0%';
+                const statusFile = row['حالة الملف'] || 'غير مكتمل';
+                
+                const statusBadge = statusFile === "مكتمل"
+                    ? "bg-emerald-500 text-white"
+                    : "bg-amber-100 text-amber-800 border border-amber-300";
+
+                rowHtml += `
+                    <td class="p-4 text-center font-bold text-slate-800 font-mono">${ratio}</td>
+                    <td class="p-4 text-center">
+                        <span class="${statusBadge} px-3 py-1 rounded-full text-[10px] font-bold shadow-xs">${statusFile}</span>
+                    </td>
+                `;
+
+                tr.innerHTML = rowHtml;
+                tbody.appendChild(tr);
+            });
+        }
+
+        // 7. تفعيل الفلترة والبحث اللحظي في الواجهة
+        function filterTable() {
+            const query = document.getElementById('search_input').value.trim().toLowerCase();
+            const filter = document.getElementById('status_filter').value;
+
+            const filtered = studentData.filter(row => {
+                const name = (row['الاسم'] || row['اسم الطالب'] || row['Name'] || row['name'] || row['NAME'] || '').toLowerCase();
+                const id = (row.ID || '').toLowerCase();
+                const fileStatus = row['حالة الملف'] || 'غير مكتمل';
+
+                // شرط البحث بالنص
+                const matchesSearch = name.includes(query) || id.includes(query);
+
+                // شرط الفلترة بالحالة
+                let matchesFilter = true;
+                if (filter === "COMPLETE") {
+                    matchesFilter = fileStatus === "مكتمل";
+                } else if (filter === "INCOMPLETE") {
+                    matchesFilter = fileStatus === "غير مكتمل";
+                }
+
+                return matchesSearch && matchesFilter;
+            });
+
+            renderTable(filtered);
+        }
+
+        // 8. حساب وعرض الإحصائيات الذكية
+        function calculateStats(data) {
+            const total = data.length;
+            if (total === 0) return;
+
+            const complete = data.filter(row => row['حالة الملف'] === "مكتمل").length;
+            const incomplete = total - complete;
+            const avgRatio = Math.round((complete / total) * 100);
+
+            document.getElementById('stat_total').innerText = total;
+            document.getElementById('stat_complete').innerText = complete;
+            document.getElementById('stat_incomplete').innerText = incomplete;
+            document.getElementById('stat_ratio').innerText = `${avgRatio}%`;
+        }
+
+        function showAlert(text, isSuccess) {
+            const el = document.getElementById('alert_box');
+            el.innerText = text;
+            el.className = `p-4 rounded-xl text-xs font-semibold block shadow-xs transition-all ${
+                isSuccess 
+                ? 'bg-emerald-50 text-emerald-800 border border-emerald-200' 
+                : 'bg-rose-50 text-rose-800 border border-rose-200'
+            }`;
+        }
+    </script>
+</body>
+</html>

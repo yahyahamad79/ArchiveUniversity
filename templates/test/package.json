@@ -1,0 +1,12 @@
+{
+  "name": "file-renamer",
+  "version": "1.0.0",
+  "description": "مرقم الملفات - مطابقة إكسل مع مجلد وإعادة تسمية تلقائية",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron ."
+  },
+  "devDependencies": {
+    "electron": "^43.1.1"
+  }
+}

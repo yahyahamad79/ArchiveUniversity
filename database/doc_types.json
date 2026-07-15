@@ -1,50 +1,5 @@
 {
   "document_types": {
-    "شهادة ثانوية": {
-      "name_ar": "شهادة ثانوية عامة",
-      "name_en": "High School Certificate",
-      "code": "HS",
-      "required": true,
-      "order": 1,
-      "storage_path": "HS/",
-      "allowed_extensions": ["pdf", "jpg", "jpeg"],
-      "max_size_mb": 5,
-      "ocr_keywords": [
-        "ثانوية", 
-        "وزارة التربية", 
-        "أتمام الدراسة", 
-        "المعدل", 
-        "رقم الطالب", 
-        "رقم الجلوس", 
-        "شهادة اتمام الثانوية", 
-        "شهادة الثانوية"
-      ],
-      "description_ar": "نسخة مصدقة من شهادة الثانوية العامة أو ما يعادلها"
-    },
-    "شهادة ميلاد": {
-      "name_ar": "شهادة ميلاد",
-      "name_en": "Birth Certificate",
-      "code": "BC",
-      "required": true,
-      "order": 2,
-      "storage_path": "BC/",
-      "allowed_extensions": ["pdf", "jpg", "jpeg"],
-      "max_size_mb": 3,
-      "ocr_keywords": ["شهادة ميلاد", "الرقم الوطني", "وزارة الصحة", "مولود"],
-      "description_ar": "شهادة الميلاد الرسمية المستخرجة من الأحوال المدنية"
-    },
-    "صورة هوية": {
-      "name_ar": "صورة هوية",
-      "name_en": "ID Card",
-      "code": "ID",
-      "required": true,
-      "order": 3,
-      "storage_path": "ID/",
-      "allowed_extensions": ["pdf", "jpg", "jpeg"],
-      "max_size_mb": 2,
-      "ocr_keywords": ["الهوية الوطنية", "البطاقة الشخصية", "رقم الهوية", "جواز سفر"],
-      "description_ar": "صورة واضحة للهوية الوطنية أو جواز السفر للوافدين"
-    },
     "صور شخصية": {
       "name_ar": "صور شخصية",
       "name_en": "Personal Photos",
@@ -52,7 +7,11 @@
       "required": true,
       "order": 4,
       "storage_path": "PH/",
-      "allowed_extensions": ["jpg", "jpeg", "png"],
+      "allowed_extensions": [
+        "jpg",
+        "jpeg",
+        "png"
+      ],
       "max_size_mb": 2,
       "ocr_keywords": [],
       "description_ar": "صورة شخصية حديثة بخلفية بيضاء"
@@ -64,22 +23,19 @@
       "required": true,
       "order": 5,
       "storage_path": "TR/",
-      "allowed_extensions": ["pdf", "jpg", "jpeg"],
+      "allowed_extensions": [
+        "pdf",
+        "jpg",
+        "jpeg"
+      ],
       "max_size_mb": 10,
-      "ocr_keywords": ["كشف درجات", "السجل الأكاديمي", "الدرجات", "المقررات"],
+      "ocr_keywords": [
+        "كشف درجات",
+        "السجل الأكاديمي",
+        "الدرجات",
+        "المقررات"
+      ],
       "description_ar": "كشف درجات تفصيلي للمواد السابقة"
-    },
-    "احتساب المقررات": {
-      "name_ar": "احتساب المقررات",
-      "name_en": "Course Equivalence",
-      "code": "HSC",
-      "required": false,
-      "order": 6,
-      "storage_path": "HSC/",
-      "allowed_extensions": ["pdf"],
-      "max_size_mb": 10,
-      "ocr_keywords": ["معادلة مواد", "احتساب", "المقاصة العلمية"],
-      "description_ar": "طلب أو قرار اعتماد الساعات المحولة من جامعة أخرى"
     },
     "شهادة صحية": {
       "name_ar": "شهادة صحية",
@@ -88,10 +44,109 @@
       "required": false,
       "order": 7,
       "storage_path": "HC/",
-      "allowed_extensions": ["pdf", "jpg", "jpeg"],
+      "allowed_extensions": [
+        "pdf",
+        "jpg",
+        "jpeg"
+      ],
       "max_size_mb": 3,
-      "ocr_keywords": ["تقرير طبي", "خال من الأمراض", "الفحص الطبي", "مستشفى"],
+      "ocr_keywords": [
+        "تقرير طبي",
+        "خال من الأمراض",
+        "الفحص الطبي",
+        "مستشفى"
+      ],
       "description_ar": "شهادة اللياقة الطبية الصادرة من جهة رسمية معتمدة"
+    },
+    "شهادة ميلاد": {
+      "name_ar": "شهادة ميلاد",
+      "name_en": "Birth Certificate",
+      "code": "BC",
+      "required": true,
+      "order": 2,
+      "storage_path": "E:\\MyProjects\\ArchiveUniversity\\database\\storage_secure\\HC",
+      "allowed_extensions": [
+        "pdf",
+        "jpg",
+        "jpeg"
+      ],
+      "max_size_mb": 3,
+      "ocr_keywords": [
+        "شهادة ميلاد",
+        "الرقم الوطني",
+        "وزارة الصحة",
+        "مولود"
+      ]
+    },
+    "شهادة ثانوية عامة": {
+      "name_ar": "شهادة ثانوية عامة",
+      "name_en": "High School Certificate",
+      "code": "HS",
+      "required": true,
+      "order": 1,
+      "storage_path": "E:\\MyProjects\\ArchiveUniversity\\database\\storage_secure\\HS",
+      "allowed_extensions": [
+        "pdf",
+        "jpg",
+        "jpeg",
+        "png"
+      ],
+      "max_size_mb": 5,
+      "ocr_keywords": [
+        "رقم الجلوس ، اسم الطالب ، المعدل ، التربية والتعليم،وزارة التربية والتعليم"
+      ]
+    },
+    "حسن سير وسلوك": {
+      "name_ar": "حسن سير وسلوك",
+      "name_en": "Athics\\888",
+      "code": "ATH",
+      "required": false,
+      "order": 8,
+      "storage_path": "HS/",
+      "allowed_extensions": [
+        "pdf",
+        "jpg",
+        "jpeg",
+        "png",
+        "pdf"
+      ],
+      "max_size_mb": 5,
+      "ocr_keywords": [
+        "وزارة الداخلة ، حسن سير وسلوك"
+      ]
+    },
+    "الاحتساب": {
+      "name_ar": "الاحتساب",
+      "name_en": "ششسسaaaaaa",
+      "code": "QOU",
+      "required": true,
+      "order": 8,
+      "storage_path": "HS/",
+      "allowed_extensions": [
+        "pdf"
+      ],
+      "max_size_mb": 5,
+      "ocr_keywords": []
+    },
+    "صورة هوية": {
+      "name_ar": "صورة هوية",
+      "name_en": "ID Card",
+      "code": "ID",
+      "required": true,
+      "order": 3,
+      "storage_path": "ID/",
+      "allowed_extensions": [
+        "pdf",
+        "jpg",
+        "jpeg"
+      ],
+      "max_size_mb": 3,
+      "ocr_keywords": [
+        "الهوية الوطنية",
+        "البطاقة الشخصية",
+        "رقم الهوية",
+        "جواز سفر"
+      ]
     }
   }
 }

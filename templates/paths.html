@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>إعداد المسارات المحلية - نظام الأرشفة</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@300;400;600;700&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Cairo', sans-serif; }
+    </style>
+</head>
+<body class="bg-slate-50 min-h-screen flex flex-col justify-between">
+
+    <header class="bg-slate-900 text-white px-8 py-5 shadow-md">
+        <div class="max-w-7xl mx-auto flex justify-between items-center">
+            <div class="flex items-center gap-3">
+                <span class="text-2xl">⚙️</span>
+                <div>
+                    <h1 class="text-lg font-bold">تهيئة مسارات النظام</h1>
+                    <p class="text-xs text-slate-400">ضبط مسارات صندوق العمل، الأرشيف، وقاعدة البيانات</p>
+                </div>
+            </div>
+            <a href="/" class="bg-slate-800 hover:bg-slate-750 text-slate-200 text-xs font-bold px-4 py-2 rounded-lg border border-slate-700 transition-all flex items-center gap-1">
+                🏠 العودة للبوابة الرئيسية
+            </a>
+        </div>
+    </header>
+
+    <main class="flex-grow flex items-center justify-center p-6 my-6">
+        <div class="max-w-3xl w-full bg-white p-8 rounded-2xl shadow-sm border border-slate-100 space-y-6">
+            
+            <div class="border-b pb-4">
+                <h2 class="text-lg font-bold text-slate-800">إدارة وربط المجلدات المحلية</h2>
+                <p class="text-xs text-slate-500 mt-1">يجب تحديد المسارات الفعلية بدقة على القرص الصلب الخاص بك لكي يعمل النظام بسلاسة.</p>
+            </div>
+
+            <div class="space-y-5">
+                
+                <div class="space-y-2">
+                    <div class="flex justify-between items-center">
+                        <label class="block text-xs font-bold text-slate-700">1. مسار صندوق ملفات العمل (Staging Box):</label>
+                        <span id="status_workspace" class="text-[10px] font-bold text-slate-400">لم يتم الفحص</span>
+                    </div>
+                    <div class="relative rounded-md shadow-xs">
+                        <input type="text" id="workspace_path" placeholder="مثال: E:\Staging_Box" 
+                               class="w-full text-xs px-4 py-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none transition-all font-mono">
+                    </div>
+                    <p class="text-[10px] text-slate-400">المجلد المؤقت الذي يتم استقبال وثائق الطلاب الجديدة بداخله قبل فرزها.</p>
+                </div>
+
+                <div class="space-y-2">
+                    <div class="flex justify-between items-center">
+                        <label class="block text-xs font-bold text-slate-700">2. مسار الأرشيف النهائي (storage_secure):</label>
+                        <span id="status_archive" class="text-[10px] font-bold text-slate-400">لم يتم الفحص</span>
+                    </div>
+                    <input type="text" id="archive_path" placeholder="مثال: E:\storage_secure" 
+                           class="w-full text-xs px-4 py-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none transition-all font-mono">
+                    <p class="text-[10px] text-slate-400">المستودع الرئيسي الخارجي المنفصل عن كود المشروع والمستبعد من مستودع GitHub.</p>
+                </div>
+
+                <div class="space-y-2">
+                    <div class="flex justify-between items-center">
+                        <label class="block text-xs font-bold text-slate-700">3. مسار ملف قاعدة البيانات (students_db.xlsx):</label>
+                        <span id="status_excel" class="text-[10px] font-bold text-slate-400">لم يتم الفحص</span>
+                    </div>
+                    <input type="text" id="excel_path" placeholder="مثال: E:\database\students_db.xlsx" 
+                           class="w-full text-xs px-4 py-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none transition-all font-mono">
+                    <p class="text-[10px] text-slate-400">ملف جدول البيانات المعتمد لتحديث حالات الوثائق ونسب اكتمالها.</p>
+                </div>
+
+            </div>
+
+            <div id="path_alert" class="hidden p-4 rounded-xl text-xs font-semibold shadow-xs"></div>
+
+            <div class="flex gap-3 justify-end pt-4 border-t">
+                <button onclick="testPathsOnServer()" class="bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold px-5 py-3 rounded-lg transition-all border border-slate-200">
+                    🔍 اختبار الاتصال بالمسارات
+                </button>
+                <button onclick="savePathsLocally()" class="bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold px-6 py-3 rounded-lg shadow-md transition-all">
+                    💾 حفظ واعتماد المسارات
+                </button>
+            </div>
+
+        </div>
+    </main>
+
+    <footer class="bg-white border-t border-gray-200 py-4 text-center text-[10px] text-slate-450">
+        شاشة تهيئة المسارات المستقلة - نظام الأرشفة الهجين
+    </footer>
+
+    <script>
+        // عند فتح الشاشة: جلب المسارات المحفوظة مسبقاً في المتصفح تلقائياً لتسهيل العمل
+        window.addEventListener('DOMContentLoaded', () => {
+            document.getElementById('workspace_path').value = localStorage.getItem('workspace_path') || '';
+            document.getElementById('archive_path').value = localStorage.getItem('archive_path') || '';
+            document.getElementById('excel_path').value = localStorage.getItem('excel_path') || '';
+        });
+
+        // 1. حفظ المسارات في ذاكرة المتصفح المحلية
+        function savePathsLocally() {
+            const workspace = document.getElementById('workspace_path').value.trim();
+            const archive = document.getElementById('archive_path').value.trim();
+            const excel = document.getElementById('excel_path').value.trim();
+
+            if(!workspace || !archive || !excel) {
+                showAlert("يرجى ملء جميع حقول المسارات قبل الحفظ.", false);
+                return;
+            }
+
+            localStorage.setItem('workspace_path', workspace);
+            localStorage.setItem('archive_path', archive);
+            localStorage.setItem('excel_path', excel);
+
+            showAlert("✅ تم حفظ وإعداد المسارات محلياً في المتصفح بنجاح! سيتم استخدامها تلقائياً في شاشات المطابقة والأرشفة.", true);
+        }
+
+        // 2. اختبار المسارات الفعلية عبر الباك إند
+        async function testPathsOnServer() {
+            const workspace = document.getElementById('workspace_path').value.trim();
+            const archive = document.getElementById('archive_path').value.trim();
+            const excel = document.getElementById('excel_path').value.trim();
+
+            if(!workspace || !archive || !excel) {
+                showAlert("يرجى ملء الحقول أولاً لتجربة الاتصال بها.", false);
+                return;
+            }
+
+            showAlert("جاري فحص المجلدات والملفات المحلية على نظام التشغيل...", true);
+
+            try {
+                const response = await fetch('/api/verify-paths', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ workspace, archive, excel })
+                });
+                
+                const result = await response.json();
+                
+                // تحديث مؤشرات الحالة البصرية بجانب كل حقل
+                updateBadge('status_workspace', result.workspace_exists, "موجود", "غير موجود");
+                updateBadge('status_archive', result.archive_exists, "موجود", "غير موجود");
+                updateBadge('status_excel', result.excel_exists, "موجود", "غير موجود");
+
+                if(result.all_ok) {
+                    showAlert("🎉 رائع! جميع المسارات الثلاثة صحيحة وموجودة بالفعل على جهازك والاتصال بها مستقر بنسبة 100%.", true);
+                } else {
+                    showAlert("❌ تنبيه: بعض المسارات المحددة غير موجودة أو لم يتم العثور عليها. يرجى مراجعة التهيئة.", false);
+                }
+
+            } catch (err) {
+                showAlert("فشل الاتصال بالخادم المحلي للتحقق. تأكد من تشغيل ملف app.py.", false);
+            }
+        }
+
+        // دوال مساعدة لتحديث الواجهة
+        function updateBadge(elementId, exists, successText, failText) {
+            const el = document.getElementById(elementId);
+            if(exists) {
+                el.innerText = successText;
+                el.className = "text-[10px] font-bold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded";
+            } else {
+                el.innerText = failText;
+                el.className = "text-[10px] font-bold text-rose-600 bg-rose-50 px-2 py-0.5 rounded";
+            }
+        }
+
+        function showAlert(text, isSuccess) {
+            const el = document.getElementById('path_alert');
+            el.innerText = text;
+            el.className = `p-4 rounded-xl text-xs font-semibold block ${
+                isSuccess 
+                ? 'bg-emerald-50 text-emerald-800 border border-emerald-200' 
+                : 'bg-rose-50 text-rose-800 border border-rose-200'
+            }`;
+        }
+    </script>
+</body>
+</html>

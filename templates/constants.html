@@ -1,0 +1,347 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>إدارة الثوابت والمستندات - نظام الأرشفة</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@300;400;600;700&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Cairo', sans-serif; }
+    </style>
+</head>
+<body class="bg-slate-50 min-h-screen flex flex-col justify-between">
+
+    <header class="bg-slate-900 text-white px-8 py-5 shadow-md">
+        <div class="max-w-7xl mx-auto flex justify-between items-center">
+            <div class="flex items-center gap-3">
+                <span class="text-2xl">📄</span>
+                <div>
+                    <h1 class="text-lg font-bold">إدارة الثوابت والوثائق</h1>
+                    <p class="text-xs text-slate-400">التحكم في امتدادات، أحجام وقواعد مطابقة المستندات وتزامن الإكسل</p>
+                </div>
+            </div>
+            <a href="/" class="bg-slate-800 hover:bg-slate-750 text-slate-200 text-xs font-bold px-4 py-2 rounded-lg border border-slate-700 transition-all">
+                🏠 العودة للبوابة الرئيسية
+            </a>
+        </div>
+    </header>
+
+    <main class="flex-grow p-6 max-w-7xl mx-auto w-full space-y-6">
+        
+        <div id="alert_box" class="hidden p-4 rounded-xl text-xs font-semibold shadow-xs transition-all"></div>
+
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            
+            <section class="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 space-y-4 h-fit">
+                <h2 id="form_title" class="text-sm font-bold text-slate-800 border-b pb-2 flex items-center gap-1.5">
+                    ➕ إضافة وثيقة جديدة للنظام
+                </h2>
+                
+                <form id="doc_form" onsubmit="saveDocument(event)" class="space-y-3">
+                    <input type="hidden" id="original_name" value="">
+
+                    <div>
+                        <label class="block text-[11px] font-bold text-slate-650 mb-1">اسم الوثيقة بالعربية:</label>
+                        <input type="text" id="doc_name_ar" required placeholder="مثال: شهادة ثانوية عامة" 
+                               class="w-full text-xs px-3 py-2 border border-slate-300 rounded-lg outline-none focus:ring-2 focus:ring-amber-500">
+                    </div>
+
+                    <div>
+                        <label class="block text-[11px] font-bold text-slate-650 mb-1">الاسم بالإنجليزية:</label>
+                        <input type="text" id="doc_name_en" required placeholder="مثال: High School Certificate" 
+                               class="w-full text-xs px-3 py-2 border border-slate-300 rounded-lg outline-none focus:ring-2 focus:ring-amber-500">
+                    </div>
+
+                    <div class="grid grid-cols-2 gap-3">
+                        <div>
+                            <label class="block text-[11px] font-bold text-slate-650 mb-1">الرمز الفريد (Code):</label>
+                            <input type="text" id="doc_code" required placeholder="مثال: HS" 
+                                   class="w-full text-xs px-3 py-2 border border-slate-300 rounded-lg outline-none focus:ring-2 focus:ring-amber-500 font-mono uppercase">
+                            <span class="text-[9px] text-rose-500 block mt-1">يمنع التكرار نهائياً!</span>
+                        </div>
+                        <div>
+                            <label class="block text-[11px] font-bold text-slate-650 mb-1">الترتيب:</label>
+                            <input type="number" id="doc_order" required min="1" placeholder="مثال: 1" 
+                                   class="w-full text-xs px-3 py-2 border border-slate-300 rounded-lg outline-none focus:ring-2 focus:ring-amber-500">
+                        </div>
+                    </div>
+
+                    <div>
+                        <label class="block text-[11px] font-bold text-slate-650 mb-1">مسار المجلد الفرعي (Storage Path):</label>
+                        <input type="text" id="doc_storage" required placeholder="مثال: HS/" 
+                               class="w-full text-xs px-3 py-2 border border-slate-300 rounded-lg outline-none focus:ring-2 focus:ring-amber-500 font-mono">
+                    </div>
+
+                    <div class="grid grid-cols-2 gap-3">
+                        <div>
+                            <label class="block text-[11px] font-bold text-slate-650 mb-1">الحجم الأقصى (MB):</label>
+                            <input type="number" id="doc_size" required min="1" placeholder="مثال: 5" 
+                                   class="w-full text-xs px-3 py-2 border border-slate-300 rounded-lg outline-none focus:ring-2 focus:ring-amber-500">
+                        </div>
+                        <div>
+                            <label class="block text-[11px] font-bold text-slate-650 mb-1">نوع الوثيقة:</label>
+                            <select id="doc_required" class="w-full text-xs px-3 py-2 border border-slate-300 rounded-lg outline-none focus:ring-2 focus:ring-amber-500">
+                                <option value="true">إلزامية (Required)</option>
+                                <option value="false">اختيارية (Optional)</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div>
+                        <label class="block text-[11px] font-bold text-slate-650 mb-1">الامتدادات المسموحة (مفصولة بفاصلة):</label>
+                        <input type="text" id="doc_exts" required placeholder="pdf, jpg, jpeg" 
+                               class="w-full text-xs px-3 py-2 border border-slate-300 rounded-lg outline-none focus:ring-2 focus:ring-amber-500 font-mono">
+                    </div>
+
+                    <div>
+                        <label class="block text-[11px] font-bold text-indigo-700 mb-1 flex items-center gap-1">
+                            🔑 الكلمات الدلالية والمفتاحية لـ OCR (مفصولة بفاصلة):
+                        </label>
+                        <input type="text" id="doc_keywords" placeholder="مثال: ثانوية, معدل, دراسي, علمي" 
+                               class="w-full text-xs px-3 py-2 border border-indigo-300 rounded-lg outline-none focus:ring-2 focus:ring-indigo-500 font-semibold bg-indigo-50/30">
+                        <span class="text-[9px] text-indigo-500 block mt-1">يستخدمها النظام للتعرف التلقائي على الوثيقة الممسوحة ضوئياً.</span>
+                    </div>
+
+                    <div class="pt-3 flex gap-2">
+                        <button type="submit" class="w-full bg-amber-500 hover:bg-amber-600 text-white text-xs font-bold py-2.5 rounded-lg transition-all shadow-xs">
+                            💾 حفظ التغييرات
+                        </button>
+                        <button type="button" onclick="resetForm()" class="bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold px-3 py-2.5 rounded-lg border border-slate-200">
+                            إلغاء
+                        </button>
+                    </div>
+                </form>
+            </section>
+
+            <section class="lg:col-span-2 space-y-4">
+                <div class="bg-white p-4 rounded-xl shadow-sm border border-slate-100 flex justify-between items-center">
+                    <h3 class="font-bold text-xs text-slate-800 flex items-center gap-1.5">
+                        📂 قائمة الوثائق المعرفة بالنظام حالياً
+                    </h3>
+                    <span id="doc_count" class="bg-amber-50 text-amber-700 text-[10px] font-bold px-2 py-1 rounded-full border border-amber-200">0 وثائق</span>
+                </div>
+
+                <div id="documents_list" class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    </div>
+            </section>
+
+        </div>
+    </main>
+
+    <footer class="bg-white border-t border-gray-200 py-4 text-center text-[10px] text-slate-400">
+        شاشة إدارة قواعد الثوابت والمستندات - نظام الأرشفة الذكي
+    </footer>
+
+    <script>
+        let systemDocuments = {};
+
+        window.addEventListener('DOMContentLoaded', loadConstantsFromServer);
+
+        // 1. جلب بيانات doc_types.json من الخادم
+        async function loadConstantsFromServer() {
+            try {
+                const response = await fetch('/api/get-constants');
+                const result = await response.json();
+                if(result.success) {
+                    systemDocuments = result.document_types;
+                    renderDocumentCards();
+                } else {
+                    showAlert("فشل جلب ملف الثوابت من الخادم.", false);
+                }
+            } catch (err) {
+                showAlert("لا يمكن الاتصال بخادم الباك إند.", false);
+            }
+        }
+
+        // 2. رسم بطاقات الوثائق بشكل مرئي
+        function renderDocumentCards() {
+            const container = document.getElementById('documents_list');
+            container.innerHTML = '';
+            
+            const keys = Object.keys(systemDocuments);
+            document.getElementById('doc_count').innerText = `${keys.length} وثائق`;
+
+            keys.forEach(key => {
+                const doc = systemDocuments[key];
+                const card = document.createElement('div');
+                card.className = "bg-white p-5 rounded-2xl shadow-xs border border-slate-150 hover:shadow-md transition-all space-y-3 flex flex-col justify-between";
+                
+                const requiredBadge = doc.required 
+                    ? `<span class="bg-red-50 text-red-700 border border-red-200 text-[9px] font-bold px-2 py-0.5 rounded-full">إلزامية</span>`
+                    : `<span class="bg-slate-50 text-slate-500 border border-slate-200 text-[9px] font-bold px-2 py-0.5 rounded-full">اختيارية</span>`;
+
+                // استعراض الكلمات الدلالية في الكرت بشكل أنيق
+                const keywordsList = (doc.ocr_keywords && doc.ocr_keywords.length > 0)
+                    ? doc.ocr_keywords.map(kw => `<span class="bg-indigo-50 text-indigo-700 border border-indigo-150 px-1.5 py-0.5 rounded text-[9px] font-semibold">${kw}</span>`).join(' ')
+                    : `<span class="text-slate-400 text-[9px] italic">لا يوجد كلمات دلالية</span>`;
+
+                card.innerHTML = `
+                    <div class="space-y-2">
+                        <div class="flex justify-between items-start">
+                            <span class="bg-amber-100 text-amber-800 text-[10px] font-mono font-bold px-2.5 py-0.5 rounded border border-amber-200 uppercase">${doc.code}</span>
+                            ${requiredBadge}
+                        </div>
+                        <div>
+                            <h4 class="font-bold text-xs text-slate-800">${doc.name_ar}</h4>
+                            <p class="text-[10px] text-slate-400 font-mono">${doc.name_en}</p>
+                        </div>
+                        <div class="text-[10px] space-y-1.5 text-slate-500 border-t pt-2">
+                            <div>📁 المسار: <span class="font-mono text-slate-700">${doc.storage_path}</span></div>
+                            <div>💾 الحجم الأقصى: <span class="font-mono text-slate-700">${doc.max_size_mb} MB</span></div>
+                            <div>🔧 الامتدادات: <span class="font-mono text-slate-700">${doc.allowed_extensions.join(', ')}</span></div>
+                            <div class="pt-1 flex flex-wrap gap-1 items-center">
+                                <span class="text-slate-600 font-bold">🔑 الكلمات:</span> ${keywordsList}
+                            </div>
+                        </div>
+                    </div>
+                    <div class="flex gap-2 pt-2 border-t justify-end">
+                        <button onclick="prepareEdit('${key}')" class="bg-blue-50 hover:bg-blue-100 text-blue-700 text-[10px] font-bold px-3 py-1.5 rounded-lg border border-blue-200 transition-all">
+                            ✏️ تعديل
+                        </button>
+                        <button onclick="deleteDocument('${key}')" class="bg-rose-50 hover:bg-rose-100 text-rose-700 text-[10px] font-bold px-3 py-1.5 rounded-lg border border-rose-200 transition-all">
+                            🗑️ حذف
+                        </button>
+                    </div>
+                `;
+                container.appendChild(card);
+            });
+        }
+
+        // 3. التحضير لعملية التعديل وتعبئة حقول الـ Form
+        function prepareEdit(key) {
+            const doc = systemDocuments[key];
+            document.getElementById('form_title').innerHTML = `✏️ تعديل الوثيقة: ${key}`;
+            document.getElementById('original_name').value = key;
+
+            document.getElementById('doc_name_ar').value = doc.name_ar;
+            document.getElementById('doc_name_en').value = doc.name_en;
+            document.getElementById('doc_code').value = doc.code;
+            document.getElementById('doc_order').value = doc.order;
+            document.getElementById('doc_storage').value = doc.storage_path;
+            document.getElementById('doc_size').value = doc.max_size_mb;
+            document.getElementById('doc_required').value = doc.required.toString();
+            document.getElementById('doc_exts').value = doc.allowed_extensions.join(', ');
+            document.getElementById('doc_keywords').value = doc.ocr_keywords ? doc.ocr_keywords.join(', ') : '';
+        }
+
+        // 4. حفظ أو تعديل الوثيقة مع فحص منع تكرار الرمز ومزامنة الإكسل
+        async function saveDocument(event) {
+            event.preventDefault();
+
+            const originalName = document.getElementById('original_name').value;
+            const nameAr = document.getElementById('doc_name_ar').value.trim();
+            const nameEn = document.getElementById('doc_name_en').value.trim();
+            const code = document.getElementById('doc_code').value.trim().toUpperCase();
+            const order = parseInt(document.getElementById('doc_order').value);
+            const storage = document.getElementById('doc_storage').value.trim();
+            const size = parseInt(document.getElementById('doc_size').value);
+            const required = document.getElementById('doc_required').value === "true";
+            const allowedExtensions = document.getElementById('doc_exts').value.split(',').map(ext => ext.trim().toLowerCase());
+            
+            const rawKeywords = document.getElementById('doc_keywords').value;
+            const ocrKeywords = rawKeywords 
+                ? rawKeywords.split(',').map(kw => kw.trim()).filter(kw => kw.length > 0)
+                : [];
+
+            // جلب مسار ملف الإكسل المخزن في ذاكرة متصفح الموظف لإجراء التزامن
+            const excelPath = localStorage.getItem('excel_path') || '';
+
+            // فحص منع تكرار الرمز الفريد (Code)
+            for (let currentKey in systemDocuments) {
+                if (originalName && currentKey === originalName) {
+                    continue;
+                }
+                if (systemDocuments[currentKey].code.toUpperCase() === code) {
+                    showAlert(`❌ خطأ أمني: الرمز [${code}] محجوز ومستعمل بالفعل لوثيقة أخرى (${systemDocuments[currentKey].name_ar}). يرجى اختيار رمز فريد آخر!`, false);
+                    return;
+                }
+            }
+
+            const updatedDoc = {
+                name_ar: nameAr,
+                name_en: nameEn,
+                code: code,
+                required: required,
+                order: order,
+                storage_path: storage,
+                allowed_extensions: allowedExtensions,
+                max_size_mb: size,
+                ocr_keywords: ocrKeywords
+            };
+
+            try {
+                const response = await fetch('/api/save-constant', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        original_name: originalName,
+                        doc_key: nameAr,
+                        doc_data: updatedDoc,
+                        excel_path: excelPath // تمرير مسار الإكسل للمزامنة
+                    })
+                });
+
+                const result = await response.json();
+                if(result.success) {
+                    showAlert(result.message, true);
+                    resetForm();
+                    loadConstantsFromServer();
+                } else {
+                    showAlert(result.message, false);
+                }
+            } catch (err) {
+                showAlert("حدث خطأ أثناء الاتصال بالخادم لحفظ التعديلات.", false);
+            }
+        }
+
+        // 5. حذف وثيقة من النظام ومن ملف الإكسل
+        async function deleteDocument(key) {
+            if(!confirm(`هل أنت متأكد تماماً من رغبتك في حذف الوثيقة (${key}) نهائياً؟ سيؤدي ذلك أيضاً لحذف العمود الخاص بها من ملف الإكسل!`)) {
+                return;
+            }
+
+            // جلب مسار ملف الإكسل لإجراء عملية تنظيف للعمود المحذوف
+            const excelPath = localStorage.getItem('excel_path') || '';
+
+            try {
+                const response = await fetch('/api/delete-constant', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ 
+                        doc_key: key,
+                        excel_path: excelPath // تمرير المسار لحذف العمود المقابل
+                    })
+                });
+
+                const result = await response.json();
+                if(result.success) {
+                    showAlert(result.message, true);
+                    loadConstantsFromServer();
+                } else {
+                    showAlert(result.message, false);
+                }
+            } catch (err) {
+                showAlert("حدث خطأ في الاتصال بالخادم أثناء محاولة الحذف.", false);
+            }
+        }
+
+        // إعادة ضبط الاستمارة
+        function resetForm() {
+            document.getElementById('doc_form').reset();
+            document.getElementById('original_name').value = "";
+            document.getElementById('form_title').innerHTML = `➕ إضافة وثيقة جديدة للنظام`;
+        }
+
+        function showAlert(text, isSuccess) {
+            const el = document.getElementById('alert_box');
+            el.innerText = text;
+            el.className = `p-4 rounded-xl text-xs font-semibold block shadow-xs transition-all ${
+                isSuccess 
+                ? 'bg-emerald-50 text-emerald-800 border border-emerald-200' 
+                : 'bg-rose-50 text-rose-800 border border-rose-200'
+            }`;
+        }
+    </script>
+</body>
+</html>

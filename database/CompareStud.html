@@ -1,0 +1,665 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>أداة مقارنة ملفي إكسل</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+  :root{
+    --bg:#0f1419; --panel:#1a222c; --panel2:#222d39; --line:#2d3a47;
+    --txt:#e8edf2; --muted:#93a1ad; --accent:#3d8bff; --accent2:#2563eb;
+    --match:#16321f; --match-b:#2ea043; --only-a:#3a2417; --only-a-b:#e3742e;
+    --only-b:#33291a; --only-b-b:#d4a017; --diff:#3a1f2b; --diff-b:#d6336c;
+    --radius:12px; --shadow:0 4px 24px rgba(0,0,0,.35);
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{
+    font-family:"Segoe UI","Tahoma",sans-serif; background:var(--bg);
+    color:var(--txt); line-height:1.6; padding:24px; min-height:100vh;
+  }
+  .wrap{max-width:1280px;margin:0 auto}
+  header{text-align:center;margin-bottom:28px}
+  header h1{font-size:26px;font-weight:700;letter-spacing:-.3px}
+  header p{color:var(--muted);margin-top:6px;font-size:14px}
+  .step{
+    background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);
+    padding:22px;margin-bottom:18px;box-shadow:var(--shadow);
+  }
+  .step-title{
+    display:flex;align-items:center;gap:10px;font-size:17px;font-weight:600;
+    margin-bottom:16px;
+  }
+  .step-num{
+    background:var(--accent2);color:#fff;width:28px;height:28px;border-radius:50%;
+    display:grid;place-items:center;font-size:14px;font-weight:700;flex-shrink:0;
+  }
+  .files-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+  @media(max-width:760px){.files-grid{grid-template-columns:1fr}}
+  .file-box{
+    border:2px dashed var(--line);border-radius:var(--radius);padding:18px;
+    text-align:center;transition:.2s;background:var(--panel2);
+  }
+  .file-box.loaded{border-color:var(--match-b);border-style:solid}
+  .file-box label{font-weight:600;display:block;margin-bottom:10px;font-size:15px}
+  .file-box input[type=file]{
+    width:100%;padding:9px;background:var(--bg);border:1px solid var(--line);
+    border-radius:8px;color:var(--txt);font-family:inherit;cursor:pointer;
+  }
+  .file-info{margin-top:10px;font-size:13px;color:var(--muted);min-height:18px}
+  .file-info.ok{color:var(--match-b)}
+  .sheet-sel{margin-top:10px;display:none}
+  select,input[type=text]{
+    width:100%;padding:9px;background:var(--bg);border:1px solid var(--line);
+    border-radius:8px;color:var(--txt);font-family:inherit;font-size:14px;
+  }
+  .radio-row{display:flex;gap:12px;flex-wrap:wrap}
+  .radio-card{
+    flex:1;min-width:180px;border:2px solid var(--line);border-radius:var(--radius);
+    padding:14px;cursor:pointer;transition:.2s;background:var(--panel2);
+  }
+  .radio-card.active{border-color:var(--accent);background:#17304f}
+  .radio-card input{display:none}
+  .radio-card .rc-title{font-weight:600;font-size:15px}
+  .radio-card .rc-desc{color:var(--muted);font-size:13px;margin-top:4px}
+  .cols-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+  @media(max-width:760px){.cols-grid{grid-template-columns:1fr}}
+  .col-panel{background:var(--panel2);border:1px solid var(--line);border-radius:var(--radius);padding:16px}
+  .col-panel h3{font-size:15px;margin-bottom:12px;color:var(--accent);font-weight:600}
+  .field{margin-bottom:14px}
+  .field label{display:block;font-size:13px;color:var(--muted);margin-bottom:6px}
+  .chk-list{
+    max-height:240px;overflow-y:auto;border:1px solid var(--line);border-radius:8px;
+    padding:8px;background:var(--bg);
+    display:flex;flex-wrap:wrap;flex-direction:row;direction:rtl;gap:6px;
+  }
+  .chk-item{display:flex;align-items:center;gap:8px;padding:6px 10px;border-radius:6px;cursor:pointer;
+    border:1px solid var(--line);background:var(--panel)}
+  .chk-item:hover{background:var(--bg);border-color:var(--accent)}
+  .chk-item input{width:16px;height:16px;cursor:pointer;accent-color:var(--accent)}
+  .chk-item span{font-size:14px}
+  .col-num{font-size:11px;color:var(--muted);background:var(--bg);border-radius:4px;padding:1px 6px;min-width:20px;text-align:center}
+  .progress-track{height:14px;background:var(--bg);border:1px solid var(--line);border-radius:20px;overflow:hidden}
+  .progress-fill{height:100%;width:0%;border-radius:20px;background:linear-gradient(90deg,var(--accent),#2dd4bf);transition:width .15s ease}
+  .mini-actions{display:flex;gap:8px;margin-bottom:8px}
+  .mini-btn{
+    font-size:12px;padding:4px 10px;background:var(--panel);border:1px solid var(--line);
+    border-radius:6px;color:var(--muted);cursor:pointer;
+  }
+  .mini-btn:hover{color:var(--txt);border-color:var(--accent)}
+  .opts-row{display:flex;gap:18px;flex-wrap:wrap;margin-top:8px}
+  .opt-toggle{display:flex;align-items:center;gap:8px;font-size:14px;cursor:pointer;color:var(--muted)}
+  .opt-toggle input{width:16px;height:16px;accent-color:var(--accent)}
+  .btn{
+    background:linear-gradient(135deg,var(--accent),var(--accent2));color:#fff;border:none;
+    padding:13px 28px;border-radius:10px;font-size:16px;font-weight:600;cursor:pointer;
+    font-family:inherit;transition:.2s;
+  }
+  .btn:hover{filter:brightness(1.1)}
+  .btn:disabled{opacity:.4;cursor:not-allowed;filter:none}
+  .btn-row{display:flex;gap:12px;flex-wrap:wrap;align-items:center}
+  .btn-ghost{background:var(--panel2);border:1px solid var(--line);color:var(--txt)}
+  .hidden{display:none!important}
+  .summary{display:flex;gap:14px;flex-wrap:wrap;margin-bottom:18px}
+  .stat{
+    flex:1;min-width:140px;padding:14px;border-radius:var(--radius);text-align:center;
+    border:1px solid var(--line);background:var(--panel2);
+  }
+  .stat .num{font-size:26px;font-weight:700}
+  .stat .lbl{font-size:13px;color:var(--muted);margin-top:4px}
+  .stat.s-match{border-color:var(--match-b)} .stat.s-match .num{color:var(--match-b)}
+  .stat.s-a{border-color:var(--only-a-b)} .stat.s-a .num{color:var(--only-a-b)}
+  .stat.s-b{border-color:var(--only-b-b)} .stat.s-b .num{color:var(--only-b-b)}
+  .stat.s-diff{border-color:var(--diff-b)} .stat.s-diff .num{color:var(--diff-b)}
+  .filter-row{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px;align-items:center}
+  .filter-chip{
+    padding:6px 14px;border-radius:20px;border:1px solid var(--line);background:var(--panel2);
+    cursor:pointer;font-size:13px;color:var(--muted);user-select:none;
+  }
+  .filter-chip.active{background:var(--accent2);color:#fff;border-color:var(--accent)}
+  .search-box{margin-right:auto;max-width:260px}
+  .table-wrap{overflow-x:auto;border:1px solid var(--line);border-radius:var(--radius)}
+  table{border-collapse:collapse;width:100%;font-size:13px}
+  th,td{padding:9px 12px;text-align:right;border-bottom:1px solid var(--line);white-space:nowrap}
+  th{background:var(--panel2);position:sticky;top:0;font-weight:600;z-index:1}
+  tr.r-match{background:var(--match)} tr.r-match td:first-child{border-right:3px solid var(--match-b)}
+  tr.r-a{background:var(--only-a)} tr.r-a td:first-child{border-right:3px solid var(--only-a-b)}
+  tr.r-b{background:var(--only-b)} tr.r-b td:first-child{border-right:3px solid var(--only-b-b)}
+  tr.r-diff{background:var(--diff)} tr.r-diff td:first-child{border-right:3px solid var(--diff-b)}
+  .tag{font-size:11px;padding:2px 8px;border-radius:10px;font-weight:600}
+  .tag-match{background:var(--match-b);color:#03260f}
+  .tag-a{background:var(--only-a-b);color:#2a1303}
+  .tag-b{background:var(--only-b-b);color:#2a2103}
+  .tag-diff{background:var(--diff-b);color:#2a0512}
+  td.cell-diff{font-weight:700;color:#ff9ec3}
+  .empty{padding:40px;text-align:center;color:var(--muted)}
+  .legend{display:flex;gap:16px;flex-wrap:wrap;font-size:12px;color:var(--muted);margin-top:12px}
+  .legend span{display:flex;align-items:center;gap:6px}
+  .swatch{width:14px;height:14px;border-radius:3px;display:inline-block}
+  .note{font-size:13px;color:var(--muted);background:var(--panel2);padding:10px 14px;border-radius:8px;border-right:3px solid var(--accent);margin-top:12px}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>🔍 أداة مقارنة ملفي إكسل</h1>
+    <p>قارن بين ملفين، حدّد المفتاح والأعمدة، واعرض النتائج بتمييز لوني — كل المعالجة تتم داخل متصفحك</p>
+  </header>
+
+  <!-- خطوة 1: رفع الملفين -->
+  <div class="step">
+    <div class="step-title"><span class="step-num">1</span> رفع الملفين</div>
+    <div class="files-grid">
+      <div class="file-box" id="boxA">
+        <label>📄 الملف الأول (A)</label>
+        <input type="file" id="fileA" accept=".xlsx,.xls,.csv">
+        <div class="file-info" id="infoA">لم يتم اختيار ملف</div>
+        <div class="sheet-sel" id="sheetSelA">
+          <label style="font-size:13px;color:var(--muted);margin:8px 0 4px;display:block">اختر الورقة (Sheet):</label>
+          <select id="sheetA"></select>
+        </div>
+      </div>
+      <div class="file-box" id="boxB">
+        <label>📄 الملف الثاني (B)</label>
+        <input type="file" id="fileB" accept=".xlsx,.xls,.csv">
+        <div class="file-info" id="infoB">لم يتم اختيار ملف</div>
+        <div class="sheet-sel" id="sheetSelB">
+          <label style="font-size:13px;color:var(--muted);margin:8px 0 4px;display:block">اختر الورقة (Sheet):</label>
+          <select id="sheetB"></select>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- خطوة 2: نوع المقارنة + الملف الأساس -->
+  <div class="step hidden" id="step2">
+    <div class="step-title"><span class="step-num">2</span> نوع المقارنة</div>
+    <div class="radio-row">
+      <label class="radio-card active" id="rcNum">
+        <input type="radio" name="cmpType" value="number" checked>
+        <div class="rc-title">🔢 مقارنة حسب الرقم</div>
+        <div class="rc-desc">مطابقة دقيقة (رقم هوية، رقم طالب، رقم وظيفي...)</div>
+      </label>
+      <label class="radio-card" id="rcName">
+        <input type="radio" name="cmpType" value="name">
+        <div class="rc-title">👤 مقارنة حسب الاسم</div>
+        <div class="rc-desc">مطابقة ذكية للأسماء العربية (تطبيع + تقريبية)</div>
+      </label>
+    </div>
+    <div class="field" style="margin-top:16px">
+      <label>الملف الأساس للمطابقة (يُطابَق كل صف فيه مع الملف الآخر):</label>
+      <select id="baseFile">
+        <option value="A">الملف A هو الأساس</option>
+        <option value="B">الملف B هو الأساس</option>
+      </select>
+    </div>
+  </div>
+
+  <!-- خطوة 3: المفاتيح والأعمدة -->
+  <div class="step hidden" id="step3">
+    <div class="step-title"><span class="step-num">3</span> تحديد عمود المطابقة (المفتاح) والأعمدة المطلوبة للعرض</div>
+    <div class="cols-grid">
+      <div class="col-panel">
+        <h3 id="titleA">الملف A</h3>
+        <div class="field">
+          <label>عمود المطابقة (المفتاح) في الملف A:</label>
+          <select id="keyA"></select>
+        </div>
+        <div class="field">
+          <label>الأعمدة المطلوب عرضها من الملف A:</label>
+          <div class="mini-actions">
+            <span class="mini-btn" onclick="toggleAll('A',true)">تحديد الكل</span>
+            <span class="mini-btn" onclick="toggleAll('A',false)">إلغاء الكل</span>
+          </div>
+          <div class="chk-list" id="colsA"></div>
+        </div>
+      </div>
+      <div class="col-panel">
+        <h3 id="titleB">الملف B</h3>
+        <div class="field">
+          <label>عمود المطابقة (المفتاح) في الملف B:</label>
+          <select id="keyB"></select>
+        </div>
+        <div class="field">
+          <label>الأعمدة المطلوب عرضها من الملف B:</label>
+          <div class="mini-actions">
+            <span class="mini-btn" onclick="toggleAll('B',true)">تحديد الكل</span>
+            <span class="mini-btn" onclick="toggleAll('B',false)">إلغاء الكل</span>
+          </div>
+          <div class="chk-list" id="colsB"></div>
+        </div>
+      </div>
+    </div>
+    <div class="opts-row">
+      <label class="opt-toggle"><input type="checkbox" id="optNormalize" checked> تطبيع النص العربي (توحيد كل أشكال الألف والهمزة إلى ا، حذف الهمزة المنفردة، ة=ه، ى=ي، إزالة التشكيل والرموز)</label>
+      <label class="opt-toggle" id="fuzzyWrap"><input type="checkbox" id="optFuzzy"> مطابقة تقريبية للأسماء (للاختلافات البسيطة)</label>
+    </div>
+    <div class="note" id="fuzzyNote" style="display:none">المطابقة التقريبية تعتبر اسمين متطابقين إذا تجاوز التشابه بينهما 85% بعد التطبيع — مفيدة لاختلاف ترتيب أو حذف جزء بسيط من الاسم.</div>
+    <div class="btn-row" style="margin-top:18px">
+      <button class="btn" id="runBtn">⚡ تنفيذ المقارنة</button>
+    </div>
+    <div id="progressWrap" style="display:none;margin-top:16px">
+      <div style="display:flex;justify-content:space-between;font-size:13px;color:var(--muted);margin-bottom:6px">
+        <span id="progressLabel">جارٍ المقارنة...</span>
+        <span id="progressPct">0%</span>
+      </div>
+      <div class="progress-track"><div class="progress-fill" id="progressFill"></div></div>
+    </div>
+  </div>
+
+  <!-- خطوة 4: النتائج -->
+  <div class="step hidden" id="step4">
+    <div class="step-title"><span class="step-num">4</span> النتائج</div>
+    <div class="summary" id="summary"></div>
+    <div class="filter-row">
+      <span class="filter-chip active" data-f="all">الكل</span>
+      <span class="filter-chip" data-f="match">متطابق</span>
+      <span class="filter-chip" data-f="diff">متطابق المفتاح / مختلف القيم</span>
+      <span class="filter-chip" data-f="a">في A فقط</span>
+      <span class="filter-chip" data-f="b">في B فقط</span>
+      <input type="text" class="search-box" id="searchBox" placeholder="🔎 بحث في النتائج...">
+    </div>
+    <div class="table-wrap">
+      <table id="resultTable"><thead></thead><tbody></tbody></table>
+    </div>
+    <div class="legend">
+      <span><span class="swatch" style="background:var(--match-b)"></span> متطابق</span>
+      <span><span class="swatch" style="background:var(--diff-b)"></span> مفتاح متطابق وقيم مختلفة</span>
+      <span><span class="swatch" style="background:var(--only-a-b)"></span> في A فقط</span>
+      <span><span class="swatch" style="background:var(--only-b-b)"></span> في B فقط</span>
+    </div>
+    <div class="btn-row" style="margin-top:18px">
+      <button class="btn" id="exportBtn">📥 تصدير النتائج إلى Excel</button>
+      <button class="btn" id="exportUnifiedBtn">✨ استخراج الملف الجديد (موحّد) Excel</button>
+      <button class="btn btn-ghost" id="resetBtn">🔄 مقارنة جديدة (مسح الكل)</button>
+    </div>
+  </div>
+</div>
+
+<script>
+/* ============ الحالة العامة ============ */
+const S = {
+  A:{wb:null,rows:[],cols:[],name:""},
+  B:{wb:null,rows:[],cols:[],name:""},
+  results:[], headers:[]
+};
+
+/* ============ قراءة الملف ============ */
+function readFile(which){
+  const input = document.getElementById('file'+which);
+  const file = input.files[0];
+  if(!file) return;
+  const info = document.getElementById('info'+which);
+  info.textContent = 'جارٍ القراءة...'; info.className='file-info';
+  const reader = new FileReader();
+  reader.onload = e=>{
+    try{
+      const wb = XLSX.read(e.target.result,{type:'array'});
+      S[which].wb = wb; S[which].name = file.name;
+      const sel = document.getElementById('sheet'+which);
+      sel.innerHTML = wb.SheetNames.map(n=>`<option>${n}</option>`).join('');
+      document.getElementById('sheetSel'+which).style.display = wb.SheetNames.length>1?'block':'none';
+      loadSheet(which);
+      info.textContent = `✓ ${file.name}`; info.className='file-info ok';
+      document.getElementById('box'+which).classList.add('loaded');
+    }catch(err){ info.textContent='خطأ في قراءة الملف: '+err.message; }
+  };
+  reader.readAsArrayBuffer(file);
+}
+function loadSheet(which){
+  const sheetName = document.getElementById('sheet'+which).value || S[which].wb.SheetNames[0];
+  const ws = S[which].wb.Sheets[sheetName];
+  const json = XLSX.utils.sheet_to_json(ws,{defval:'',raw:false});
+  S[which].rows = json;
+  S[which].cols = json.length ? Object.keys(json[0]) : [];
+  maybeShowSteps();
+}
+['A','B'].forEach(w=>{
+  document.getElementById('file'+w).addEventListener('change',()=>readFile(w));
+  document.getElementById('sheet'+w).addEventListener('change',()=>{loadSheet(w);buildColumnUI();});
+});
+
+/* ============ إظهار الخطوات ============ */
+function maybeShowSteps(){
+  if(S.A.cols.length && S.B.cols.length){
+    document.getElementById('step2').classList.remove('hidden');
+    document.getElementById('step3').classList.remove('hidden');
+    buildColumnUI();
+  }
+}
+function buildColumnUI(){
+  document.getElementById('titleA').textContent = 'الملف A — '+(S.A.name||'');
+  document.getElementById('titleB').textContent = 'الملف B — '+(S.B.name||'');
+  ['A','B'].forEach(w=>{
+    const keySel = document.getElementById('key'+w);
+    keySel.innerHTML = S[w].cols.map(c=>`<option value="${esc(c)}">${esc(c)}</option>`).join('');
+    const list = document.getElementById('cols'+w);
+    list.innerHTML = S[w].cols.map((c,i)=>`
+      <label class="chk-item" title="العمود رقم ${i+1} في الملف"><input type="checkbox" value="${esc(c)}" checked><span class="col-num">${i+1}</span><span>${esc(c)}</span></label>
+    `).join('');
+  });
+}
+function toggleAll(which,val){
+  document.querySelectorAll('#cols'+which+' input').forEach(c=>c.checked=val);
+}
+
+/* ============ نوع المقارنة UI ============ */
+document.querySelectorAll('input[name=cmpType]').forEach(r=>{
+  r.addEventListener('change',()=>{
+    document.getElementById('rcNum').classList.toggle('active',r.value==='number'&&r.checked);
+    document.getElementById('rcName').classList.toggle('active',r.value==='name'&&r.checked);
+    const isName = document.querySelector('input[name=cmpType]:checked').value==='name';
+    document.getElementById('fuzzyWrap').style.opacity = isName?'1':'.4';
+    document.getElementById('optFuzzy').disabled = !isName;
+    if(!isName) document.getElementById('optFuzzy').checked=false;
+    document.getElementById('fuzzyNote').style.display = (isName&&document.getElementById('optFuzzy').checked)?'block':'none';
+  });
+});
+document.getElementById('optFuzzy').addEventListener('change',e=>{
+  document.getElementById('fuzzyNote').style.display = e.target.checked?'block':'none';
+});
+
+/* ============ التطبيع والمطابقة ============ */
+function normalizeArabic(s){
+  if(s==null) return '';
+  s = String(s).trim();
+  s = s.replace(/[\u064B-\u0652\u0670\u0640]/g,'');      // تشكيل + تطويل
+  // توحيد كل أشكال الألف والهمزة إلى ألف عادية (إ أ آ ا ٱ ء)
+  s = s.replace(/[إأآاٱ]/g,'ا');
+  s = s.replace(/[ؤئء]/g,'');          // حذف الهمزة المنفردة وعلى الواو/الياء تماماً
+  s = s.replace(/ة/g,'ه');             // التاء المربوطة = هاء
+  s = s.replace(/ى/g,'ي');             // الألف المقصورة = ياء
+  s = s.replace(/ي/g,'ي');             // توحيد الياء
+  // إزالة أي محرف غير حرف عربي أساسي أو أي فاصل/رمز، ثم حذف المسافات
+  s = s.replace(/[^\u0621-\u064A]/g,'');
+  return s;
+}
+function keyVal(raw,type,normalize){
+  if(type==='number'){
+    let v = String(raw==null?'':raw).replace(/[^\d]/g,'');
+    return v;
+  }
+  return normalize ? normalizeArabic(raw) : String(raw==null?'':raw).trim();
+}
+// مقارنة قيمتين: للأرقام نقارن الأرقام فقط، وللنصوص نطبّق التطبيع العربي عند تفعيله
+function valuesEqual(va,vb,type,normalize){
+  const a=String(va==null?'':va).trim();
+  const b=String(vb==null?'':vb).trim();
+  // إذا كانت القيمة رقمية بحتة، قارن بعد إزالة غير الأرقام
+  const onlyDigits=s=>s.replace(/[^\d]/g,'');
+  const aD=onlyDigits(a), bD=onlyDigits(b);
+  if(aD!==''&&bD!==''&&aD===a.replace(/[\s\-+.]/g,'')&&bD===b.replace(/[\s\-+.]/g,'')){
+    return aD===bD;
+  }
+  if(normalize){
+    // طبّق التطبيع العربي على النصوص لتجاهل اختلاف الهمزة/الألف/ة/ى
+    return normalizeArabic(a)===normalizeArabic(b);
+  }
+  return a===b;
+}
+function similarity(a,b){
+  if(a===b) return 1;
+  if(!a.length||!b.length) return 0;
+  const m=a.length,n=b.length;
+  const d=Array.from({length:m+1},(_,i)=>[i,...Array(n).fill(0)]);
+  for(let j=0;j<=n;j++) d[0][j]=j;
+  for(let i=1;i<=m;i++)for(let j=1;j<=n;j++){
+    const c=a[i-1]===b[j-1]?0:1;
+    d[i][j]=Math.min(d[i-1][j]+1,d[i][j-1]+1,d[i-1][j-1]+c);
+  }
+  return 1 - d[m][n]/Math.max(m,n);
+}
+
+/* ============ تنفيذ المقارنة ============ */
+document.getElementById('runBtn').addEventListener('click',runCompare);
+function setProgress(pct,label){
+  document.getElementById('progressFill').style.width=pct+'%';
+  document.getElementById('progressPct').textContent=Math.round(pct)+'%';
+  if(label) document.getElementById('progressLabel').textContent=label;
+}
+async function runCompare(){
+  const type = document.querySelector('input[name=cmpType]:checked').value;
+  const base = document.getElementById('baseFile').value;          // A أو B
+  const keyA = document.getElementById('key'+'A').value;
+  const keyB = document.getElementById('key'+'B').value;
+  const normalize = document.getElementById('optNormalize').checked;
+  const fuzzy = document.getElementById('optFuzzy').checked && type==='name';
+  const selA = [...document.querySelectorAll('#colsA input:checked')].map(c=>c.value);
+  const selB = [...document.querySelectorAll('#colsB input:checked')].map(c=>c.value);
+
+  if(!selA.length && !selB.length){ alert('اختر عموداً واحداً على الأقل للعرض'); return; }
+
+  const runBtn=document.getElementById('runBtn');
+  runBtn.disabled=true; runBtn.style.opacity='.6';
+  document.getElementById('progressWrap').style.display='block';
+  setProgress(0,'جارٍ تجهيز البيانات...');
+  await new Promise(r=>setTimeout(r,30));
+
+  // فهرسة الملف الثاني (غير الأساس) حسب المفتاح
+  const baseW = base, otherW = base==='A'?'B':'A';
+  const baseKey = base==='A'?keyA:keyB;
+  const otherKey = base==='A'?keyB:keyA;
+
+  const otherIndex = new Map();
+  S[otherW].rows.forEach((r,i)=>{
+    const k = keyVal(r[otherKey],type,normalize);
+    if(k==='') return;
+    if(!otherIndex.has(k)) otherIndex.set(k,[]);
+    otherIndex.get(k).push({row:r,i});
+  });
+  setProgress(8,'جارٍ مطابقة السجلات...');
+  await new Promise(r=>setTimeout(r,20));
+
+  const usedOther = new Set();
+  const results = [];
+  const baseRows = S[baseW].rows;
+  const total = baseRows.length || 1;
+  const CHUNK = 200;          // عدد الصفوف لكل دفعة قبل تحديث الشريط
+
+  for(let start=0; start<baseRows.length; start+=CHUNK){
+    const end=Math.min(start+CHUNK,baseRows.length);
+    for(let bi=start; bi<end; bi++){
+      const br=baseRows[bi];
+      const k = keyVal(br[baseKey],type,normalize);
+      let matchObj = null, matchKey = k;
+      if(k!==''){
+        if(otherIndex.has(k)){
+          const cand = otherIndex.get(k).find(c=>!usedOther.has(otherW+c.i));
+          if(cand){ matchObj=cand; }
+        } else if(fuzzy){
+          let best=null,bestScore=0;
+          otherIndex.forEach((arr,ok)=>{
+            arr.forEach(c=>{
+              if(usedOther.has(otherW+c.i)) return;
+              const sc = similarity(k,ok);
+              if(sc>bestScore){bestScore=sc;best=c;matchKey=ok;}
+            });
+          });
+          if(best && bestScore>=0.85){ matchObj=best; }
+        }
+      }
+      if(matchObj){ usedOther.add(otherW+matchObj.i); }
+      // تحديد الحالة + كشف فروق القيم
+      let status, diffCols=[];
+      if(matchObj){
+        const shared = selA.filter(c=>selB.includes(c));
+        shared.forEach(c=>{
+          const va = (base==='A'?br:matchObj.row)[c];
+          const vb = (base==='A'?matchObj.row:br)[c];
+          if(!valuesEqual(va,vb,type,normalize)) diffCols.push(c);
+        });
+        status = diffCols.length ? 'diff' : 'match';
+      } else {
+        status = base==='A'?'a':'b';
+      }
+      results.push({base:br,other:matchObj?matchObj.row:null,status,diffCols,keyShown:String(br[baseKey]??'')});
+    }
+    // 8% تجهيز + حتى 88% للمطابقة
+    setProgress(8 + (end/total)*80, 'جارٍ مطابقة السجلات... ('+end+'/'+total+')');
+    await new Promise(r=>setTimeout(r,0));   // إفساح المجال لتحديث الواجهة
+  }
+
+  // صفوف الملف الآخر التي لم تُطابَق (موجودة فيه فقط)
+  setProgress(92,'جارٍ تجميع السجلات الفريدة...');
+  await new Promise(r=>setTimeout(r,20));
+  S[otherW].rows.forEach((or,oi)=>{
+    if(usedOther.has(otherW+oi)) return;
+    const k = keyVal(or[otherKey],type,normalize);
+    if(k==='' && Object.values(or).every(v=>String(v).trim()==='')) return;
+    results.push({base:null,other:or,status:otherW==='A'?'a':'b',diffCols:[],keyShown:String(or[otherKey]??'')});
+  });
+
+  setProgress(100,'اكتملت المقارنة ✓');
+  S.results = results;
+  renderResults(selA,selB,base);
+  setTimeout(()=>{
+    document.getElementById('progressWrap').style.display='none';
+    runBtn.disabled=false; runBtn.style.opacity='1';
+  },500);
+}
+
+/* ============ عرض النتائج ============ */
+function renderResults(selA,selB,base){
+  const headers = ['الحالة','المفتاح',
+    ...selA.map(c=>'A: '+c),
+    ...selB.map(c=>'B: '+c)];
+  S.headers = headers; S.selA=selA; S.selB=selB; S.base=base;
+
+  const counts={match:0,diff:0,a:0,b:0};
+  S.results.forEach(r=>counts[r.status]++);
+  document.getElementById('summary').innerHTML = `
+    <div class="stat s-match"><div class="num">${counts.match}</div><div class="lbl">متطابق تماماً</div></div>
+    <div class="stat s-diff"><div class="num">${counts.diff}</div><div class="lbl">مفتاح متطابق / قيم مختلفة</div></div>
+    <div class="stat s-a"><div class="num">${counts.a}</div><div class="lbl">في A فقط</div></div>
+    <div class="stat s-b"><div class="num">${counts.b}</div><div class="lbl">في B فقط</div></div>`;
+
+  document.querySelector('#resultTable thead').innerHTML =
+    '<tr>'+headers.map(h=>`<th>${esc(h)}</th>`).join('')+'</tr>';
+  drawRows();
+  document.getElementById('step4').classList.remove('hidden');
+  document.getElementById('step4').scrollIntoView({behavior:'smooth'});
+}
+const tagMap={match:['tag-match','متطابق'],diff:['tag-diff','مختلف'],a:['tag-a','في A فقط'],b:['tag-b','في B فقط']};
+function drawRows(){
+  const filter = document.querySelector('.filter-chip.active').dataset.f;
+  const q = document.getElementById('searchBox').value.trim().toLowerCase();
+  const tbody = document.querySelector('#resultTable tbody');
+  const rows = S.results.filter(r=>{
+    if(filter!=='all' && r.status!==filter) return false;
+    if(q){
+      const hay = [r.keyShown,...S.selA.map(c=>r.base?.[c]??''),...S.selB.map(c=>r.other?.[c]??'')].join(' ').toLowerCase();
+      if(!hay.includes(q)) return false;
+    }
+    return true;
+  });
+  if(!rows.length){ tbody.innerHTML='<tr><td colspan="99"><div class="empty">لا توجد نتائج مطابقة للمرشّح</div></td></tr>'; return; }
+  tbody.innerHTML = rows.map(r=>{
+    const [tcls,tlbl]=tagMap[r.status];
+    const cellsA = S.selA.map(c=>{
+      const v = r.base?r.base[c]:'';
+      const diff = r.diffCols.includes(c)?'cell-diff':'';
+      return `<td class="${diff}">${esc(v??'')}</td>`;
+    }).join('');
+    const cellsB = S.selB.map(c=>{
+      const v = r.other?r.other[c]:'';
+      const diff = r.diffCols.includes(c)?'cell-diff':'';
+      return `<td class="${diff}">${esc(v??'')}</td>`;
+    }).join('');
+    return `<tr class="r-${r.status}"><td><span class="tag ${tcls}">${tlbl}</span></td><td>${esc(r.keyShown)}</td>${cellsA}${cellsB}</tr>`;
+  }).join('');
+}
+document.querySelectorAll('.filter-chip').forEach(c=>c.addEventListener('click',()=>{
+  document.querySelectorAll('.filter-chip').forEach(x=>x.classList.remove('active'));
+  c.classList.add('active'); drawRows();
+}));
+document.getElementById('searchBox').addEventListener('input',drawRows);
+
+/* ============ تصدير Excel ============ */
+document.getElementById('exportBtn').addEventListener('click',()=>{
+  const statusAr={match:'متطابق',diff:'مفتاح متطابق/قيم مختلفة',a:'في A فقط',b:'في B فقط'};
+  const data = S.results.map(r=>{
+    const o={'الحالة':statusAr[r.status],'المفتاح':r.keyShown};
+    S.selA.forEach(c=>o['A: '+c]=r.base?r.base[c]:'');
+    S.selB.forEach(c=>o['B: '+c]=r.other?r.other[c]:'');
+    return o;
+  });
+  const ws = XLSX.utils.json_to_sheet(data);
+  ws['!cols'] = S.headers.map(()=>({wch:18}));
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb,ws,'نتائج المقارنة');
+  XLSX.writeFile(wb,'نتائج_المقارنة.xlsx');
+});
+
+/* ============ استخراج الملف الجديد الموحّد ============
+   يُنتج ملف إكسل نظيفاً بالأعمدة الأصلية للملف الأساس، مع توحيد كتابة
+   الأسماء العربية (إزالة اختلاف الهمزة/الألف/ة/ى) — يشمل السجلات المتطابقة
+   ومتطابقة المفتاح. مفيد لاعتماد نسخة موحّدة من البيانات. */
+document.getElementById('exportUnifiedBtn').addEventListener('click',()=>{
+  if(!S.results || !S.results.length){ alert('نفّذ المقارنة أولاً'); return; }
+  const type = document.querySelector('input[name=cmpType]:checked').value;
+  const normalize = document.getElementById('optNormalize').checked;
+  // اعتمد أعمدة الملف الأساس كما هي
+  const base = S.base;
+  const cols = (base==='A'? S.A.cols : S.B.cols);
+  const isArabicText = v=>/[\u0621-\u064A]/.test(String(v??''));
+  // ضمّن السجلات التي تطابق مفتاحها (match أو diff). يمكن للمستخدم التصدير الكامل عبر الزر الآخر
+  const data = S.results
+    .filter(r=> r.base && (r.status==='match' || r.status==='diff'))
+    .map(r=>{
+      const o={};
+      cols.forEach(c=>{
+        let v = r.base[c];
+        // وحّد كتابة القيم النصية العربية فقط؛ اترك الأرقام كما هي
+        if(normalize && type==='name' && isArabicText(v)){
+          v = normalizeArabic(v);
+        }
+        o[c]=v==null?'':v;
+      });
+      return o;
+    });
+  if(!data.length){ alert('لا توجد سجلات متطابقة لاستخراجها'); return; }
+  const ws = XLSX.utils.json_to_sheet(data,{header:cols});
+  ws['!cols'] = cols.map(()=>({wch:20}));
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb,ws,'البيانات الموحّدة');
+  XLSX.writeFile(wb,'الملف_الجديد_الموحّد.xlsx');
+});
+
+/* ============ مقارنة جديدة: مسح كل شيء ============ */
+document.getElementById('resetBtn').addEventListener('click',()=>{
+  // مسح الحالة الداخلية
+  S.A={wb:null,rows:[],cols:[],name:""};
+  S.B={wb:null,rows:[],cols:[],name:""};
+  S.results=[]; S.headers=[]; S.selA=[]; S.selB=[]; S.base=null;
+  // مسح حقول رفع الملفات والمعلومات
+  ['A','B'].forEach(w=>{
+    document.getElementById('file'+w).value='';
+    const info=document.getElementById('info'+w);
+    info.textContent='لم يتم اختيار ملف'; info.className='file-info';
+    document.getElementById('box'+w).classList.remove('loaded');
+    document.getElementById('sheet'+w).innerHTML='';
+    document.getElementById('sheetSel'+w).style.display='none';
+    document.getElementById('cols'+w).innerHTML='';
+    document.getElementById('key'+w).innerHTML='';
+  });
+  // إخفاء الخطوات والنتائج
+  document.getElementById('step2').classList.add('hidden');
+  document.getElementById('step3').classList.add('hidden');
+  document.getElementById('step4').classList.add('hidden');
+  document.querySelector('#resultTable thead').innerHTML='';
+  document.querySelector('#resultTable tbody').innerHTML='';
+  document.getElementById('summary').innerHTML='';
+  // إعادة ضبط الخيارات والمرشّحات
+  document.getElementById('searchBox').value='';
+  document.querySelectorAll('.filter-chip').forEach(x=>x.classList.remove('active'));
+  const allChip=document.querySelector('.filter-chip[data-f="all"]');
+  if(allChip) allChip.classList.add('active');
+  // العودة لأعلى الصفحة
+  window.scrollTo({top:0,behavior:'smooth'});
+});
+
+/* ============ أدوات ============ */
+function esc(s){return String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));}
+</script>
+</body>
+</html>

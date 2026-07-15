@@ -3,194 +3,100 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>نظام الأرشفة الذكي المزدوج</title>
+    <title>بوابة نظام الأرشفة الجامعي الذكي</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@300;400;600;700&display=swap" rel="stylesheet">
     <style>
         body { font-family: 'Cairo', sans-serif; }
     </style>
 </head>
-<body class="bg-gray-50 min-h-screen flex flex-col">
+<body class="bg-slate-50 min-h-screen flex flex-col justify-between">
 
-    <header class="bg-blue-900 text-white shadow-md px-6 py-4 flex justify-between items-center">
-        <h1 class="text-xl font-bold flex items-center gap-2">
-            <span>🗃️</span> نظام الأرشفة الذكي المزدوج للجامعة
-        </h1>
-        <span class="bg-blue-800 text-xs px-3 py-1 rounded-full font-mono">الوضع المحلي النشط (Fully Local)</span>
+    <header class="bg-slate-900 text-white px-8 py-5 shadow-md">
+        <div class="max-w-7xl mx-auto flex justify-between items-center">
+            <div class="flex items-center gap-3">
+                <span class="text-3xl">🗃️</span>
+                <div>
+                    <h1 class="text-xl font-bold">منظومة الأرشفة الرقمية الذكية</h1>
+                    <p class="text-xs text-slate-400">جامعة الأرشيف الذكي | تشغيل محلي آمن</p>
+                </div>
+            </div>
+            <span class="bg-emerald-500/10 text-emerald-400 text-xs px-3 py-1 rounded-full border border-emerald-500/20 font-semibold">
+                الخادم المحلي نشط
+            </span>
+        </div>
     </header>
 
-    <main class="flex-grow p-6 max-w-7xl mx-auto w-full grid grid-cols-1 gap-6">
-        
-        <section class="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
-            <h2 class="text-lg font-bold text-gray-800 mb-4 flex items-center gap-2">
-                ⚙️ إعدادات مسارات العمل والأرشيف
-            </h2>
-            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div>
-                    <label class="block text-xs font-bold text-gray-600 mb-2">1. مسار صندوق ملفات العمل (مؤقت):</label>
-                    <input type="text" id="workspace_path" placeholder="مثال: E:\Staging_Box" 
-                           class="w-full text-sm px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none">
-                </div>
-                <div>
-                    <label class="block text-xs font-bold text-gray-600 mb-2">2. مسار الأرشيف النهائي (storage_secure):</label>
-                    <input type="text" id="archive_path" placeholder="مثال: E:\storage_secure" 
-                           class="w-full text-sm px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none">
-                </div>
-                <div>
-                    <label class="block text-xs font-bold text-gray-600 mb-2">3. مسار قاعدة البيانات (students_db.xlsx):</label>
-                    <input type="text" id="excel_path" placeholder="مثال: E:\database\students_db.xlsx" 
-                           class="w-full text-sm px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none">
-                </div>
-            </div>
+    <main class="flex-grow flex items-center justify-center p-6 my-8">
+        <div class="max-w-5xl w-full space-y-8">
             
-            <div class="mt-4 flex gap-3 justify-end">
-                <button onclick="loadDatabase()" class="bg-gray-100 hover:bg-gray-200 text-gray-700 text-sm font-bold px-4 py-2 rounded-lg transition-all">
-                    📁 تحميل قاعدة البيانات
-                </button>
-                <button onclick="triggerSync()" class="bg-blue-600 hover:bg-blue-700 text-white text-sm font-bold px-6 py-2 rounded-lg transition-all shadow-sm">
-                    ⚡ تفعيل الفحص والاعتماد (المطابقة)
-                </button>
+            <div class="text-center space-y-2">
+                <h2 class="text-2xl font-bold text-slate-800">مرحباً بك في لوحة التحكم الرئيسية</h2>
+                <p class="text-sm text-slate-500">يرجى اختيار النظام الفرعي الذي ترغب في العمل عليه الآن</p>
             </div>
-        </section>
 
-        <div id="status_message" class="hidden p-4 rounded-lg text-sm font-semibold"></div>
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                
+                <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 hover:shadow-md hover:border-blue-300 transition-all flex flex-col justify-between group">
+                    <div class="space-y-4">
+                        <div class="text-4xl p-3 bg-blue-50 rounded-xl w-fit group-hover:bg-blue-100 transition-all">⚙️</div>
+                        <h3 class="text-lg font-bold text-slate-800">إعدادات المسارات المحلية</h3>
+                        <p class="text-xs text-slate-500 leading-relaxed">
+                            التحكم وتهيئة مسارات النظام الثلاثة (صندوق ملفات العمل، الأرشيف النهائي الآمن، وقاعدة بيانات الإكسل).
+                        </p>
+                    </div>
+                    <div class="mt-6">
+                        <a href="/paths" class="block text-center bg-slate-100 hover:bg-blue-600 hover:text-white text-slate-700 text-xs font-bold py-2.5 rounded-lg transition-all">
+                            تهيئة المسارات ←
+                        </a>
+                    </div>
+                </div>
 
-        <section class="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
-            <div class="p-4 bg-gray-50 border-b border-gray-100 flex justify-between items-center">
-                <h3 class="font-bold text-gray-800">📊 سجلات ومستندات الطلاب المكتشفة</h3>
-                <input type="text" id="search_input" oninput="filterTable()" placeholder="بحث بالرقم الجامعي..." 
-                       class="text-sm px-3 py-1.5 border rounded-lg outline-none w-64 focus:ring-2 focus:ring-blue-500">
+                <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 hover:shadow-md hover:border-emerald-300 transition-all flex flex-col justify-between group">
+                    <div class="space-y-4">
+                        <div class="text-4xl p-3 bg-emerald-50 rounded-xl w-fit group-hover:bg-emerald-100 transition-all">⚡</div>
+                        <h3 class="text-lg font-bold text-slate-800">مطابقة وفحص الأرشيف</h3>
+                        <p class="text-xs text-slate-500 leading-relaxed">
+                            تشغيل معالج المطابقة الذكي لمقارنة مستندات الطلاب الفعلية مع السجلات وتحديث نسب الاكتمال في قاعدة البيانات.
+                        </p>
+                    </div>
+                    <div class="mt-6">
+                        <a href="/matching" class="block text-center bg-slate-100 hover:bg-emerald-600 hover:text-white text-slate-700 text-xs font-bold py-2.5 rounded-lg transition-all">
+                            دخول منصة المطابقة ←
+                        </a>
+                    </div>
+                </div>
+
+                <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 hover:shadow-md hover:border-amber-300 transition-all flex flex-col justify-between group">
+                    <div class="space-y-4">
+                        <div class="text-4xl p-3 bg-amber-50 rounded-xl w-fit group-hover:bg-amber-100 transition-all">📄</div>
+                        <h3 class="text-lg font-bold text-slate-800">إدارة الثوابت والمستندات</h3>
+                        <p class="text-xs text-slate-500 leading-relaxed">
+                            تعديل وضبط قواعد وثائق الطلاب الـ 7، الامتدادات المسموح بها، والأحجام القصوى بشكل مرئي كامل.
+                        </p>
+                    </div>
+                    <div class="mt-6">
+                        <a href="/constants" class="block text-center bg-slate-100 hover:bg-amber-600 hover:text-white text-slate-700 text-xs font-bold py-2.5 rounded-lg transition-all">
+                            تعديل الثوابت (JSON) ←
+                        </a>
+                    </div>
+                </div>
+
             </div>
-            
-            <div class="overflow-x-auto">
-                <table class="w-full text-right text-sm">
-                    <thead class="bg-gray-100 text-gray-700 font-bold border-b">
-                        <tr>
-                            <th class="p-3">ID (الرقم الجامعي)</th>
-                            <th class="p-3">اسم الطالب</th>
-                            <th class="p-3">الكلية</th>
-                            <th class="p-3 text-center">ثانوية (HS)</th>
-                            <th class="p-3 text-center">ميلاد (BC)</th>
-                            <th class="p-3 text-center">هوية (ID)</th>
-                            <th class="p-3 text-center">صورة (PH)</th>
-                            <th class="p-3 text-center">كشف (TR)</th>
-                            <th class="p-3 text-center">اكتمال</th>
-                            <th class="p-3 text-center">الحالة</th>
-                        </tr>
-                    </thead>
-                    <tbody id="students_table_body" class="divide-y text-gray-600">
-                        <tr>
-                            <td colspan="10" class="p-8 text-center text-gray-400">يرجى تحديد مسارات النظام والضغط على "تحميل قاعدة البيانات" لعرض البيانات.</td>
-                        </tr>
-                    </tbody>
-                </table>
+
+            <div class="bg-slate-100 border border-slate-200 rounded-xl p-4 flex items-center gap-3">
+                <span class="text-xl">🛡️</span>
+                <p class="text-[11px] text-slate-600 leading-relaxed">
+                    <strong>تنبيه أمني معماري:</strong> النظام يعمل محلياً بنسبة 100% على هذا الجهاز. لا يتم نقل أو مشاركة أي بيانات تخص الطلاب أو وثائقهم الرسمية عبر الإنترنت، وملفات التخزين الكبيرة مستثناة بالكامل من الرفع إلى GitHub لضمان السرية التامة.
+                </p>
             </div>
-        </section>
+
+        </div>
     </main>
 
-    <script>
-        // دالة لإظهار رسائل التحديث الفورية
-        function showMessage(text, isSuccess) {
-            const el = document.getElementById('status_message');
-            el.innerText = text;
-            el.className = `p-4 rounded-lg text-sm font-semibold block ${isSuccess ? 'bg-green-50 text-green-700 border border-green-200' : 'bg-red-50 text-red-700 border border-red-200'}`;
-        }
+    <footer class="bg-white border-t border-gray-200 py-4 text-center text-[10px] text-slate-400">
+        منظومة الأرشفة الرقمية المتكاملة © 2026
+    </footer>
 
-        // 1. تحميل البيانات المبدئي من الإكسل
-        async function loadDatabase() {
-            const excel_path = document.getElementById('excel_path').value;
-            if(!excel_path) {
-                alert("يرجى إدخال مسار ملف الإكسل أولاً.");
-                return;
-            }
-
-            const response = await fetch('/api/load-data', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ excel_path })
-            });
-
-            const result = await response.json();
-            if(result.success) {
-                renderTable(result.students);
-                showMessage("تم تحميل قاعدة البيانات المؤقتة بنجاح.", true);
-            } else {
-                showMessage(result.message, false);
-            }
-        }
-
-        // 2. تفعيل بروتوكول المطابقة الآمن
-        async function triggerSync() {
-            const workspace_path = document.getElementById('workspace_path').value;
-            const archive_path = document.getElementById('archive_path').value;
-            const excel_path = document.getElementById('excel_path').value;
-
-            const response = await fetch('/api/sync', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ workspace_path, archive_path, excel_path })
-            });
-
-            const result = await response.json();
-            if(result.success) {
-                renderTable(result.students);
-                showMessage(result.message, true);
-            } else {
-                showMessage(result.message, false);
-            }
-        }
-
-        // 3. بناء الجدول ديناميكياً وعرض الحالات الملونة للوثائق والنسبة
-        function renderTable(students) {
-            const tbody = document.getElementById('students_table_body');
-            tbody.innerHTML = '';
-
-            students.forEach(student => {
-                const tr = document.createElement('tr');
-                tr.className = "hover:bg-gray-50 transition-all";
-
-                // تنسيقات مخصصة للأيقونات
-                const checkIcon = (val) => val === "نعم" 
-                    ? `<span class="bg-green-100 text-green-800 text-xs font-bold px-2.5 py-1 rounded-full">نعم</span>` 
-                    : `<span class="bg-red-100 text-red-800 text-xs font-bold px-2.5 py-1 rounded-full">لا</span>`;
-
-                const statusBadge = (status) => status === "مكتمل"
-                    ? `<span class="bg-emerald-500 text-white text-xs font-bold px-2.5 py-1 rounded-md">مكتمل</span>`
-                    : `<span class="bg-amber-500 text-white text-xs font-bold px-2.5 py-1 rounded-md">غير مكتمل</span>`;
-
-                tr.innerHTML = `
-                    <td class="p-3 font-mono font-bold text-gray-900">${student.ID}</td>
-                    <td class="p-3 font-semibold text-gray-800">${student["اسم الطالب"]}</td>
-                    <td class="p-3 text-gray-500">${student["الكلية"]}</td>
-                    <td class="p-3 text-center">${checkIcon(student.HS)}</td>
-                    <td class="p-3 text-center">${checkIcon(student.BC)}</td>
-                    <td class="p-3 text-center">${checkIcon(student.ID)}</td>
-                    <td class="p-3 text-center">${checkIcon(student.PH)}</td>
-                    <td class="p-3 text-center">${checkIcon(student.TR)}</td>
-                    <td class="p-3 text-center font-bold text-blue-900">${student["نسبة الاكتمال"]}</td>
-                    <td class="p-3 text-center">${statusBadge(student["حالة الملف"])}</td>
-                `;
-                tbody.appendChild(tr);
-            });
-        }
-
-        // 4. الفلترة والبحث الفوري في الجدول بالرقم الجامعي
-        function filterTable() {
-            const filter = document.getElementById('search_input').value.trim();
-            const rows = document.getElementById('students_table_body').getElementsByTagName('tr');
-
-            for (let i = 0; i < rows.length; i++) {
-                const idCell = rows[i].getElementsByTagName('td')[0];
-                if (idCell) {
-                    const idText = idCell.textContent || idCell.innerText;
-                    if (idText.indexOf(filter) > -1) {
-                        rows[i].style.display = "";
-                    } else {
-                        rows[i].style.display = "none";
-                    }
-                }
-            }
-        }
-    </script>
 </body>
 </html>
