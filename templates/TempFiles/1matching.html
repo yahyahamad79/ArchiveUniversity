@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>مطابقة وترقيم الملفات - تعديل المجلد</title>
+<title>مطابقة وترقيم الملفات</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <style>
   :root {
@@ -585,58 +585,13 @@
     border-right: 3px solid var(--warning);
   }
 
-  /* منطقة الترقيم */
-  #renameArea {
-    margin-top: 16px;
-    padding: 16px;
+  /* نتائج الترقيم */
+  .rename-result {
     background: var(--panel2);
     border: 1px solid var(--line);
     border-radius: var(--radius);
-  }
-  #renameArea .header-row {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    flex-wrap: wrap;
-    gap: 10px;
-  }
-  #renameArea h4 {
-    color: var(--accent);
-    font-size: 15px;
-  }
-  #renameArea .info-text {
-    font-size: 13px;
-    color: var(--muted);
-  }
-  .rename-preview {
+    padding: 16px;
     margin-top: 12px;
-    padding: 10px;
-    background: var(--bg);
-    border-radius: 6px;
-    border: 1px solid var(--line);
-    max-height: 150px;
-    overflow-y: auto;
-  }
-  .rename-preview .item {
-    display: flex;
-    justify-content: space-between;
-    padding: 3px 0;
-    font-size: 12px;
-    font-family: monospace;
-  }
-  .rename-preview .old {
-    color: var(--missing-b);
-  }
-  .rename-preview .new {
-    color: var(--found-b);
-  }
-
-  .rename-result {
-    margin-top: 12px;
-    padding: 12px;
-    border-radius: var(--radius);
-    background: var(--bg);
-    border: 1px solid var(--line);
   }
   .rename-result .success {
     color: var(--found-b);
@@ -658,39 +613,53 @@
     font-weight: 600;
   }
 
-  /* طريقة الترقيم - اختيار */
-  .method-group {
+  .badge {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 10px;
+    font-size: 11px;
+    font-weight: 600;
+  }
+  .badge-success {
+    background: var(--found-b);
+    color: #03260f;
+  }
+  .badge-danger {
+    background: var(--danger);
+    color: #fff;
+  }
+  .badge-warning {
+    background: var(--warning);
+    color: #1a1a1a;
+  }
+
+  .status-icon {
+    font-size: 16px;
+  }
+
+  .rename-preview {
+    margin-top: 12px;
+    padding: 10px;
+    background: var(--bg);
+    border-radius: 6px;
+    border: 1px solid var(--line);
+    max-height: 150px;
+    overflow-y: auto;
+  }
+  .rename-preview .item {
     display: flex;
-    gap: 12px;
-    flex-wrap: wrap;
-    margin-top: 6px;
-  }
-  .method-chip {
-    padding: 8px 16px;
-    border-radius: var(--radius);
-    border: 2px solid var(--line);
-    background: var(--panel);
-    cursor: pointer;
-    font-size: 13px;
-    color: var(--muted);
-    user-select: none;
-    transition: .2s;
-  }
-  .method-chip.active {
-    border-color: var(--accent);
-    background: #17304f;
-    color: var(--txt);
-  }
-  .method-chip input {
-    display: none;
+    justify-content: space-between;
+    padding: 3px 0;
+    font-size: 12px;
+    font-family: monospace;
   }
 </style>
 </head>
 <body>
 <div class="wrap">
   <header>
-    <h1>📂 مطابقة وترقيم الملفات - تعديل المجلد</h1>
-    <p>قارن أسماء الطلاب مع الملفات، ثم أعد تسمية الملفات في المجلد باستخدام الأرقام من الإكسل</p>
+    <h1>📂 مطابقة وترقيم الملفات</h1>
+    <p>قارن أسماء الطلاب في ملف إكسل مع أسماء الملفات في مجلد، ثم أعد تسمية الملفات باستخدام الأرقام من الإكسل</p>
   </header>
 
   <!-- الخطوة 1: رفع الملف والمجلد -->
@@ -707,8 +676,8 @@
         </div>
       </div>
       <div class="file-box" id="boxFolder">
-        <label>📁 المجلد (الملفات المراد ترقيمها)</label>
-        <input type="file" id="fileFolder" webkitdirectory multiple>
+        <label>📁 المجلد (الملفات: صور، وثائق، PDF...)</label>
+        <button type="button" class="btn" id="pickFolderBtn" style="width:100%">📂 اختيار المجلد</button>
         <div class="file-info" id="infoFolder">لم يتم اختيار مجلد</div>
         <div class="file-list" id="folderFileList"></div>
       </div>
@@ -725,12 +694,12 @@
         <div class="field">
           <label>📝 عمود الأسماء (للمطابقة):</label>
           <select id="nameColumn"></select>
-          <div style="font-size:11px;color:var(--muted);margin-top:4px">يستخدم لمطابقة الأسماء مع أسماء الملفات</div>
+          <div style="font-size:11px;color:var(--muted);margin-top:4px">يستخدم لمطابقة الأسماء مع أسماء الملفات في المجلد</div>
         </div>
         <div class="field">
           <label>🔢 عمود الترقيم (لإعادة التسمية):</label>
           <select id="numberColumn"></select>
-          <div style="font-size:11px;color:var(--muted);margin-top:4px">سيتم استخدام هذه الأرقام لإعادة تسمية الملفات</div>
+          <div style="font-size:11px;color:var(--muted);margin-top:4px">سيتم استخدام هذه الأرقام لإعادة تسمية الملفات بعد المطابقة</div>
         </div>
       </div>
 
@@ -760,19 +729,6 @@
         <div class="opts-row">
           <label class="opt-toggle"><input type="checkbox" id="optRemoveExt" checked> إزالة الامتداد</label>
           <label class="opt-toggle"><input type="checkbox" id="optNormalize" checked> تطبيع الأسماء</label>
-        </div>
-        <div class="field" style="margin-top:12px">
-          <label>طريقة تنفيذ الترقيم:</label>
-          <div class="method-group">
-            <label class="method-chip active" id="methodBat">
-              <input type="radio" name="renameMethod" value="bat" checked>
-              📄 ملف .bat (PowerShell)
-            </label>
-            <label class="method-chip" id="methodTxt">
-              <input type="radio" name="renameMethod" value="txt">
-              📋 قائمة تغييرات (Excel)
-            </label>
-          </div>
         </div>
       </div>
     </div>
@@ -832,19 +788,18 @@
     </div>
 
     <!-- منطقة الترقيم -->
-    <div id="renameArea">
-      <div class="header-row">
+    <div id="renameArea" style="margin-top:16px;padding:16px;background:var(--panel2);border:1px solid var(--line);border-radius:var(--radius)">
+      <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px">
         <div>
-          <h4>🔄 ترقيم الملفات في المجلد</h4>
-          <div class="info-text" id="renameInfo">سيتم إعادة تسمية <strong id="renameCount">0</strong> ملف باستخدام الأرقام من الإكسل</div>
+          <h4 style="color:var(--accent);font-size:15px">🔄 ترقيم الملفات</h4>
+          <div style="font-size:13px;color:var(--muted)" id="renameInfo">سيتم إعادة تسمية <strong id="renameCount">0</strong> ملف باستخدام الأرقام من الإكسل</div>
         </div>
-        <div style="display:flex;gap:8px;flex-wrap:wrap">
-          <button class="btn btn-warning btn-sm" id="previewBtn">👁️ معاينة</button>
-          <button class="btn btn-success" id="renameBtn">🔄 تنفيذ الترقيم</button>
+        <div>
+          <button class="btn btn-warning btn-sm" id="previewBtn">👁️ معاينة التغييرات</button>
+          <button class="btn btn-success" id="renameBtn">🔄 ترقيم الملفات</button>
         </div>
       </div>
       <div id="renamePreview" class="rename-preview hidden"></div>
-      <div id="renameResult" class="rename-result hidden"></div>
     </div>
 
     <div class="btn-row">
@@ -859,15 +814,12 @@
     <div class="confirm-box">
       <h3>⚠️ تأكيد عملية الترقيم</h3>
       <div class="warning-text">
-        <strong>تنبيه:</strong> سيتم إعادة تسمية الملفات التالية في المجلد الفعلي. هذه العملية <strong>لا يمكن التراجع عنها</strong> بسهولة.
+        <strong>تنبيه:</strong> سيتم إعادة تسمية الملفات التالية. هذه العملية <strong>لا يمكن التراجع عنها</strong> بسهولة.
         يرجى التأكد من صحة الأرقام قبل المتابعة.
       </div>
       <div id="confirmList"></div>
-      <div style="margin-top:12px;font-size:13px;color:var(--muted)">
-        <strong>طريقة الترقيم:</strong> <span id="confirmMethod">ملف .bat (PowerShell)</span>
-      </div>
       <div class="btn-row">
-        <button class="btn btn-success" id="confirmRenameBtn">✅ تأكيد الترقيم</button>
+        <button class="btn btn-danger" id="confirmRenameBtn">✅ تأكيد الترقيم</button>
         <button class="btn btn-ghost" id="cancelRenameBtn">❌ إلغاء</button>
       </div>
     </div>
@@ -880,18 +832,25 @@
      ============================================================ */
   const S = {
     Excel: { wb: null, rows: [], cols: [], name: "" },
-    results: [],
+    Folder: { dirHandle: null, files: [], fileMap: {} },
+    results: [], // [{excelName, number, folderName, ext, path, status: 'found'|'missing'|'extra'|'renamed', newName}]
     nameColumn: "",
     numberColumn: "",
     matchMode: "exact",
     extensions: [],
     removeExt: true,
     normalize: true,
-    renameMethod: "bat",
     renamedCount: 0
   };
 
   let folderFileList = [];
+
+  // التحقق من دعم المتصفح لميزة الكتابة الفعلية على المجلد
+  const SUPPORTS_FS_ACCESS = typeof window.showDirectoryPicker === 'function';
+  if (!SUPPORTS_FS_ACCESS) {
+    document.getElementById('infoFolder').textContent =
+      '⚠️ متصفحك لا يدعم إعادة التسمية الفعلية للملفات. الرجاء استخدام Google Chrome أو Microsoft Edge على سطح المكتب.';
+  }
 
   /* ============================================================
      قراءة ملف الإكسل
@@ -906,7 +865,7 @@
     const reader = new FileReader();
     reader.onload = e => {
       try {
-        const wb = XLSX.read(e.target.result, { type: 'array' });
+        const wb = XLSX.read(e.target.result, { type: 'array', cellText: true, raw: false });
         S.Excel.wb = wb;
         S.Excel.name = file.name;
         const sel = document.getElementById('sheetExcel');
@@ -926,7 +885,7 @@
   function loadExcelSheet() {
     const sheetName = document.getElementById('sheetExcel').value || S.Excel.wb.SheetNames[0];
     const ws = S.Excel.wb.Sheets[sheetName];
-    const json = XLSX.utils.sheet_to_json(ws, { defval: '', raw: false });
+    const json = XLSX.utils.sheet_to_json(ws, { defval: '', raw: false, rawNumbers: false });
     S.Excel.rows = json;
     S.Excel.cols = json.length ? Object.keys(json[0]) : [];
     updateColumnSelects();
@@ -950,50 +909,49 @@
   document.getElementById('sheetExcel').addEventListener('change', loadExcelSheet);
 
   /* ============================================================
-     قراءة المجلد
+     اختيار المجلد (صلاحية قراءة وكتابة حقيقية)
      ============================================================ */
-  function readFolder() {
-    const input = document.getElementById('fileFolder');
-    const files = input.files;
-    if (!files || !files.length) return;
+  async function pickFolder() {
+    if (!SUPPORTS_FS_ACCESS) {
+      alert('متصفحك لا يدعم هذه الميزة. الرجاء استخدام Google Chrome أو Microsoft Edge على سطح المكتب.');
+      return;
+    }
+
+    let dirHandle;
+    try {
+      dirHandle = await window.showDirectoryPicker({ mode: 'readwrite' });
+    } catch (err) {
+      if (err.name === 'AbortError') return; // المستخدم ألغى الاختيار
+      alert('تعذّر فتح المجلد: ' + err.message);
+      return;
+    }
+
+    // التأكد من صلاحية الكتابة فعلياً
+    const perm = await dirHandle.requestPermission({ mode: 'readwrite' });
+    if (perm !== 'granted') {
+      alert('لم يتم منح صلاحية الكتابة على المجلد. لن تتمكن من إعادة تسمية الملفات.');
+    }
 
     const info = document.getElementById('infoFolder');
-    const fileList = document.getElementById('folderFileList');
+    info.textContent = 'جارٍ قراءة المجلد...';
 
     folderFileList = [];
-    for (let f of files) {
-      folderFileList.push(f);
+    for await (const entry of dirHandle.values()) {
+      if (entry.kind === 'file') {
+        folderFileList.push({ name: entry.name });
+      }
     }
+
+    S.Folder.dirHandle = dirHandle;
 
     info.innerHTML = `✓ تم اختيار مجلد يحتوي على <span class="count">${folderFileList.length}</span> ملف`;
     info.className = 'file-info ok';
     document.getElementById('boxFolder').classList.add('loaded');
 
-    const maxShow = 50;
-    const showFiles = folderFileList.slice(0, maxShow);
-    fileList.innerHTML = showFiles.map(f =>
-      `<span class="fname">📄 ${f.name}</span>`
-    ).join('');
-    if (folderFileList.length > maxShow) {
-      fileList.innerHTML += `<span class="fname" style="color:var(--accent)">... و ${folderFileList.length - maxShow} ملفات أخرى</span>`;
-    }
-
     checkReady();
   }
 
-  document.getElementById('fileFolder').addEventListener('change', readFolder);
-
-  /* ============================================================
-     طريقة الترقيم UI
-     ============================================================ */
-  document.querySelectorAll('input[name=renameMethod]').forEach(r => {
-    r.addEventListener('change', () => {
-      document.querySelectorAll('.method-chip').forEach(c => c.classList.remove('active'));
-      const parent = r.closest('.method-chip');
-      if (parent) parent.classList.add('active');
-      S.renameMethod = r.value;
-    });
-  });
+  document.getElementById('pickFolderBtn').addEventListener('click', pickFolder);
 
   /* ============================================================
      التحقق من الجاهزية
@@ -1092,6 +1050,7 @@
     S.removeExt = document.getElementById('optRemoveExt').checked;
     S.normalize = document.getElementById('optNormalize').checked;
 
+    // تحضير بيانات الإكسل
     const excelData = S.Excel.rows.map(row => ({
       name: String(row[nameCol] || '').trim(),
       number: String(row[numCol] || '').trim()
@@ -1107,6 +1066,7 @@
     setProgress(0, 'جارٍ تجهيز البيانات...');
     await sleep(30);
 
+    // تصفية الملفات حسب الامتداد
     let filteredFiles = folderFileList;
     if (S.extensions.length) {
       filteredFiles = folderFileList.filter(f => {
@@ -1117,6 +1077,7 @@
       await sleep(20);
     }
 
+    // بناء خريطة الملفات
     const fileMap = new Map();
     const fileMapNormalized = new Map();
 
@@ -1133,17 +1094,18 @@
       }
       const key = S.normalize ? normalizeArabic(name) : name.trim();
       if (!fileMap.has(key)) {
-        fileMap.set(key, { fullName: f.name, ext: ext, file: f });
+        fileMap.set(key, { fullName: f.name, ext: ext, path: f.webkitRelativePath || f.name, file: f });
       }
       const normKey = normalizeArabic(name);
       if (!fileMapNormalized.has(normKey)) {
-        fileMapNormalized.set(normKey, { fullName: f.name, ext: ext, file: f });
+        fileMapNormalized.set(normKey, { fullName: f.name, ext: ext, path: f.webkitRelativePath || f.name, file: f });
       }
     }
 
     setProgress(10, 'جارٍ المطابقة...');
     await sleep(20);
 
+    // المطابقة
     const results = [];
     const usedFiles = new Set();
     const total = excelData.length;
@@ -1237,6 +1199,7 @@
         number: item.number,
         folderName: match ? match.fullName : '',
         ext: match ? match.ext : '',
+        path: match ? match.path : '',
         file: match ? match.file : null,
         status: matchType,
         matchedKey: matchedKey,
@@ -1251,6 +1214,7 @@
       }
     }
 
+    // الملفات الإضافية
     setProgress(88, 'جارٍ استخراج الملفات الإضافية...');
     await sleep(20);
 
@@ -1278,6 +1242,7 @@
           number: '',
           folderName: f.name,
           ext: ext,
+          path: f.webkitRelativePath || f.name,
           file: f,
           status: 'extra',
           matchedKey: '',
@@ -1377,7 +1342,7 @@
     );
     document.getElementById('renameCount').textContent = toRename.length;
     document.getElementById('renameInfo').innerHTML =
-      `سيتم إعادة تسمية <strong>${toRename.length}</strong> ملف باستخدام الأرقام من الإكسل`;
+      `سيتم إعادة تسمية <strong id="renameCount">${toRename.length}</strong> ملف باستخدام الأرقام من الإكسل`;
   }
 
   /* ============================================================
@@ -1404,7 +1369,7 @@
   });
 
   /* ============================================================
-     تنفيذ الترقيم - توليد ملف الأوامر
+     ترقيم الملفات
      ============================================================ */
   document.getElementById('renameBtn').addEventListener('click', () => {
     const toRename = S.results.filter(r =>
@@ -1418,9 +1383,6 @@
     // عرض نافذة التأكيد
     const overlay = document.getElementById('confirmOverlay');
     const list = document.getElementById('confirmList');
-    const method = document.getElementById('confirmMethod');
-    method.textContent = S.renameMethod === 'bat' ? '📄 ملف .bat (PowerShell)' : '📋 قائمة تغييرات (Excel)';
-
     list.innerHTML = toRename.map(r =>
       `<div class="rename-item">
         <span class="old">${esc(r.folderName)}</span>
@@ -1435,7 +1397,7 @@
     document.getElementById('confirmOverlay').classList.add('hidden');
   });
 
-  document.getElementById('confirmRenameBtn').addEventListener('click', () => {
+  document.getElementById('confirmRenameBtn').addEventListener('click', async () => {
     const overlay = document.getElementById('confirmOverlay');
     overlay.classList.add('hidden');
 
@@ -1445,228 +1407,71 @@
 
     if (!toRename.length) return;
 
-    if (S.renameMethod === 'bat') {
-      // إنشاء ملف .bat
-      generateBatFile(toRename);
+    if (!S.Folder.dirHandle) {
+      alert('يجب اختيار المجلد أولاً باستخدام زر "اختيار المجلد".');
+      return;
+    }
+
+    const runBtn = document.getElementById('renameBtn');
+    runBtn.disabled = true;
+    runBtn.textContent = '⏳ جارٍ الترقيم...';
+
+    const dirHandle = S.Folder.dirHandle;
+    let renamedCount = 0;
+    const errors = [];
+
+    for (const r of toRename) {
+      const oldName = r.folderName;
+      const newName = r.newName;
+
+      if (!newName || oldName === newName) {
+        continue;
+      }
+
+      try {
+        const oldHandle = await dirHandle.getFileHandle(oldName);
+
+        if (typeof oldHandle.move === 'function') {
+          // الطريقة المباشرة: إعادة تسمية حقيقية بدون نسخ
+          await oldHandle.move(newName);
+        } else {
+          // بديل: نسخ المحتوى لملف جديد بالاسم الجديد ثم حذف القديم
+          const fileData = await oldHandle.getFile();
+          const buffer = await fileData.arrayBuffer();
+          const newHandle = await dirHandle.getFileHandle(newName, { create: true });
+          const writable = await newHandle.createWritable();
+          await writable.write(buffer);
+          await writable.close();
+          await dirHandle.removeEntry(oldName);
+        }
+
+        r.folderName = newName;
+        r.status = 'renamed';
+        r.renamed = true;
+        renamedCount++;
+      } catch (err) {
+        errors.push(`${oldName} ← ${err.message}`);
+      }
+
+      await sleep(20);
+    }
+
+    S.renamedCount = renamedCount;
+    renderResults();
+    updateRenameInfo();
+
+    runBtn.disabled = false;
+    runBtn.textContent = '🔄 ترقيم الملفات';
+
+    const renameInfo = document.getElementById('renameInfo');
+    if (errors.length) {
+      renameInfo.innerHTML = `✅ تم ترقيم <strong>${renamedCount}</strong> ملف بنجاح. ⚠️ فشل ترقيم <strong>${errors.length}</strong> ملف: ${errors.slice(0, 5).map(esc).join(' | ')}`;
+      renameInfo.style.color = 'var(--warning)';
     } else {
-      // إنشاء ملف Excel مع قائمة التغييرات
-      generateRenameExcel(toRename);
+      renameInfo.innerHTML = `✅ تم ترقيم <strong>${renamedCount}</strong> ملف بنجاح داخل المجلد فعلياً.`;
+      renameInfo.style.color = 'var(--success)';
     }
   });
-
-  /* ============================================================
-     توليد ملف .bat (PowerShell)
-     ============================================================ */
- /* ============================================================
-     توليد ملف .bat (PowerShell) - النسخة المصححة والمحدثة
-     ============================================================ */
-  function generateBatFile(toRename) {
-    const resultDiv = document.getElementById('renameResult');
-    resultDiv.classList.remove('hidden');
-
-    // إنشاء محتوى ملف PowerShell مع دعم الترميز العربي UTF-8
-    let psContent = `# ملف أوامر PowerShell لإعادة تسمية الملفات
-# تاريخ الإنشاء: ${new Date().toLocaleString()}
-# عدد الملفات المراد ترقيمها: ${toRename.length}
-
-# إجبار التيرمنال على قراءة الحروف العربية بشكل صحيح
-[Console]::OutputEncoding = [System.Text.Encoding]::UTF8
-
-# تعيين المجلد الحالي كمسار العمل
-$folderPath = Get-Location
-
-Write-Host "🚀 بدء عملية استبدال الأسماء بالأرقام المطابقة..." -ForegroundColor Cyan
-Write-Host "📊 عدد الملفات الإجمالي: ${toRename.length}" -ForegroundColor Yellow
-Write-Host "--------------------------------------------------" -ForegroundColor Gray
-
-$successCount = 0
-$errorCount = 0
-
-`;
-
-    for (const r of toRename) {
-      // تجهيز الأسماء وإزالة أي مشاكل قد تنتج عن علامات الاقتباس أو الرموز الخاصة في نظام التشغيل
-      const oldName = r.folderName.replace(/"/g, '`"');
-      const newName = r.newName.replace(/"/g, '`"');
-      
-      psContent += `
-try {
-    # التحقق من وجود الملف الأصلي قبل تعديله
-    if (Test-Path -LiteralPath "$oldName") {
-        Rename-Item -LiteralPath "$oldName" -NewName "$newName" -ErrorAction Stop
-        Write-Host "✅ تم بنجاح: $oldName ➡️ $newName" -ForegroundColor Green
-        $successCount++
-    } else {
-        Write-Host "⚠️ الملف غير موجود حالياً في المجلد: $oldName" -ForegroundColor Yellow
-        $errorCount++
-    }
-} catch {
-    Write-Host "❌ فشل تعديل الملف: $oldName" -ForegroundColor Red
-    Write-Host "   السبب: $($_.Exception.Message)" -ForegroundColor Red
-    $errorCount++
-}
-`;
-    }
-
-    psContent += `
-Write-Host "--------------------------------------------------" -ForegroundColor Gray
-Write-Host "✨ اكتملت العملية!" -ForegroundColor Cyan
-Write-Host "✅ تم استبدال وتعديل: $successCount ملف" -ForegroundColor Green
-if ($errorCount -gt 0) {
-    Write-Host "❌ ملفات واجهت أخطاء: $errorCount ملف" -ForegroundColor Red
-}
-
-Read-Host "اضغط Enter لإغلاق هذه النافذة"
-`;
-
-    // تحويل النص إلى Blob مع إضافة علامة الـ BOM لضمان عدم تلف الحروف العربية عند تشغيل السكربت في الويندوز
-    const bom = new Uint8Array([0xEF, 0xBB, 0xBF]);
-    const blob = new Blob([bom, psContent], { type: 'text/plain;charset=utf-8' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    
-    const timestamp = new Date().getTime();
-    a.download = `تعديل_الأسماء_إلى_أرقام_${timestamp}.ps1`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
-
-    resultDiv.innerHTML = `
-      <div class="success">✅ تم إنشاء ملف PowerShell بنجاح باسم (<strong>تعديل_الأسماء_إلى_أرقام_${timestamp}.ps1</strong>)</div>
-      <div style="margin-top:8px;font-size:13px;color:var(--muted);background:var(--panel);padding:12px;border-radius:6px;direction:rtl;text-align:right;line-height:1.8;">
-        <strong>📋 خطوات التطبيق الفعلي داخل مجلدك:</strong><br>
-        1. انقل الملف الذي تم تحميله <code>.ps1</code> وضعه <strong>داخل نفس المجلد</strong> الذي يحتوي على ملفات الطلاب.<br>
-        2. انقر بزر الماوس الأيمن على ملف السكربت واختر <strong>Run with PowerShell</strong>.<br>
-        3. سيقوم السكربت بقراءة الأسماء الحالية واستبدالها بالرقم المطابق فوراً مع الحفاظ التام على امتداد كل ملف دون أي مساس به.
-      </div>
-    `;
-
-    // تحديث حالة الملفات في الجدول لتظهر كـ "مرقّمة ومعدلة"
-    for (const r of toRename) {
-      r.status = 'renamed';
-      r.renamed = true;
-    }
-    S.renamedCount = toRename.length;
-    renderResults();
-    updateRenameInfo();
-  }
-    const resultDiv = document.getElementById('renameResult');
-    resultDiv.classList.remove('hidden');
-
-    // إنشاء محتوى ملف PowerShell
-    let psContent = `# ملف أوامر PowerShell لإعادة تسمية الملفات
-# تاريخ الإنشاء: ${new Date().toLocaleString()}
-# عدد الملفات: ${toRename.length}
-
-# تعيين المجلد الحالي كمسار العمل
-$folderPath = Get-Location
-
-Write-Host "بدء عملية إعادة التسمية..." -ForegroundColor Cyan
-Write-Host "عدد الملفات: ${toRename.length}" -ForegroundColor Yellow
-Write-Host ""
-
-$successCount = 0
-$errorCount = 0
-
-`;
-
-    for (const r of toRename) {
-      const oldName = r.folderName.replace(/"/g, '`"');
-      const newName = r.newName.replace(/"/g, '`"');
-      psContent += `
-try {
-    Rename-Item -Path "$oldName" -NewName "$newName" -ErrorAction Stop
-    Write-Host "✅ تم: $oldName → $newName" -ForegroundColor Green
-    $successCount++
-} catch {
-    Write-Host "❌ خطأ: $oldName → $newName" -ForegroundColor Red
-    Write-Host "   السبب: $($_.Exception.Message)" -ForegroundColor Red
-    $errorCount++
-}
-`;
-    }
-
-    psContent += `
-Write-Host ""
-Write-Host "========== ملخص ==========" -ForegroundColor Cyan
-Write-Host "✅ تم إعادة تسمية $successCount ملف بنجاح" -ForegroundColor Green
-if ($errorCount -gt 0) {
-    Write-Host "❌ فشل إعادة تسمية $errorCount ملف" -ForegroundColor Red
-}
-Write-Host "===========================" -ForegroundColor Cyan
-
-Read-Host "اضغط Enter للخروج"
-`;
-
-    // إنشاء ملف PowerShell
-    const blob = new Blob([psContent], { type: 'text/plain;charset=utf-8' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `rename_files_${new Date().getTime()}.ps1`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
-
-    resultDiv.innerHTML = `
-      <div class="success">✅ تم إنشاء ملف PowerShell (<strong>rename_files_${new Date().getTime()}.ps1</strong>)</div>
-      <div style="margin-top:8px;font-size:13px;color:var(--muted);background:var(--panel);padding:10px;border-radius:6px;direction:ltr;text-align:left">
-        <strong>كيفية التشغيل:</strong><br>
-        1. انسخ ملف <code>.ps1</code> إلى المجلد الذي يحتوي على الملفات<br>
-        2. افتح PowerShell كمسؤول (Run as Administrator)<br>
-        3. شغّل الأمر: <code>Set-ExecutionPolicy Bypass -Scope Process</code><br>
-        4. شغّل: <code>.\\rename_files_${new Date().getTime()}.ps1</code>
-      </div>
-    `;
-
-    // تحديث الحالة
-    for (const r of toRename) {
-      r.status = 'renamed';
-      r.renamed = true;
-    }
-    S.renamedCount = toRename.length;
-    renderResults();
-    updateRenameInfo();
-  }
-
-  /* ============================================================
-     توليد ملف Excel مع قائمة التغييرات
-     ============================================================ */
-  function generateRenameExcel(toRename) {
-    const data = toRename.map(r => ({
-      'اسم الملف الحالي': r.folderName,
-      'الاسم الجديد': r.newName,
-      'الرقم': r.number,
-      'الامتداد': r.ext
-    }));
-
-    const ws = XLSX.utils.json_to_sheet(data);
-    ws['!cols'] = [{ wch: 35 }, { wch: 25 }, { wch: 15 }, { wch: 10 }];
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, 'قائمة التغييرات');
-    XLSX.writeFile(wb, `قائمة_تغييرات_الملفات_${new Date().getTime()}.xlsx`);
-
-    const resultDiv = document.getElementById('renameResult');
-    resultDiv.classList.remove('hidden');
-    resultDiv.innerHTML = `
-      <div class="success">✅ تم إنشاء ملف Excel بقائمة التغييرات</div>
-      <div style="margin-top:8px;font-size:13px;color:var(--muted)">
-        يحتوي الملف على جميع التغييرات المقترحة. يمكنك استخدامه كمرجع لإعادة التسمية يدوياً.
-      </div>
-    `;
-
-    // تحديث الحالة
-    for (const r of toRename) {
-      r.status = 'renamed';
-      r.renamed = true;
-    }
-    S.renamedCount = toRename.length;
-    renderResults();
-    updateRenameInfo();
-  }
 
   /* ============================================================
      التصفية والبحث
@@ -1718,11 +1523,11 @@ Read-Host "اضغط Enter للخروج"
      ============================================================ */
   document.getElementById('resetBtn').addEventListener('click', () => {
     S.Excel = { wb: null, rows: [], cols: [], name: "" };
+    S.Folder = { dirHandle: null, files: [], fileMap: {} };
     S.results = [];
     S.renamedCount = 0;
 
     document.getElementById('fileExcel').value = '';
-    document.getElementById('fileFolder').value = '';
     document.getElementById('infoExcel').textContent = 'لم يتم اختيار ملف';
     document.getElementById('infoExcel').className = 'file-info';
     document.getElementById('infoFolder').textContent = 'لم يتم اختيار مجلد';
@@ -1742,8 +1547,6 @@ Read-Host "اضغط Enter للخروج"
     document.getElementById('searchBox').value = '';
     document.getElementById('renamePreview').classList.add('hidden');
     document.getElementById('renamePreview').innerHTML = '';
-    document.getElementById('renameResult').classList.add('hidden');
-    document.getElementById('renameResult').innerHTML = '';
     document.querySelectorAll('.filter-chip').forEach(x => x.classList.remove('active'));
     const allChip = document.querySelector('.filter-chip[data-f="all"]');
     if (allChip) allChip.classList.add('active');

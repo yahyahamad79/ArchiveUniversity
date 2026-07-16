@@ -694,8 +694,7 @@
     <div class="two-col">
       <div class="file-box" id="boxExcel">
         <label>📄 ملف الإكسل (أسماء + أرقام)</label>
-        <label for="fileExcel" class="btn btn-sm" style="display:block;width:100%;text-align:center;cursor:pointer">📄 اختيار ملف</label>
-        <input type="file" id="fileExcel" accept=".xlsx,.xls,.csv" style="display:none">
+        <input type="file" id="fileExcel" accept=".xlsx,.xls,.csv">
         <div class="file-info" id="infoExcel">لم يتم اختيار ملف</div>
         <div class="sheet-sel" id="sheetSelExcel">
           <label style="font-size:13px;color:var(--muted);margin:8px 0 4px;display:block">اختر الورقة (Sheet):</label>
@@ -931,8 +930,8 @@
     nameSel.innerHTML = options;
     numSel.innerHTML = options;
     if (cols.length) {
-      nameSel.value = cols.length > 1 ? cols[1] : cols[0];
-      numSel.value = cols[0];
+      nameSel.value = cols[0];
+      numSel.value = cols.length > 1 ? cols[1] : cols[0];
     }
   }
 
