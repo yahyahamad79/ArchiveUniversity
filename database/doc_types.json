@@ -6,7 +6,7 @@
       "code": "PH",
       "required": true,
       "order": 4,
-      "storage_path": "PH/",
+      "storage_path": "E:\\MyProjects\\ArchiveUniversity\\database\\storage_secure\\PH",
       "allowed_extensions": [
         "jpg",
         "jpeg",
@@ -22,7 +22,7 @@
       "code": "TR",
       "required": true,
       "order": 5,
-      "storage_path": "TR/",
+      "storage_path": "E:\\MyProjects\\ArchiveUniversity\\database\\storage_secure\\TR",
       "allowed_extensions": [
         "pdf",
         "jpg",
@@ -43,7 +43,7 @@
       "code": "HC",
       "required": false,
       "order": 7,
-      "storage_path": "HC/",
+      "storage_path": "E:\\MyProjects\\ArchiveUniversity\\database\\storage_secure\\HC",
       "allowed_extensions": [
         "pdf",
         "jpg",
@@ -102,7 +102,7 @@
       "code": "ATH",
       "required": false,
       "order": 8,
-      "storage_path": "HS/",
+      "storage_path": "E:\\MyProjects\\ArchiveUniversity\\database\\storage_secure\\ATHICS",
       "allowed_extensions": [
         "pdf",
         "jpg",
@@ -121,7 +121,7 @@
       "code": "QOU",
       "required": true,
       "order": 8,
-      "storage_path": "HS/",
+      "storage_path": "E:\\MyProjects\\ArchiveUniversity\\database\\storage_secure\\QOU",
       "allowed_extensions": [
         "pdf"
       ],
@@ -134,7 +134,7 @@
       "code": "ID",
       "required": true,
       "order": 3,
-      "storage_path": "ID/",
+      "storage_path": "E:\\MyProjects\\ArchiveUniversity\\database\\storage_secure\\ID",
       "allowed_extensions": [
         "pdf",
         "jpg",

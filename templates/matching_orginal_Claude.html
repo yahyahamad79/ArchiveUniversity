@@ -1,0 +1,1596 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>مطابقة وترقيم الملفات</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdn.tailwindcss.com"></script>
+<link href="https://fonts.googleapis.com/css2?family=Cairo:wght@300;400;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #f8fafc;
+    --panel: #ffffff;
+    --panel2: #f1f5f9;
+    --line: #e2e8f0;
+    --txt: #1e293b;
+    --muted: #64748b;
+    --accent: #10b981;
+    --accent2: #059669;
+    --accent-tint: #ecfdf5;
+    --found: #ecfdf5;
+    --found-b: #16a34a;
+    --missing: #fef2f2;
+    --missing-b: #dc2626;
+    --extra: #fffbeb;
+    --extra-b: #d97706;
+    --renamed: #eff6ff;
+    --radius: 16px;
+    --shadow: 0 1px 3px rgba(15, 23, 42, .08), 0 1px 2px rgba(15, 23, 42, .06);
+    --danger: #dc2626;
+    --warning: #d97706;
+    --success: #059669;
+  }
+
+  * {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+  }
+
+  body {
+    font-family: 'Cairo', sans-serif;
+    background: var(--bg);
+    color: var(--txt);
+    line-height: 1.6;
+    margin: 0;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .wrap {
+    max-width: 1400px;
+    margin: 0 auto;
+    padding: 32px 24px 48px;
+    width: 100%;
+    flex-grow: 1;
+  }
+
+  header {
+    text-align: center;
+    margin-bottom: 28px;
+  }
+  header h1 {
+    font-size: 26px;
+    font-weight: 700;
+    letter-spacing: -.3px;
+  }
+  header p {
+    color: var(--muted);
+    margin-top: 6px;
+    font-size: 14px;
+  }
+
+  .step {
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    padding: 22px;
+    margin-bottom: 18px;
+    box-shadow: var(--shadow);
+  }
+
+  .step-title {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 17px;
+    font-weight: 600;
+    margin-bottom: 16px;
+  }
+
+  .step-num {
+    background: var(--accent2);
+    color: #fff;
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    display: grid;
+    place-items: center;
+    font-size: 14px;
+    font-weight: 700;
+    flex-shrink: 0;
+  }
+
+  .two-col {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+  }
+  @media(max-width:760px) {
+    .two-col {
+      grid-template-columns: 1fr;
+    }
+  }
+
+  .file-box {
+    border: 2px dashed var(--line);
+    border-radius: var(--radius);
+    padding: 18px;
+    text-align: center;
+    transition: .2s;
+    background: var(--panel2);
+  }
+  .file-box.loaded {
+    border-color: var(--found-b);
+    border-style: solid;
+  }
+  .file-box label {
+    font-weight: 600;
+    display: block;
+    margin-bottom: 10px;
+    font-size: 15px;
+  }
+  .file-box input[type=file] {
+    width: 100%;
+    padding: 9px;
+    background: var(--bg);
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    color: var(--txt);
+    font-family: inherit;
+    cursor: pointer;
+  }
+  .file-box input[type=file][webkitdirectory] {
+    padding: 12px;
+  }
+
+  .file-info {
+    margin-top: 10px;
+    font-size: 13px;
+    color: var(--muted);
+    min-height: 18px;
+  }
+  .file-info.ok {
+    color: var(--found-b);
+  }
+  .file-info .count {
+    color: var(--accent);
+    font-weight: 600;
+  }
+
+  .sheet-sel {
+    margin-top: 10px;
+    display: none;
+  }
+
+  select,
+  input[type=text] {
+    width: 100%;
+    padding: 9px;
+    background: var(--bg);
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    color: var(--txt);
+    font-family: inherit;
+    font-size: 14px;
+  }
+
+  .field {
+    margin-bottom: 14px;
+  }
+  .field label {
+    display: block;
+    font-size: 13px;
+    color: var(--muted);
+    margin-bottom: 6px;
+  }
+
+  .radio-row {
+    display: flex;
+    gap: 12px;
+    flex-wrap: wrap;
+  }
+  .radio-card {
+    flex: 1;
+    min-width: 120px;
+    border: 2px solid var(--line);
+    border-radius: var(--radius);
+    padding: 12px;
+    cursor: pointer;
+    transition: .2s;
+    background: var(--panel2);
+  }
+  .radio-card.active {
+    border-color: var(--accent);
+    background: var(--accent-tint);
+  }
+  .radio-card input {
+    display: none;
+  }
+  .radio-card .rc-title {
+    font-weight: 600;
+    font-size: 14px;
+  }
+  .radio-card .rc-desc {
+    color: var(--muted);
+    font-size: 11px;
+    margin-top: 2px;
+  }
+
+  .opts-row {
+    display: flex;
+    gap: 18px;
+    flex-wrap: wrap;
+    margin-top: 8px;
+  }
+  .opt-toggle {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 14px;
+    cursor: pointer;
+    color: var(--muted);
+  }
+  .opt-toggle input {
+    width: 16px;
+    height: 16px;
+    accent-color: var(--accent);
+  }
+
+  .btn {
+    background: linear-gradient(135deg, var(--accent), var(--accent2));
+    color: #fff;
+    border: none;
+    padding: 13px 28px;
+    border-radius: 10px;
+    font-size: 16px;
+    font-weight: 600;
+    cursor: pointer;
+    font-family: inherit;
+    transition: .2s;
+  }
+  .btn:hover {
+    filter: brightness(1.1);
+  }
+  .btn:disabled {
+    opacity: .4;
+    cursor: not-allowed;
+    filter: none;
+  }
+  .btn-danger {
+    background: linear-gradient(135deg, var(--danger), #b02a37);
+  }
+  .btn-success {
+    background: linear-gradient(135deg, var(--success), #1a7a2e);
+  }
+  .btn-warning {
+    background: linear-gradient(135deg, var(--warning), #d39e00);
+    color: #1a1a1a;
+  }
+  .btn-ghost {
+    background: var(--panel2);
+    border: 1px solid var(--line);
+    color: var(--txt);
+  }
+  .btn-sm {
+    font-size: 12px;
+    padding: 6px 14px;
+  }
+
+  .btn-row {
+    display: flex;
+    gap: 12px;
+    flex-wrap: wrap;
+    align-items: center;
+    margin-top: 18px;
+  }
+
+  .hidden {
+    display: none !important;
+  }
+
+  /* التقدم */
+  .progress-track {
+    height: 14px;
+    background: var(--bg);
+    border: 1px solid var(--line);
+    border-radius: 20px;
+    overflow: hidden;
+  }
+  .progress-fill {
+    height: 100%;
+    width: 0%;
+    border-radius: 20px;
+    background: linear-gradient(90deg, var(--accent), #2dd4bf);
+    transition: width .15s ease;
+  }
+  #progressWrap {
+    margin-top: 16px;
+  }
+  #progressWrap .progress-row {
+    display: flex;
+    justify-content: space-between;
+    font-size: 13px;
+    color: var(--muted);
+    margin-bottom: 6px;
+  }
+
+  /* قائمة الملفات في المجلد */
+  .file-list {
+    max-height: 180px;
+    overflow-y: auto;
+    margin-top: 10px;
+    text-align: right;
+    font-size: 12px;
+    color: var(--muted);
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    padding: 8px;
+    background: var(--bg);
+  }
+  .file-list .fname {
+    color: var(--txt);
+    padding: 2px 4px;
+    display: block;
+    font-size: 12px;
+  }
+
+  /* الإحصائيات */
+  .summary {
+    display: flex;
+    gap: 14px;
+    flex-wrap: wrap;
+    margin-bottom: 18px;
+  }
+  .stat {
+    flex: 1;
+    min-width: 120px;
+    padding: 14px;
+    border-radius: var(--radius);
+    text-align: center;
+    border: 1px solid var(--line);
+    background: var(--panel2);
+  }
+  .stat .num {
+    font-size: 26px;
+    font-weight: 700;
+  }
+  .stat .lbl {
+    font-size: 13px;
+    color: var(--muted);
+    margin-top: 4px;
+  }
+  .stat.s-found {
+    border-color: var(--found-b);
+  }
+  .stat.s-found .num {
+    color: var(--found-b);
+  }
+  .stat.s-missing {
+    border-color: var(--missing-b);
+  }
+  .stat.s-missing .num {
+    color: var(--missing-b);
+  }
+  .stat.s-extra {
+    border-color: var(--extra-b);
+  }
+  .stat.s-extra .num {
+    color: var(--extra-b);
+  }
+  .stat.s-renamed {
+    border-color: var(--accent);
+  }
+  .stat.s-renamed .num {
+    color: var(--accent);
+  }
+
+  /* التصفية والبحث */
+  .filter-row {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    margin-bottom: 14px;
+    align-items: center;
+  }
+  .filter-chip {
+    padding: 6px 14px;
+    border-radius: 20px;
+    border: 1px solid var(--line);
+    background: var(--panel2);
+    cursor: pointer;
+    font-size: 13px;
+    color: var(--muted);
+    user-select: none;
+  }
+  .filter-chip.active {
+    background: var(--accent2);
+    color: #fff;
+    border-color: var(--accent);
+  }
+  .search-box {
+    margin-right: auto;
+    max-width: 260px;
+  }
+
+  /* الجدول */
+  .table-wrap {
+    overflow-x: auto;
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    max-height: 500px;
+    overflow-y: auto;
+  }
+  table {
+    border-collapse: collapse;
+    width: 100%;
+    font-size: 13px;
+  }
+  th,
+  td {
+    padding: 8px 12px;
+    text-align: right;
+    border-bottom: 1px solid var(--line);
+    white-space: nowrap;
+  }
+  th {
+    background: var(--panel2);
+    position: sticky;
+    top: 0;
+    font-weight: 600;
+    z-index: 1;
+  }
+
+  tr.r-found {
+    background: var(--found);
+  }
+  tr.r-found td:first-child {
+    border-right: 3px solid var(--found-b);
+  }
+  tr.r-missing {
+    background: var(--missing);
+  }
+  tr.r-missing td:first-child {
+    border-right: 3px solid var(--missing-b);
+  }
+  tr.r-extra {
+    background: var(--extra);
+  }
+  tr.r-extra td:first-child {
+    border-right: 3px solid var(--extra-b);
+  }
+  tr.r-renamed {
+    background: var(--renamed);
+  }
+  tr.r-renamed td:first-child {
+    border-right: 3px solid var(--accent);
+  }
+
+  .tag {
+    font-size: 11px;
+    padding: 2px 10px;
+    border-radius: 10px;
+    font-weight: 600;
+    display: inline-block;
+  }
+  .tag-found {
+    background: var(--found-b);
+    color: #fff;
+  }
+  .tag-missing {
+    background: var(--missing-b);
+    color: #fff;
+  }
+  .tag-extra {
+    background: var(--extra-b);
+    color: #fff;
+  }
+  .tag-renamed {
+    background: var(--accent);
+    color: #fff;
+  }
+
+  .empty {
+    padding: 40px;
+    text-align: center;
+    color: var(--muted);
+  }
+
+  .legend {
+    display: flex;
+    gap: 20px;
+    flex-wrap: wrap;
+    font-size: 12px;
+    color: var(--muted);
+    margin-top: 12px;
+  }
+  .legend span {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .swatch {
+    width: 14px;
+    height: 14px;
+    border-radius: 3px;
+    display: inline-block;
+  }
+
+  .note {
+    font-size: 13px;
+    color: var(--muted);
+    background: var(--panel2);
+    padding: 10px 14px;
+    border-radius: 8px;
+    border-right: 3px solid var(--accent);
+    margin-top: 12px;
+  }
+
+  .file-name-cell {
+    font-family: monospace;
+    font-size: 12px;
+    color: var(--accent);
+  }
+
+  /* نافذة تأكيد الترقيم */
+  .confirm-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.7);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+    padding: 20px;
+  }
+  .confirm-box {
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    padding: 30px;
+    max-width: 700px;
+    width: 100%;
+    max-height: 80vh;
+    overflow-y: auto;
+  }
+  .confirm-box h3 {
+    margin-bottom: 16px;
+    color: var(--warning);
+  }
+  .confirm-box .rename-item {
+    display: flex;
+    justify-content: space-between;
+    padding: 6px 0;
+    border-bottom: 1px solid var(--line);
+    font-size: 13px;
+    font-family: monospace;
+    gap: 10px;
+  }
+  .confirm-box .rename-item .old {
+    color: var(--missing-b);
+  }
+  .confirm-box .rename-item .arrow {
+    color: var(--muted);
+  }
+  .confirm-box .rename-item .new {
+    color: var(--found-b);
+  }
+  .confirm-box .btn-row {
+    margin-top: 20px;
+    justify-content: center;
+  }
+  .confirm-box .warning-text {
+    color: var(--warning);
+    font-size: 14px;
+    margin-bottom: 12px;
+    padding: 10px;
+    background: rgba(240, 173, 78, 0.1);
+    border-radius: 8px;
+    border-right: 3px solid var(--warning);
+  }
+
+  /* نتائج الترقيم */
+  .rename-result {
+    background: var(--panel2);
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    padding: 16px;
+    margin-top: 12px;
+  }
+  .rename-result .success {
+    color: var(--found-b);
+  }
+  .rename-result .error {
+    color: var(--danger);
+  }
+
+  .col-panel {
+    background: var(--panel2);
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    padding: 16px;
+  }
+  .col-panel h3 {
+    font-size: 15px;
+    margin-bottom: 12px;
+    color: var(--accent);
+    font-weight: 600;
+  }
+
+  .badge {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 10px;
+    font-size: 11px;
+    font-weight: 600;
+  }
+  .badge-success {
+    background: var(--found-b);
+    color: #03260f;
+  }
+  .badge-danger {
+    background: var(--danger);
+    color: #fff;
+  }
+  .badge-warning {
+    background: var(--warning);
+    color: #1a1a1a;
+  }
+
+  .status-icon {
+    font-size: 16px;
+  }
+
+  .rename-preview {
+    margin-top: 12px;
+    padding: 10px;
+    background: var(--bg);
+    border-radius: 6px;
+    border: 1px solid var(--line);
+    max-height: 150px;
+    overflow-y: auto;
+  }
+  .rename-preview .item {
+    display: flex;
+    justify-content: space-between;
+    padding: 3px 0;
+    font-size: 12px;
+    font-family: monospace;
+  }
+</style>
+</head>
+<body class="bg-slate-50">
+
+<header class="bg-slate-900 text-white px-8 py-5 shadow-md">
+    <div class="max-w-7xl mx-auto flex justify-between items-center flex-wrap gap-3">
+        <div class="flex items-center gap-3">
+            <span class="text-3xl">⚡</span>
+            <div>
+                <h1 class="text-xl font-bold">مطابقة وفحص الأرشيف</h1>
+                <p class="text-xs text-slate-400">منظومة الأرشفة الرقمية الذكية | معالج المطابقة والترقيم</p>
+            </div>
+        </div>
+        <a href="/" class="flex items-center gap-2 bg-emerald-500/10 text-emerald-400 text-xs px-4 py-2 rounded-full border border-emerald-500/20 font-semibold hover:bg-emerald-500/20 transition-all">
+            العودة للرئيسية
+            <span class="text-sm">←</span>
+        </a>
+    </div>
+</header>
+
+<div class="wrap">
+  <div class="text-center space-y-2" style="margin-bottom:28px">
+    <h2 class="text-2xl font-bold" style="color:var(--txt)">📂 مطابقة وترقيم الملفات</h2>
+    <p class="text-sm" style="color:var(--muted)">قارن أسماء الطلاب في ملف إكسل مع أسماء الملفات في مجلد، ثم أعد تسمية الملفات باستخدام الأرقام من الإكسل</p>
+  </div>
+
+  <!-- الخطوة 1: رفع الملف والمجلد -->
+  <div class="step">
+    <div class="step-title"><span class="step-num">1</span> رفع الملف الأساسي والمجلد</div>
+    <div class="two-col">
+      <div class="file-box" id="boxExcel">
+        <label>📄 ملف الإكسل (أسماء + أرقام)</label>
+        <label for="fileExcel" class="btn btn-sm" style="display:block;width:100%;text-align:center;cursor:pointer">📄 اختيار ملف</label>
+        <input type="file" id="fileExcel" accept=".xlsx,.xls,.csv" style="display:none">
+        <div class="file-info" id="infoExcel">لم يتم اختيار ملف</div>
+        <div class="sheet-sel" id="sheetSelExcel">
+          <label style="font-size:13px;color:var(--muted);margin:8px 0 4px;display:block">اختر الورقة (Sheet):</label>
+          <select id="sheetExcel"></select>
+        </div>
+      </div>
+      <div class="file-box" id="boxFolder">
+        <label>📁 المجلد (الملفات: صور، وثائق، PDF...)</label>
+        <button type="button" class="btn" id="pickFolderBtn" style="width:100%">📂 اختيار المجلد</button>
+        <div class="file-info" id="infoFolder">لم يتم اختيار مجلد</div>
+        <div class="file-list" id="folderFileList"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- الخطوة 2: الإعدادات -->
+  <div class="step hidden" id="step2">
+    <div class="step-title"><span class="step-num">2</span> إعدادات المطابقة والترقيم</div>
+
+    <div class="two-col">
+      <div class="col-panel">
+        <h3>🔑 اختيار الأعمدة في الإكسل</h3>
+        <div class="field">
+          <label>📝 عمود الأسماء (للمطابقة):</label>
+          <select id="nameColumn"></select>
+          <div style="font-size:11px;color:var(--muted);margin-top:4px">يستخدم لمطابقة الأسماء مع أسماء الملفات في المجلد</div>
+        </div>
+        <div class="field">
+          <label>🔢 عمود الترقيم (لإعادة التسمية):</label>
+          <select id="numberColumn"></select>
+          <div style="font-size:11px;color:var(--muted);margin-top:4px">سيتم استخدام هذه الأرقام لإعادة تسمية الملفات بعد المطابقة</div>
+        </div>
+      </div>
+
+      <div class="col-panel">
+        <h3>⚙️ إعدادات المطابقة</h3>
+        <div class="field">
+          <label>نمط المطابقة:</label>
+          <div class="radio-row" style="margin-top:4px">
+            <label class="radio-card active" id="rcExact" style="flex:1;min-width:80px;padding:8px">
+              <input type="radio" name="matchMode" value="exact" checked>
+              <div class="rc-title" style="font-size:13px">🎯 دقيق</div>
+            </label>
+            <label class="radio-card" id="rcSmart" style="flex:1;min-width:80px;padding:8px">
+              <input type="radio" name="matchMode" value="smart">
+              <div class="rc-title" style="font-size:13px">🧠 ذكي</div>
+            </label>
+            <label class="radio-card" id="rcFuzzy" style="flex:1;min-width:80px;padding:8px">
+              <input type="radio" name="matchMode" value="fuzzy">
+              <div class="rc-title" style="font-size:13px">🔍 تقريبي</div>
+            </label>
+          </div>
+        </div>
+        <div class="field">
+          <label>امتدادات الملفات المطلوبة (اترك فارغاً للكل):</label>
+          <input type="text" id="extensions" placeholder="مثال: jpg,png,pdf" style="width:100%;padding:9px;background:var(--bg);border:1px solid var(--line);border-radius:8px;color:var(--txt);font-family:inherit;font-size:14px">
+        </div>
+        <div class="opts-row">
+          <label class="opt-toggle"><input type="checkbox" id="optRemoveExt" checked> إزالة الامتداد</label>
+          <label class="opt-toggle"><input type="checkbox" id="optNormalize" checked> تطبيع الأسماء</label>
+        </div>
+      </div>
+    </div>
+
+    <div class="note" id="matchNote">🔹 المطابقة الدقيقة: الاسم في الإكسل مطابق تماماً لاسم الملف (بعد إزالة الامتداد).<br>🔹 المطابقة الذكية: تتجاهل اختلافات (أ/إ/آ، ة/ه، ى/ي) والمسافات الزائدة.<br>🔹 المطابقة التقريبية: تعتبر الاسمين متطابقين إذا تجاوز التشابه 80%.</div>
+
+    <div class="btn-row">
+      <button class="btn" id="runBtn">⚡ تنفيذ المطابقة</button>
+      <span style="color:var(--muted);font-size:13px" id="fileCountInfo"></span>
+    </div>
+
+    <div id="progressWrap" style="display:none">
+      <div class="progress-row">
+        <span id="progressLabel">جارٍ المطابقة...</span>
+        <span id="progressPct">0%</span>
+      </div>
+      <div class="progress-track"><div class="progress-fill" id="progressFill"></div></div>
+    </div>
+  </div>
+
+  <!-- الخطوة 3: النتائج -->
+  <div class="step hidden" id="step3">
+    <div class="step-title"><span class="step-num">3</span> النتائج</div>
+
+    <div class="summary" id="summary"></div>
+
+    <div class="filter-row">
+      <span class="filter-chip active" data-f="all">الكل</span>
+      <span class="filter-chip" data-f="found">✅ موجود</span>
+      <span class="filter-chip" data-f="missing">❌ مفقود</span>
+      <span class="filter-chip" data-f="extra">➕ إضافي</span>
+      <span class="filter-chip" data-f="renamed">🔄 مرقّم</span>
+      <input type="text" class="search-box" id="searchBox" placeholder="🔎 بحث في الأسماء...">
+    </div>
+
+    <div class="table-wrap">
+      <table id="resultTable">
+        <thead>
+          <tr>
+            <th style="width:80px">الحالة</th>
+            <th style="min-width:120px">الاسم في الإكسل</th>
+            <th style="min-width:100px">الرقم</th>
+            <th style="min-width:180px">اسم الملف الحالي</th>
+            <th style="min-width:150px">الاسم الجديد</th>
+            <th style="min-width:70px">الامتداد</th>
+          </tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+    </div>
+
+    <div class="legend">
+      <span><span class="swatch" style="background:var(--found-b)"></span> ✅ موجود — له ملف في المجلد</span>
+      <span><span class="swatch" style="background:var(--missing-b)"></span> ❌ مفقود — ليس له ملف</span>
+      <span><span class="swatch" style="background:var(--extra-b)"></span> ➕ إضافي — ملف ليس له اسم في الإكسل</span>
+      <span><span class="swatch" style="background:var(--accent)"></span> 🔄 مرقّم — تم تغيير اسم الملف</span>
+    </div>
+
+    <!-- منطقة الترقيم -->
+    <div id="renameArea" style="margin-top:16px;padding:16px;background:var(--panel2);border:1px solid var(--line);border-radius:var(--radius)">
+      <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px">
+        <div>
+          <h4 style="color:var(--accent);font-size:15px">🔄 ترقيم الملفات</h4>
+          <div style="font-size:13px;color:var(--muted)" id="renameInfo">سيتم إعادة تسمية <strong id="renameCount">0</strong> ملف باستخدام الأرقام من الإكسل</div>
+        </div>
+        <div>
+          <button class="btn btn-warning btn-sm" id="previewBtn">👁️ معاينة التغييرات</button>
+          <button class="btn btn-success" id="renameBtn">🔄 ترقيم الملفات</button>
+        </div>
+      </div>
+      <div id="renamePreview" class="rename-preview hidden"></div>
+    </div>
+
+    <div class="btn-row">
+      <button class="btn" id="exportBtn">📥 تصدير النتائج إلى Excel</button>
+      <button class="btn btn-ghost" id="exportMissingBtn">📋 تصدير المفقودين فقط</button>
+      <button class="btn btn-ghost" id="resetBtn">🔄 مقارنة جديدة</button>
+    </div>
+  </div>
+
+  <!-- نافذة تأكيد الترقيم -->
+  <div id="confirmOverlay" class="confirm-overlay hidden">
+    <div class="confirm-box">
+      <h3>⚠️ تأكيد عملية الترقيم</h3>
+      <div class="warning-text">
+        <strong>تنبيه:</strong> سيتم إعادة تسمية الملفات التالية. هذه العملية <strong>لا يمكن التراجع عنها</strong> بسهولة.
+        يرجى التأكد من صحة الأرقام قبل المتابعة.
+      </div>
+      <div id="confirmList"></div>
+      <div class="btn-row">
+        <button class="btn btn-danger" id="confirmRenameBtn">✅ تأكيد الترقيم</button>
+        <button class="btn btn-ghost" id="cancelRenameBtn">❌ إلغاء</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<footer class="bg-white border-t border-gray-200 py-4 text-center text-[10px] text-slate-400">
+    منظومة الأرشفة الرقمية المتكاملة © 2026
+</footer>
+
+<script>
+  /* ============================================================
+     الحالة العامة
+     ============================================================ */
+  const S = {
+    Excel: { wb: null, rows: [], cols: [], name: "" },
+    Folder: { dirHandle: null, files: [], fileMap: {} },
+    results: [], // [{excelName, number, folderName, ext, path, status: 'found'|'missing'|'extra'|'renamed', newName}]
+    nameColumn: "",
+    numberColumn: "",
+    matchMode: "exact",
+    extensions: [],
+    removeExt: true,
+    normalize: true,
+    renamedCount: 0
+  };
+
+  let folderFileList = [];
+
+  // التحقق من دعم المتصفح لميزة الكتابة الفعلية على المجلد
+  const SUPPORTS_FS_ACCESS = typeof window.showDirectoryPicker === 'function';
+  if (!SUPPORTS_FS_ACCESS) {
+    document.getElementById('infoFolder').textContent =
+      '⚠️ متصفحك لا يدعم إعادة التسمية الفعلية للملفات. الرجاء استخدام Google Chrome أو Microsoft Edge على سطح المكتب.';
+  }
+
+  /* ============================================================
+     قراءة ملف الإكسل
+     ============================================================ */
+  function readExcelFile() {
+    const input = document.getElementById('fileExcel');
+    const file = input.files[0];
+    if (!file) return;
+    const info = document.getElementById('infoExcel');
+    info.textContent = 'جارٍ القراءة...';
+    info.className = 'file-info';
+    const reader = new FileReader();
+    reader.onload = e => {
+      try {
+        const wb = XLSX.read(e.target.result, { type: 'array', cellText: true, raw: false });
+        S.Excel.wb = wb;
+        S.Excel.name = file.name;
+        const sel = document.getElementById('sheetExcel');
+        sel.innerHTML = wb.SheetNames.map(n => `<option>${n}</option>`).join('');
+        document.getElementById('sheetSelExcel').style.display = wb.SheetNames.length > 1 ? 'block' : 'none';
+        loadExcelSheet();
+        info.textContent = `✓ ${file.name}`;
+        info.className = 'file-info ok';
+        document.getElementById('boxExcel').classList.add('loaded');
+      } catch (err) {
+        info.textContent = 'خطأ في قراءة الملف: ' + err.message;
+      }
+    };
+    reader.readAsArrayBuffer(file);
+  }
+
+  function loadExcelSheet() {
+    const sheetName = document.getElementById('sheetExcel').value || S.Excel.wb.SheetNames[0];
+    const ws = S.Excel.wb.Sheets[sheetName];
+    const json = XLSX.utils.sheet_to_json(ws, { defval: '', raw: false, rawNumbers: false });
+    S.Excel.rows = json;
+    S.Excel.cols = json.length ? Object.keys(json[0]) : [];
+    updateColumnSelects();
+    checkReady();
+  }
+
+  function updateColumnSelects() {
+    const cols = S.Excel.cols;
+    const nameSel = document.getElementById('nameColumn');
+    const numSel = document.getElementById('numberColumn');
+    const options = cols.map(c => `<option value="${esc(c)}">${esc(c)}</option>`).join('');
+    nameSel.innerHTML = options;
+    numSel.innerHTML = options;
+    if (cols.length) {
+      nameSel.value = cols.length > 1 ? cols[1] : cols[0];
+      numSel.value = cols[0];
+    }
+  }
+
+  document.getElementById('fileExcel').addEventListener('change', readExcelFile);
+  document.getElementById('sheetExcel').addEventListener('change', loadExcelSheet);
+
+  /* ============================================================
+     اختيار المجلد (صلاحية قراءة وكتابة حقيقية)
+     ============================================================ */
+  async function pickFolder() {
+    if (!SUPPORTS_FS_ACCESS) {
+      alert('متصفحك لا يدعم هذه الميزة. الرجاء استخدام Google Chrome أو Microsoft Edge على سطح المكتب.');
+      return;
+    }
+
+    let dirHandle;
+    try {
+      dirHandle = await window.showDirectoryPicker({ mode: 'readwrite' });
+    } catch (err) {
+      if (err.name === 'AbortError') return; // المستخدم ألغى الاختيار
+      alert('تعذّر فتح المجلد: ' + err.message);
+      return;
+    }
+
+    // التأكد من صلاحية الكتابة فعلياً
+    const perm = await dirHandle.requestPermission({ mode: 'readwrite' });
+    if (perm !== 'granted') {
+      alert('لم يتم منح صلاحية الكتابة على المجلد. لن تتمكن من إعادة تسمية الملفات.');
+    }
+
+    const info = document.getElementById('infoFolder');
+    info.textContent = 'جارٍ قراءة المجلد...';
+
+    folderFileList = [];
+    for await (const entry of dirHandle.values()) {
+      if (entry.kind === 'file') {
+        folderFileList.push({ name: entry.name });
+      }
+    }
+
+    S.Folder.dirHandle = dirHandle;
+
+    info.innerHTML = `✓ تم اختيار مجلد يحتوي على <span class="count">${folderFileList.length}</span> ملف`;
+    info.className = 'file-info ok';
+    document.getElementById('boxFolder').classList.add('loaded');
+
+    checkReady();
+  }
+
+  document.getElementById('pickFolderBtn').addEventListener('click', pickFolder);
+
+  /* ============================================================
+     التحقق من الجاهزية
+     ============================================================ */
+  function checkReady() {
+    if (S.Excel.cols.length && folderFileList.length) {
+      document.getElementById('step2').classList.remove('hidden');
+      document.getElementById('fileCountInfo').textContent = `📁 ${folderFileList.length} ملف في المجلد`;
+    }
+  }
+
+  /* ============================================================
+     نوع المطابقة UI
+     ============================================================ */
+  document.querySelectorAll('input[name=matchMode]').forEach(r => {
+    r.addEventListener('change', () => {
+      document.querySelectorAll('.radio-card').forEach(c => c.classList.remove('active'));
+      const parent = r.closest('.radio-card');
+      if (parent) parent.classList.add('active');
+
+      const mode = r.value;
+      const notes = {
+        'exact': '🔹 المطابقة الدقيقة: الاسم في الإكسل مطابق تماماً لاسم الملف (بعد إزالة الامتداد).',
+        'smart': '🔹 المطابقة الذكية: تتجاهل اختلافات (أ/إ/آ، ة/ه، ى/ي) والمسافات الزائدة.',
+        'fuzzy': '🔹 المطابقة التقريبية: تعتبر الاسمين متطابقين إذا تجاوز التشابه 80%.'
+      };
+      document.getElementById('matchNote').textContent = notes[mode] || '';
+    });
+  });
+
+  /* ============================================================
+     دوال التطبيع والمطابقة
+     ============================================================ */
+  function normalizeArabic(s) {
+    if (s == null) return '';
+    s = String(s).trim();
+    s = s.replace(/[\u064B-\u0652\u0670\u0640]/g, '');
+    s = s.replace(/[إأآاٱ]/g, 'ا');
+    s = s.replace(/[ؤئء]/g, '');
+    s = s.replace(/ة/g, 'ه');
+    s = s.replace(/ى/g, 'ي');
+    s = s.replace(/ي/g, 'ي');
+    s = s.replace(/\s+/g, ' ').trim();
+    return s;
+  }
+
+  function similarity(a, b) {
+    if (a === b) return 1;
+    if (!a.length || !b.length) return 0;
+    const m = a.length,
+      n = b.length;
+    const d = Array.from({ length: m + 1 }, (_, i) => [i, ...Array(n).fill(0)]);
+    for (let j = 0; j <= n; j++) d[0][j] = j;
+    for (let i = 1; i <= m; i++)
+      for (let j = 1; j <= n; j++) {
+        const c = a[i - 1] === b[j - 1] ? 0 : 1;
+        d[i][j] = Math.min(d[i - 1][j] + 1, d[i][j - 1] + 1, d[i - 1][j - 1] + c);
+      }
+    return 1 - d[m][n] / Math.max(m, n);
+  }
+
+  function getFileNameWithoutExt(name) {
+    const parts = name.split('.');
+    if (parts.length > 1) {
+      const ext = parts.pop();
+      return { name: parts.join('.'), ext: ext.toLowerCase() };
+    }
+    return { name: name, ext: '' };
+  }
+
+  function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
+
+  /* ============================================================
+     تنفيذ المطابقة
+     ============================================================ */
+  document.getElementById('runBtn').addEventListener('click', runMatch);
+
+  function setProgress(pct, label) {
+    document.getElementById('progressFill').style.width = pct + '%';
+    document.getElementById('progressPct').textContent = Math.round(pct) + '%';
+    if (label) document.getElementById('progressLabel').textContent = label;
+  }
+
+  async function runMatch() {
+    const nameCol = document.getElementById('nameColumn').value;
+    const numCol = document.getElementById('numberColumn').value;
+    if (!nameCol) { alert('اختر عمود الأسماء في ملف الإكسل'); return; }
+    if (!numCol) { alert('اختر عمود الترقيم في ملف الإكسل'); return; }
+
+    S.nameColumn = nameCol;
+    S.numberColumn = numCol;
+    S.matchMode = document.querySelector('input[name=matchMode]:checked').value;
+
+    const extInput = document.getElementById('extensions').value.trim();
+    S.extensions = extInput ? extInput.split(',').map(e => e.trim().toLowerCase()).filter(e => e) : [];
+    S.removeExt = document.getElementById('optRemoveExt').checked;
+    S.normalize = document.getElementById('optNormalize').checked;
+
+    // تحضير بيانات الإكسل
+    const excelData = S.Excel.rows.map(row => ({
+      name: String(row[nameCol] || '').trim(),
+      number: String(row[numCol] || '').trim()
+    })).filter(d => d.name);
+
+    if (!excelData.length) { alert('لا توجد أسماء في عمود الإكسل المحدد'); return; }
+    if (!folderFileList.length) { alert('المجلد فارغ'); return; }
+
+    const runBtn = document.getElementById('runBtn');
+    runBtn.disabled = true;
+    runBtn.style.opacity = '.6';
+    document.getElementById('progressWrap').style.display = 'block';
+    setProgress(0, 'جارٍ تجهيز البيانات...');
+    await sleep(30);
+
+    // تصفية الملفات حسب الامتداد
+    let filteredFiles = folderFileList;
+    if (S.extensions.length) {
+      filteredFiles = folderFileList.filter(f => {
+        const ext = f.name.split('.').pop().toLowerCase();
+        return S.extensions.includes(ext);
+      });
+      setProgress(5, `تم تصفية ${filteredFiles.length} ملف من ${folderFileList.length}`);
+      await sleep(20);
+    }
+
+    // بناء خريطة الملفات
+    const fileMap = new Map();
+    const fileMapNormalized = new Map();
+
+    for (const f of filteredFiles) {
+      let name = f.name;
+      let ext = '';
+      if (S.removeExt) {
+        const parsed = getFileNameWithoutExt(name);
+        name = parsed.name;
+        ext = parsed.ext;
+      } else {
+        const parts = name.split('.');
+        ext = parts.length > 1 ? parts.pop().toLowerCase() : '';
+      }
+      const key = S.normalize ? normalizeArabic(name) : name.trim();
+      if (!fileMap.has(key)) {
+        fileMap.set(key, { fullName: f.name, ext: ext, path: f.webkitRelativePath || f.name, file: f });
+      }
+      const normKey = normalizeArabic(name);
+      if (!fileMapNormalized.has(normKey)) {
+        fileMapNormalized.set(normKey, { fullName: f.name, ext: ext, path: f.webkitRelativePath || f.name, file: f });
+      }
+    }
+
+    setProgress(10, 'جارٍ المطابقة...');
+    await sleep(20);
+
+    // المطابقة
+    const results = [];
+    const usedFiles = new Set();
+    const total = excelData.length;
+    let processed = 0;
+
+    for (const item of excelData) {
+      let match = null;
+      let matchType = 'missing';
+      let matchedKey = '';
+
+      const normName = S.normalize ? normalizeArabic(item.name) : item.name.trim();
+
+      if (S.matchMode === 'exact') {
+        const key = S.normalize ? normName : item.name.trim();
+        if (fileMap.has(key)) {
+          match = fileMap.get(key);
+          matchType = 'found';
+          matchedKey = key;
+        }
+      } else if (S.matchMode === 'smart') {
+        if (fileMapNormalized.has(normName)) {
+          match = fileMapNormalized.get(normName);
+          matchType = 'found';
+          matchedKey = normName;
+        } else {
+          const noSpaceKey = normName.replace(/\s+/g, '');
+          for (const [k, v] of fileMapNormalized) {
+            if (k.replace(/\s+/g, '') === noSpaceKey) {
+              match = v;
+              matchType = 'found';
+              matchedKey = k;
+              break;
+            }
+          }
+        }
+      } else if (S.matchMode === 'fuzzy') {
+        let bestScore = 0;
+        let bestMatch = null;
+        let bestKey = '';
+        for (const [k, v] of fileMapNormalized) {
+          const score = similarity(normName, k);
+          if (score > bestScore && score >= 0.8) {
+            bestScore = score;
+            bestMatch = v;
+            bestKey = k;
+          }
+        }
+        if (bestMatch) {
+          match = bestMatch;
+          matchType = 'found';
+          matchedKey = bestKey;
+        }
+      }
+
+      if (matchType === 'found' && match) {
+        const fileKey = match.fullName;
+        if (usedFiles.has(fileKey)) {
+          match = null;
+          matchType = 'missing';
+          for (const [k, v] of fileMapNormalized) {
+            if (k === matchedKey && !usedFiles.has(v.fullName)) {
+              match = v;
+              matchType = 'found';
+              matchedKey = k;
+              break;
+            }
+          }
+          if (!match) {
+            const baseKey = S.normalize ? normalizeArabic(item.name) : item.name.trim();
+            for (const [k, v] of fileMap) {
+              if (k === baseKey && !usedFiles.has(v.fullName)) {
+                match = v;
+                matchType = 'found';
+                matchedKey = k;
+                break;
+              }
+            }
+          }
+        }
+        if (match) {
+          usedFiles.add(match.fullName);
+        }
+      }
+
+      const newName = matchType === 'found' && item.number ?
+        item.number + (match ? '.' + match.ext : '') :
+        '';
+
+      results.push({
+        excelName: item.name,
+        number: item.number,
+        folderName: match ? match.fullName : '',
+        ext: match ? match.ext : '',
+        path: match ? match.path : '',
+        file: match ? match.file : null,
+        status: matchType,
+        matchedKey: matchedKey,
+        newName: newName,
+        renamed: false
+      });
+
+      processed++;
+      if (processed % 10 === 0) {
+        setProgress(10 + (processed / total) * 75, `مطابقة ${processed}/${total}...`);
+        await sleep(0);
+      }
+    }
+
+    // الملفات الإضافية
+    setProgress(88, 'جارٍ استخراج الملفات الإضافية...');
+    await sleep(20);
+
+    const usedNames = new Set();
+    for (const r of results) {
+      if (r.status === 'found' && r.folderName) {
+        usedNames.add(r.folderName);
+      }
+    }
+
+    for (const f of filteredFiles) {
+      if (!usedNames.has(f.name)) {
+        let name = f.name;
+        let ext = '';
+        if (S.removeExt) {
+          const parsed = getFileNameWithoutExt(name);
+          name = parsed.name;
+          ext = parsed.ext;
+        } else {
+          const parts = name.split('.');
+          ext = parts.length > 1 ? parts.pop().toLowerCase() : '';
+        }
+        results.push({
+          excelName: '',
+          number: '',
+          folderName: f.name,
+          ext: ext,
+          path: f.webkitRelativePath || f.name,
+          file: f,
+          status: 'extra',
+          matchedKey: '',
+          newName: '',
+          renamed: false
+        });
+      }
+    }
+
+    setProgress(100, 'اكتملت المطابقة ✓');
+    S.results = results;
+    S.renamedCount = 0;
+    renderResults();
+    updateRenameInfo();
+
+    setTimeout(() => {
+      document.getElementById('progressWrap').style.display = 'none';
+      runBtn.disabled = false;
+      runBtn.style.opacity = '1';
+    }, 500);
+  }
+
+  /* ============================================================
+     عرض النتائج
+     ============================================================ */
+  function renderResults() {
+    const results = S.results;
+
+    const found = results.filter(r => r.status === 'found').length;
+    const missing = results.filter(r => r.status === 'missing').length;
+    const extra = results.filter(r => r.status === 'extra').length;
+    const renamed = results.filter(r => r.status === 'renamed').length;
+
+    document.getElementById('summary').innerHTML = `
+      <div class="stat s-found"><div class="num">${found}</div><div class="lbl">✅ موجود</div></div>
+      <div class="stat s-missing"><div class="num">${missing}</div><div class="lbl">❌ مفقود</div></div>
+      <div class="stat s-extra"><div class="num">${extra}</div><div class="lbl">➕ إضافي</div></div>
+      <div class="stat s-renamed"><div class="num">${renamed}</div><div class="lbl">🔄 مرقّم</div></div>
+    `;
+
+    drawTable();
+    document.getElementById('step3').classList.remove('hidden');
+    document.getElementById('step3').scrollIntoView({ behavior: 'smooth' });
+  }
+
+  function drawTable() {
+    const filter = document.querySelector('.filter-chip.active').dataset.f;
+    const q = document.getElementById('searchBox').value.trim().toLowerCase();
+
+    let filtered = S.results;
+    if (filter !== 'all') {
+      filtered = filtered.filter(r => r.status === filter);
+    }
+    if (q) {
+      filtered = filtered.filter(r =>
+        (r.excelName || '').toLowerCase().includes(q) ||
+        (r.folderName || '').toLowerCase().includes(q) ||
+        (r.number || '').toLowerCase().includes(q)
+      );
+    }
+
+    const tbody = document.querySelector('#resultTable tbody');
+    if (!filtered.length) {
+      tbody.innerHTML = '<tr><td colspan="6"><div class="empty">لا توجد نتائج مطابقة للمرشّح</div></td></tr>';
+      return;
+    }
+
+    const statusMap = {
+      'found': { class: 'r-found', tag: 'tag-found', label: '✅ موجود' },
+      'missing': { class: 'r-missing', tag: 'tag-missing', label: '❌ مفقود' },
+      'extra': { class: 'r-extra', tag: 'tag-extra', label: '➕ إضافي' },
+      'renamed': { class: 'r-renamed', tag: 'tag-renamed', label: '🔄 مرقّم' }
+    };
+
+    tbody.innerHTML = filtered.map(r => {
+      const st = statusMap[r.status] || statusMap.missing;
+      const newNameDisplay = r.newName || '—';
+      const extDisplay = r.ext || '—';
+      const numDisplay = r.number || '—';
+      return `<tr class="${st.class}">
+        <td><span class="tag ${st.tag}">${st.label}</span></td>
+        <td>${esc(r.excelName || '—')}</td>
+        <td>${esc(numDisplay)}</td>
+        <td class="file-name-cell">${esc(r.folderName || '—')}</td>
+        <td class="file-name-cell" style="color:${r.newName ? 'var(--found-b)' : 'var(--muted)'}">${esc(newNameDisplay)}</td>
+        <td>${esc(extDisplay)}</td>
+      </tr>`;
+    }).join('');
+  }
+
+  /* ============================================================
+     تحديث معلومات الترقيم
+     ============================================================ */
+  function updateRenameInfo() {
+    const toRename = S.results.filter(r =>
+      r.status === 'found' && r.number && r.folderName && !r.renamed
+    );
+    document.getElementById('renameCount').textContent = toRename.length;
+    document.getElementById('renameInfo').innerHTML =
+      `سيتم إعادة تسمية <strong id="renameCount">${toRename.length}</strong> ملف باستخدام الأرقام من الإكسل`;
+  }
+
+  /* ============================================================
+     معاينة التغييرات
+     ============================================================ */
+  document.getElementById('previewBtn').addEventListener('click', () => {
+    const toRename = S.results.filter(r =>
+      r.status === 'found' && r.number && r.folderName && !r.renamed
+    );
+    const preview = document.getElementById('renamePreview');
+    if (!toRename.length) {
+      preview.innerHTML = '<div style="color:var(--muted);text-align:center">لا توجد ملفات للترقيم</div>';
+      preview.classList.remove('hidden');
+      return;
+    }
+    preview.innerHTML = toRename.map(r =>
+      `<div class="item">
+        <span class="old">${esc(r.folderName)}</span>
+        <span style="color:var(--muted)"> → </span>
+        <span class="new">${esc(r.newName)}</span>
+      </div>`
+    ).join('');
+    preview.classList.toggle('hidden');
+  });
+
+  /* ============================================================
+     ترقيم الملفات
+     ============================================================ */
+  document.getElementById('renameBtn').addEventListener('click', () => {
+    const toRename = S.results.filter(r =>
+      r.status === 'found' && r.number && r.folderName && !r.renamed
+    );
+    if (!toRename.length) {
+      alert('لا توجد ملفات للترقيم. تأكد من وجود أسماء مطابقة بأرقام.');
+      return;
+    }
+
+    // عرض نافذة التأكيد
+    const overlay = document.getElementById('confirmOverlay');
+    const list = document.getElementById('confirmList');
+    list.innerHTML = toRename.map(r =>
+      `<div class="rename-item">
+        <span class="old">${esc(r.folderName)}</span>
+        <span class="arrow"> → </span>
+        <span class="new">${esc(r.newName)}</span>
+      </div>`
+    ).join('');
+    overlay.classList.remove('hidden');
+  });
+
+  document.getElementById('cancelRenameBtn').addEventListener('click', () => {
+    document.getElementById('confirmOverlay').classList.add('hidden');
+  });
+
+  document.getElementById('confirmRenameBtn').addEventListener('click', async () => {
+    const overlay = document.getElementById('confirmOverlay');
+    overlay.classList.add('hidden');
+
+    const toRename = S.results.filter(r =>
+      r.status === 'found' && r.number && r.folderName && !r.renamed
+    );
+
+    if (!toRename.length) return;
+
+    if (!S.Folder.dirHandle) {
+      alert('يجب اختيار المجلد أولاً باستخدام زر "اختيار المجلد".');
+      return;
+    }
+
+    const runBtn = document.getElementById('renameBtn');
+    runBtn.disabled = true;
+    runBtn.textContent = '⏳ جارٍ الترقيم...';
+
+    const dirHandle = S.Folder.dirHandle;
+    let renamedCount = 0;
+    const errors = [];
+
+    for (const r of toRename) {
+      const oldName = r.folderName;
+      const newName = r.newName;
+
+      if (!newName || oldName === newName) {
+        continue;
+      }
+
+      try {
+        const oldHandle = await dirHandle.getFileHandle(oldName);
+
+        if (typeof oldHandle.move === 'function') {
+          // الطريقة المباشرة: إعادة تسمية حقيقية بدون نسخ
+          await oldHandle.move(newName);
+        } else {
+          // بديل: نسخ المحتوى لملف جديد بالاسم الجديد ثم حذف القديم
+          const fileData = await oldHandle.getFile();
+          const buffer = await fileData.arrayBuffer();
+          const newHandle = await dirHandle.getFileHandle(newName, { create: true });
+          const writable = await newHandle.createWritable();
+          await writable.write(buffer);
+          await writable.close();
+          await dirHandle.removeEntry(oldName);
+        }
+
+        r.folderName = newName;
+        r.status = 'renamed';
+        r.renamed = true;
+        renamedCount++;
+      } catch (err) {
+        errors.push(`${oldName} ← ${err.message}`);
+      }
+
+      await sleep(20);
+    }
+
+    S.renamedCount = renamedCount;
+    renderResults();
+    updateRenameInfo();
+
+    runBtn.disabled = false;
+    runBtn.textContent = '🔄 ترقيم الملفات';
+
+    const renameInfo = document.getElementById('renameInfo');
+    if (errors.length) {
+      renameInfo.innerHTML = `✅ تم ترقيم <strong>${renamedCount}</strong> ملف بنجاح. ⚠️ فشل ترقيم <strong>${errors.length}</strong> ملف: ${errors.slice(0, 5).map(esc).join(' | ')}`;
+      renameInfo.style.color = 'var(--warning)';
+    } else {
+      renameInfo.innerHTML = `✅ تم ترقيم <strong>${renamedCount}</strong> ملف بنجاح داخل المجلد فعلياً.`;
+      renameInfo.style.color = 'var(--success)';
+    }
+  });
+
+  /* ============================================================
+     التصفية والبحث
+     ============================================================ */
+  document.querySelectorAll('.filter-chip').forEach(c => c.addEventListener('click', () => {
+    document.querySelectorAll('.filter-chip').forEach(x => x.classList.remove('active'));
+    c.classList.add('active');
+    drawTable();
+  }));
+
+  document.getElementById('searchBox').addEventListener('input', drawTable);
+
+  /* ============================================================
+     تصدير النتائج
+     ============================================================ */
+  document.getElementById('exportBtn').addEventListener('click', () => {
+    const data = S.results.map(r => ({
+      'الحالة': r.status === 'found' ? 'موجود' : r.status === 'missing' ? 'مفقود' : r.status === 'renamed' ? 'مرقّم' : 'إضافي',
+      'الاسم في الإكسل': r.excelName || '',
+      'الرقم': r.number || '',
+      'اسم الملف الحالي': r.folderName || '',
+      'الاسم الجديد المقترح': r.newName || '',
+      'الامتداد': r.ext || ''
+    }));
+    if (!data.length) { alert('لا توجد نتائج للتصدير'); return; }
+    const ws = XLSX.utils.json_to_sheet(data);
+    ws['!cols'] = [{ wch: 12 }, { wch: 25 }, { wch: 15 }, { wch: 30 }, { wch: 30 }, { wch: 10 }];
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'نتائج المطابقة');
+    XLSX.writeFile(wb, 'نتائج_المطابقة.xlsx');
+  });
+
+  document.getElementById('exportMissingBtn').addEventListener('click', () => {
+    const missing = S.results.filter(r => r.status === 'missing');
+    if (!missing.length) { alert('لا يوجد أسماء مفقودة للتصدير'); return; }
+    const data = missing.map(r => ({
+      'الاسم المفقود': r.excelName || '',
+      'الرقم': r.number || ''
+    }));
+    const ws = XLSX.utils.json_to_sheet(data);
+    ws['!cols'] = [{ wch: 30 }, { wch: 15 }];
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'الأسماء المفقودة');
+    XLSX.writeFile(wb, 'الأسماء_المفقودة.xlsx');
+  });
+
+  /* ============================================================
+     إعادة تعيين
+     ============================================================ */
+  document.getElementById('resetBtn').addEventListener('click', () => {
+    S.Excel = { wb: null, rows: [], cols: [], name: "" };
+    S.Folder = { dirHandle: null, files: [], fileMap: {} };
+    S.results = [];
+    S.renamedCount = 0;
+
+    document.getElementById('fileExcel').value = '';
+    document.getElementById('infoExcel').textContent = 'لم يتم اختيار ملف';
+    document.getElementById('infoExcel').className = 'file-info';
+    document.getElementById('infoFolder').textContent = 'لم يتم اختيار مجلد';
+    document.getElementById('infoFolder').className = 'file-info';
+    document.getElementById('boxExcel').classList.remove('loaded');
+    document.getElementById('boxFolder').classList.remove('loaded');
+    document.getElementById('folderFileList').innerHTML = '';
+    document.getElementById('sheetSelExcel').style.display = 'none';
+    document.getElementById('sheetExcel').innerHTML = '';
+    document.getElementById('nameColumn').innerHTML = '';
+    document.getElementById('numberColumn').innerHTML = '';
+    document.getElementById('step2').classList.add('hidden');
+    document.getElementById('step3').classList.add('hidden');
+    document.getElementById('summary').innerHTML = '';
+    document.querySelector('#resultTable tbody').innerHTML = '';
+    document.getElementById('fileCountInfo').textContent = '';
+    document.getElementById('searchBox').value = '';
+    document.getElementById('renamePreview').classList.add('hidden');
+    document.getElementById('renamePreview').innerHTML = '';
+    document.querySelectorAll('.filter-chip').forEach(x => x.classList.remove('active'));
+    const allChip = document.querySelector('.filter-chip[data-f="all"]');
+    if (allChip) allChip.classList.add('active');
+    folderFileList = [];
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  });
+
+  /* ============================================================
+     أدوات
+     ============================================================ */
+  function esc(s) {
+    return String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' } [c]));
+  }
+</script>
+</body>
+</html>
