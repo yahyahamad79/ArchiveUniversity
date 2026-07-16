@@ -13,4 +13,194 @@
 <body class="bg-slate-50 min-h-screen flex flex-col justify-between">
 
     <header class="bg-slate-900 text-white px-8 py-5 shadow-md">
-        <div class="max-w-7xl mx-auto flex justify-between items
+        <div class="max-w-7xl mx-auto flex justify-between items-center">
+            <div class="flex items-center gap-3">
+                <span class="text-2xl">⚙️</span>
+                <div>
+                    <h1 class="text-lg font-bold">تهيئة مسارات النظام</h1>
+                    <p class="text-xs text-slate-400">ضبط واختيار مجلدات العمل وقاعدة البيانات بسهولة</p>
+                </div>
+            </div>
+            <a href="/" class="bg-slate-800 hover:bg-slate-750 text-slate-200 text-xs font-bold px-4 py-2 rounded-lg border border-slate-700 transition">العودة للرئيسية</a>
+        </div>
+    </header>
+
+    <main class="max-w-3xl mx-auto my-10 p-8 bg-white rounded-2xl shadow-sm border border-slate-100 flex-grow w-full">
+        <h2 class="text-xl font-bold text-slate-800 mb-6 pb-3 border-b border-slate-100">📂 اختيار وتأكيد مسارات العمل</h2>
+
+        <div class="space-y-6">
+            <div class="bg-slate-50 p-5 rounded-xl border border-slate-200">
+                <label class="block text-sm font-bold text-slate-700 mb-2">1. مجلد صندوق العمل المؤقت (Workspace):</label>
+                <div class="flex gap-2">
+                    <input type="text" id="workspace_path" oninput="handleManualInput('workspace_path', 'workspace_badge')" placeholder="اكتب المسار يدوياً هنا أو استخدم زر الاختيار..." 
+                           class="w-full text-xs bg-white border border-slate-300 rounded-lg px-3 py-2 text-slate-800 focus:ring-2 focus:ring-indigo-500 focus:outline-none">
+                    <button onclick="document.getElementById('workspace_input').click()" class="bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold px-4 py-2 rounded-lg whitespace-nowrap transition">
+                        📁 اختر المجلد
+                    </button>
+                    <input type="file" id="workspace_input" webkitdirectory directory multiple class="hidden" onchange="handleFolderSelect(this, 'workspace_path', 'workspace_badge')">
+                </div>
+                <div class="mt-2 flex justify-between items-center">
+                    <span class="text-[11px] text-slate-500">اكتب المسار يدوياً (مثال: D:\Workspace) أو حدده بالزر.</span>
+                    <span id="workspace_badge" class="text-[10px] font-bold text-rose-600 bg-rose-50 px-2 py-0.5 rounded">غير محدد</span>
+                </div>
+            </div>
+
+            <div class="bg-slate-50 p-5 rounded-xl border border-slate-200">
+                <label class="block text-sm font-bold text-slate-700 mb-2">2. مجلد الأرشيف الفعلي المستهدف (Archive):</label>
+                <div class="flex gap-2">
+                    <input type="text" id="archive_path" oninput="handleManualInput('archive_path', 'archive_badge')" placeholder="اكتب المسار يدوياً هنا أو استخدم زر الاختيار..." 
+                           class="w-full text-xs bg-white border border-slate-300 rounded-lg px-3 py-2 text-slate-800 focus:ring-2 focus:ring-indigo-500 focus:outline-none">
+                    <button onclick="document.getElementById('archive_input').click()" class="bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold px-4 py-2 rounded-lg whitespace-nowrap transition">
+                        📁 اختر المجلد
+                    </button>
+                    <input type="file" id="archive_input" webkitdirectory directory multiple class="hidden" onchange="handleFolderSelect(this, 'archive_path', 'archive_badge')">
+                </div>
+                <div class="mt-2 flex justify-between items-center">
+                    <span class="text-[11px] text-slate-500">اكتب المسار يدوياً (مثال: D:\Archive) أو حدده بالزر.</span>
+                    <span id="archive_badge" class="text-[10px] font-bold text-rose-600 bg-rose-50 px-2 py-0.5 rounded">غير محدد</span>
+                </div>
+            </div>
+
+            <div class="bg-slate-50 p-5 rounded-xl border border-slate-200">
+                <label class="block text-sm font-bold text-slate-700 mb-2">3. ملف قاعدة البيانات الرئيسي (Excel):</label>
+                <div class="flex gap-2">
+                    <input type="text" id="excel_path" oninput="handleManualInput('excel_path', 'excel_badge')" placeholder="اكتب مسار ملف الإكسل يدوياً أو استخدم زر الاختيار..." 
+                           class="w-full text-xs bg-white border border-slate-300 rounded-lg px-3 py-2 text-slate-800 focus:ring-2 focus:ring-indigo-500 focus:outline-none">
+                    <button onclick="document.getElementById('excel_input').click()" class="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold px-4 py-2 rounded-lg whitespace-nowrap transition">
+                        📊 اختر الملف
+                    </button>
+                    <input type="file" id="excel_input" accept=".xlsx, .xls" class="hidden" onchange="handleFileSelect(this, 'excel_path', 'excel_badge')">
+                </div>
+                <div class="mt-2 flex justify-between items-center">
+                    <span class="text-[11px] text-slate-500">اكتب مسار ملف الإكسل يدوياً (مثال: D:\data.xlsx) أو حدده بالزر.</span>
+                    <span id="excel_badge" class="text-[10px] font-bold text-rose-600 bg-rose-50 px-2 py-0.5 rounded">غير محدد</span>
+                </div>
+            </div>
+
+            <div id="path_alert" class="hidden p-4 rounded-xl text-xs font-semibold"></div>
+
+            <div class="flex gap-3 justify-end pt-4">
+                <button onclick="verifySelectedPaths()" class="bg-slate-800 hover:bg-slate-700 text-white text-xs font-bold px-6 py-3 rounded-xl transition shadow-sm">
+                    🔍 اختبار وتأكيد الاختيارات
+                </button>
+                <button onclick="savePathsToLocal()" class="bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold px-6 py-3 rounded-xl transition shadow-sm">
+                    💾 حفظ التهيئة بالنظام
+                </button>
+            </div>
+        </div>
+    </main>
+
+    <footer class="bg-slate-900 text-slate-500 text-center py-4 border-t border-slate-800 text-xs">
+        &copy; 2026 نظام الأرشفة الذكي - جامعة القدس المفتوحة. جميع الحقوق محفوظة.
+    </footer>
+
+    <script>
+        // استعادة البيانات المخزنة محلياً عند فتح الصفحة وتعبئتها
+        window.onload = function() {
+            const savedWorkspace = localStorage.getItem('workspace_path_val');
+            const savedArchive = localStorage.getItem('archive_path_val');
+            const savedExcel = localStorage.getItem('excel_path_val');
+
+            if (savedWorkspace) {
+                document.getElementById('workspace_path').value = savedWorkspace;
+                updateBadge('workspace_badge', true, "محدد ومحفوظ");
+            }
+            if (savedArchive) {
+                document.getElementById('archive_path').value = savedArchive;
+                updateBadge('archive_badge', true, "محدد ومحفوظ");
+            }
+            if (savedExcel) {
+                document.getElementById('excel_path').value = savedExcel;
+                updateBadge('excel_badge', true, "محدد ومحفوظ");
+            }
+        }
+
+        // التعامل مع الإدخال اليدوي وتحديث الشارات مباشرة
+        function handleManualInput(inputId, badgeId) {
+            const val = document.getElementById(inputId).value.trim();
+            if (val.length > 0) {
+                updateBadge(badgeId, true, "تم الإدخال يدوياً");
+            } else {
+                updateBadge(badgeId, false, "");
+            }
+        }
+
+        // معالجة اختيار المجلدات عبر الزر
+        function handleFolderSelect(input, textId, badgeId) {
+            if (input.files.length > 0) {
+                // نأخذ مسار المجلد التقديري أو اسم المجلد الرئيسي
+                const relativePath = input.files[0].webkitRelativePath;
+                const folderName = relativePath.split('/')[0];
+                document.getElementById(textId).value = folderName;
+                updateBadge(badgeId, true, "تم الاختيار بالزر");
+                showAlert("تم اختيار المجلد بنجاح!", true);
+            }
+        }
+
+        // معالجة اختيار ملف الإكسل عبر الزر
+        function handleFileSelect(input, textId, badgeId) {
+            if (input.files.length > 0) {
+                const fileName = input.files[0].name;
+                document.getElementById(textId).value = fileName;
+                updateBadge(badgeId, true, "تم الاختيار بالزر");
+                showAlert("تم اختيار ملف الإكسل بنجاح!", true);
+            }
+        }
+
+        // التحقق واختبار المجلدات المحددة (يدوياً أو بالزر)
+        function verifySelectedPaths() {
+            const workspace = document.getElementById('workspace_path').value.trim();
+            const archive = document.getElementById('archive_path').value.trim();
+            const excel = document.getElementById('excel_path').value.trim();
+
+            if (!workspace || !archive || !excel) {
+                showAlert("❌ تنبيه: يرجى كتابة المسارات أو اختيارها بالكامل أولاً لتأكيدها.", false);
+            } else {
+                showAlert(`🎉 ممتاز! تم التأكد من إدخال جميع المسارات بنجاح وهي جاهزة للحفظ.`, true);
+            }
+        }
+
+        // حفظ مسارات التهيئة في المتصفح لاستخدامها في الشاشات الأخرى
+        function savePathsToLocal() {
+            const workspace = document.getElementById('workspace_path').value.trim();
+            const archive = document.getElementById('archive_path').value.trim();
+            const excel = document.getElementById('excel_path').value.trim();
+
+            if (!workspace || !archive || !excel) {
+                showAlert("❌ فشل الحفظ: لا يمكن ترك أي مسار فارغاً.", false);
+                return;
+            }
+
+            // تخزين دائم في المتصفح لضمان عدم ضياع المدخلات
+            localStorage.setItem('workspace_path_val', workspace);
+            localStorage.setItem('archive_path_val', archive);
+            localStorage.setItem('excel_path_val', excel);
+            
+            showAlert("💾 تم حفظ كافة الإعدادات والمسارات بنجاح داخل المتصفح! يمكنك المتابعة الآن بأمان.", true);
+        }
+
+        // تحديث شارات الحالة
+        function updateBadge(elementId, exists, text) {
+            const el = document.getElementById(elementId);
+            if(exists) {
+                el.innerText = text;
+                el.className = "text-[10px] font-bold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded";
+            } else {
+                el.innerText = "غير محدد";
+                el.className = "text-[10px] font-bold text-rose-600 bg-rose-50 px-2 py-0.5 rounded";
+            }
+        }
+
+        // عرض رسائل التنبيه والنجاح
+        function showAlert(text, isSuccess) {
+            const el = document.getElementById('path_alert');
+            el.innerText = text;
+            el.className = `p-4 rounded-xl text-xs font-semibold block ${
+                isSuccess 
+                ? 'bg-emerald-50 text-emerald-800 border border-emerald-100' 
+                : 'bg-rose-50 text-rose-800 border border-rose-100'
+            }`;
+        }
+    </script>
+</body>
+</html>
