@@ -108,8 +108,18 @@
     grid-template-columns: 1fr 1fr;
     gap: 16px;
   }
+  .three-col {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 16px;
+  }
+  @media(max-width:960px) {
+    .three-col {
+      grid-template-columns: 1fr 1fr;
+    }
+  }
   @media(max-width:760px) {
-    .two-col {
+    .two-col, .three-col {
       grid-template-columns: 1fr;
     }
   }
@@ -691,10 +701,10 @@
   <!-- الخطوة 1: رفع الملف والمجلد -->
   <div class="step">
     <div class="step-title"><span class="step-num">1</span> رفع الملف الأساسي والمجلد</div>
-    <div class="two-col">
+    <div class="three-col">
       <div class="file-box" id="boxExcel">
         <label>📄 ملف الإكسل (أسماء + أرقام)</label>
-        <label for="fileExcel" class="btn btn-sm" style="display:block;width:100%;text-align:center;cursor:pointer">📄 اختيار ملف</label>
+        <label for="fileExcel" class="btn" style="display:block;width:100%;text-align:center;cursor:pointer">📄 اختيار ملف</label>
         <input type="file" id="fileExcel" accept=".xlsx,.xls,.csv" style="display:none">
         <div class="file-info" id="infoExcel">لم يتم اختيار ملف</div>
         <div class="sheet-sel" id="sheetSelExcel">
@@ -707,6 +717,11 @@
         <button type="button" class="btn" id="pickFolderBtn" style="width:100%">📂 اختيار المجلد</button>
         <div class="file-info" id="infoFolder">لم يتم اختيار مجلد</div>
         <div class="file-list" id="folderFileList"></div>
+      </div>
+      <div class="file-box" id="boxDestination">
+        <label>🚚 مسار الوجهة (نقل الملفات المرقمة إليه)</label>
+        <button type="button" class="btn" id="pickDestinationBtn" style="width:100%">📂 اختيار مسار الوجهة</button>
+        <div class="file-info" id="infoDestination">لم يتم اختيار مسار (اختياري الآن)</div>
       </div>
     </div>
   </div>
@@ -829,6 +844,19 @@
       <div id="renamePreview" class="rename-preview hidden"></div>
     </div>
 
+    <!-- منطقة الترحيل والنقل -->
+    <div id="migrateArea" style="margin-top:16px;padding:16px;background:var(--panel2);border:1px solid var(--line);border-radius:var(--radius);display:none">
+      <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px">
+        <div>
+          <h4 style="color:var(--accent);font-size:15px">🚚 الترحيل والنقل</h4>
+          <div style="font-size:13px;color:var(--muted)" id="migrateInfo">سيتم نقل <strong id="migrateCount">0</strong> ملف مرقّم إلى مسار الوجهة (وحذفها من المجلد المصدر بعد نجاح النقل)</div>
+        </div>
+        <div>
+          <button class="btn" id="migrateBtn">🚚 الترحيل والنقل</button>
+        </div>
+      </div>
+    </div>
+
     <div class="btn-row">
       <button class="btn" id="exportBtn">📥 تصدير النتائج إلى Excel</button>
       <button class="btn btn-ghost" id="exportMissingBtn">📋 تصدير المفقودين فقط</button>
@@ -864,6 +892,7 @@
   const S = {
     Excel: { wb: null, rows: [], cols: [], name: "" },
     Folder: { dirHandle: null, files: [], fileMap: {} },
+    Destination: { dirHandle: null },
     results: [], // [{excelName, number, folderName, ext, path, status: 'found'|'missing'|'extra'|'renamed', newName}]
     nameColumn: "",
     numberColumn: "",
@@ -871,7 +900,8 @@
     extensions: [],
     removeExt: true,
     normalize: true,
-    renamedCount: 0
+    renamedCount: 0,
+    migratedCount: 0
   };
 
   let folderFileList = [];
@@ -983,6 +1013,40 @@
   }
 
   document.getElementById('pickFolderBtn').addEventListener('click', pickFolder);
+
+  /* ============================================================
+     اختيار مسار الوجهة (المجلد الذي ستُنقل إليه الملفات المرقمة)
+     ============================================================ */
+  async function pickDestinationFolder() {
+    if (!SUPPORTS_FS_ACCESS) {
+      alert('متصفحك لا يدعم هذه الميزة. الرجاء استخدام Google Chrome أو Microsoft Edge على سطح المكتب.');
+      return;
+    }
+
+    let dirHandle;
+    try {
+      dirHandle = await window.showDirectoryPicker({ mode: 'readwrite' });
+    } catch (err) {
+      if (err.name === 'AbortError') return;
+      alert('تعذّر فتح المجلد: ' + err.message);
+      return;
+    }
+
+    const perm = await dirHandle.requestPermission({ mode: 'readwrite' });
+    if (perm !== 'granted') {
+      alert('لم يتم منح صلاحية الكتابة على مجلد الوجهة. لن تتمكن من نقل الملفات إليه.');
+      return;
+    }
+
+    S.Destination.dirHandle = dirHandle;
+
+    const info = document.getElementById('infoDestination');
+    info.innerHTML = `✓ تم اختيار مسار الوجهة: <strong>${esc(dirHandle.name)}</strong>`;
+    info.className = 'file-info ok';
+    document.getElementById('boxDestination').classList.add('loaded');
+  }
+
+  document.getElementById('pickDestinationBtn').addEventListener('click', pickDestinationFolder);
 
   /* ============================================================
      التحقق من الجاهزية
@@ -1286,8 +1350,10 @@
     setProgress(100, 'اكتملت المطابقة ✓');
     S.results = results;
     S.renamedCount = 0;
+    S.migratedCount = 0;
     renderResults();
     updateRenameInfo();
+    document.getElementById('migrateArea').style.display = 'none';
 
     setTimeout(() => {
       document.getElementById('progressWrap').style.display = 'none';
@@ -1353,11 +1419,12 @@
       const newNameDisplay = r.newName || '—';
       const extDisplay = r.ext || '—';
       const numDisplay = r.number || '—';
+      const label = r.migrated ? `${st.label} 🚚` : st.label;
       return `<tr class="${st.class}">
-        <td><span class="tag ${st.tag}">${st.label}</span></td>
+        <td><span class="tag ${st.tag}">${label}</span></td>
         <td>${esc(r.excelName || '—')}</td>
         <td>${esc(numDisplay)}</td>
-        <td class="file-name-cell">${esc(r.folderName || '—')}</td>
+        <td class="file-name-cell">${esc(r.migrated ? (r.migratedName || r.folderName) : (r.folderName || '—'))}</td>
         <td class="file-name-cell" style="color:${r.newName ? 'var(--found-b)' : 'var(--muted)'}">${esc(newNameDisplay)}</td>
         <td>${esc(extDisplay)}</td>
       </tr>`;
@@ -1451,56 +1518,245 @@
     let renamedCount = 0;
     const errors = [];
 
-    for (const r of toRename) {
-      const oldName = r.folderName;
-      const newName = r.newName;
+    try {
+      for (const r of toRename) {
+        const oldName = r.folderName;
+        const newName = r.newName;
 
-      if (!newName || oldName === newName) {
-        continue;
-      }
-
-      try {
-        const oldHandle = await dirHandle.getFileHandle(oldName);
-
-        if (typeof oldHandle.move === 'function') {
-          // الطريقة المباشرة: إعادة تسمية حقيقية بدون نسخ
-          await oldHandle.move(newName);
-        } else {
-          // بديل: نسخ المحتوى لملف جديد بالاسم الجديد ثم حذف القديم
-          const fileData = await oldHandle.getFile();
-          const buffer = await fileData.arrayBuffer();
-          const newHandle = await dirHandle.getFileHandle(newName, { create: true });
-          const writable = await newHandle.createWritable();
-          await writable.write(buffer);
-          await writable.close();
-          await dirHandle.removeEntry(oldName);
+        if (!newName || oldName === newName) {
+          continue;
         }
 
-        r.folderName = newName;
-        r.status = 'renamed';
-        r.renamed = true;
-        renamedCount++;
-      } catch (err) {
-        errors.push(`${oldName} ← ${err.message}`);
+        try {
+          const oldHandle = await dirHandle.getFileHandle(oldName);
+
+          if (typeof oldHandle.move === 'function') {
+            // الطريقة المباشرة: إعادة تسمية حقيقية بدون نسخ
+            await oldHandle.move(newName);
+          } else {
+            // بديل: نسخ المحتوى لملف جديد بالاسم الجديد ثم حذف القديم
+            const fileData = await oldHandle.getFile();
+            const buffer = await fileData.arrayBuffer();
+            const newHandle = await dirHandle.getFileHandle(newName, { create: true });
+            const writable = await newHandle.createWritable();
+            await writable.write(buffer);
+            await writable.close();
+            await dirHandle.removeEntry(oldName);
+          }
+
+          r.folderName = newName;
+          r.status = 'renamed';
+          r.renamed = true;
+          renamedCount++;
+        } catch (err) {
+          errors.push(`${oldName} ← ${err.message}`);
+        }
+
+        await sleep(20);
       }
 
-      await sleep(20);
+      S.renamedCount = renamedCount;
+
+      const renameInfo = document.getElementById('renameInfo');
+      if (errors.length) {
+        renameInfo.innerHTML = `✅ تم ترقيم <strong>${renamedCount}</strong> ملف بنجاح. ⚠️ فشل ترقيم <strong>${errors.length}</strong> ملف: ${errors.slice(0, 5).map(esc).join(' | ')}`;
+        renameInfo.style.color = 'var(--warning)';
+      } else {
+        renameInfo.innerHTML = `✅ تم ترقيم <strong>${renamedCount}</strong> ملف بنجاح داخل المجلد فعلياً.`;
+        renameInfo.style.color = 'var(--success)';
+      }
+    } catch (fatalErr) {
+      // أي خطأ غير متوقع في تحديث الواجهة لا يجب أن يُبقي الزر معطّلاً للأبد
+      console.error('خطأ أثناء الترقيم:', fatalErr);
+      const renameInfo = document.getElementById('renameInfo');
+      renameInfo.innerHTML = `⚠️ حدث خطأ غير متوقع أثناء تحديث النتائج، لكن الملفات التي تمت معالجتها (<strong>${renamedCount}</strong>) تم ترقيمها فعلياً. التفاصيل: ${esc(fatalErr.message || String(fatalErr))}`;
+      renameInfo.style.color = 'var(--warning)';
+    } finally {
+      // ضمان إعادة تفعيل الزر دائماً، بغض النظر عن نجاح أو فشل أي خطوة لاحقة
+      runBtn.disabled = false;
+      runBtn.textContent = '🔄 ترقيم الملفات';
     }
 
-    S.renamedCount = renamedCount;
-    renderResults();
-    updateRenameInfo();
+    try {
+      renderResults();
+    } catch (e) {
+      console.error('خطأ أثناء عرض النتائج:', e);
+    }
+    try {
+      updateRenameInfo();
+    } catch (e) {
+      console.error('خطأ أثناء تحديث معلومات الترقيم:', e);
+    }
+    try {
+      updateMigrateInfo();
+    } catch (e) {
+      console.error('خطأ أثناء تحديث معلومات الترحيل:', e);
+    }
 
-    runBtn.disabled = false;
-    runBtn.textContent = '🔄 ترقيم الملفات';
+    // الانتقال تلقائياً إلى قسم الترحيل عند وجود ملفات مرقّمة بانتظار النقل
+    if (renamedCount > 0) {
+      const migrateArea = document.getElementById('migrateArea');
+      if (migrateArea && migrateArea.style.display !== 'none') {
+        migrateArea.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        migrateArea.style.outline = '2px solid var(--accent)';
+        setTimeout(() => { migrateArea.style.outline = 'none'; }, 1500);
+      }
+    }
+  });
 
-    const renameInfo = document.getElementById('renameInfo');
-    if (errors.length) {
-      renameInfo.innerHTML = `✅ تم ترقيم <strong>${renamedCount}</strong> ملف بنجاح. ⚠️ فشل ترقيم <strong>${errors.length}</strong> ملف: ${errors.slice(0, 5).map(esc).join(' | ')}`;
-      renameInfo.style.color = 'var(--warning)';
-    } else {
-      renameInfo.innerHTML = `✅ تم ترقيم <strong>${renamedCount}</strong> ملف بنجاح داخل المجلد فعلياً.`;
-      renameInfo.style.color = 'var(--success)';
+  /* ============================================================
+     تحديث معلومات قسم الترحيل والنقل
+     ============================================================ */
+  function updateMigrateInfo() {
+    const migrateArea = document.getElementById('migrateArea');
+    const pending = S.results.filter(r => r.status === 'renamed' && !r.migrated);
+
+    if (!pending.length) {
+      migrateArea.style.display = 'none';
+      return;
+    }
+
+    migrateArea.style.display = 'block';
+    document.getElementById('migrateCount').textContent = pending.length;
+  }
+
+  /* ============================================================
+     إيجاد اسم متاح في مجلد الوجهة دون استبدال أي ملف موجود
+     ============================================================ */
+  async function findAvailableName(dirHandle, name) {
+    async function exists(n) {
+      try {
+        await dirHandle.getFileHandle(n);
+        return true;
+      } catch (e) {
+        return false;
+      }
+    }
+
+    if (!(await exists(name))) return name;
+
+    const dotIdx = name.lastIndexOf('.');
+    const base = dotIdx > 0 ? name.slice(0, dotIdx) : name;
+    const ext = dotIdx > 0 ? name.slice(dotIdx) : '';
+
+    let i = 1;
+    let candidate;
+    do {
+      candidate = `${base}_${i}${ext}`;
+      i++;
+    } while (await exists(candidate));
+
+    return candidate;
+  }
+
+  /* ============================================================
+     الترحيل والنقل الفعلي للملفات المرقمة إلى مسار الوجهة
+     ============================================================ */
+  document.getElementById('migrateBtn').addEventListener('click', async () => {
+    const migrateInfo = document.getElementById('migrateInfo');
+    const migrateBtn = document.getElementById('migrateBtn');
+
+    if (!S.Destination.dirHandle) {
+      migrateInfo.innerHTML = '⚠️ يجب اختيار مسار الوجهة أولاً من الأعلى قبل الترحيل.';
+      migrateInfo.style.color = 'var(--warning)';
+      return;
+    }
+
+    if (!S.Folder.dirHandle) {
+      migrateInfo.innerHTML = '⚠️ لم يعد المجلد المصدر متاحاً.';
+      migrateInfo.style.color = 'var(--warning)';
+      return;
+    }
+
+    const toMigrate = S.results.filter(r => r.status === 'renamed' && !r.migrated);
+    if (!toMigrate.length) {
+      migrateInfo.innerHTML = 'لا توجد ملفات مرقّمة بانتظار الترحيل حالياً.';
+      migrateInfo.style.color = 'var(--muted)';
+      return;
+    }
+
+    migrateBtn.disabled = true;
+    migrateBtn.textContent = '⏳ جارٍ الترحيل...';
+    migrateInfo.innerHTML = 'جارٍ ترحيل الملفات، الرجاء الانتظار...';
+    migrateInfo.style.color = 'var(--muted)';
+
+    const srcDir = S.Folder.dirHandle;
+    const destDir = S.Destination.dirHandle;
+    let migratedCount = 0;
+    let renamedDueToConflict = 0;
+    const errors = [];
+    let remainingPending = 0;
+
+    try {
+      try {
+        for (const r of toMigrate) {
+          const oldName = r.folderName;
+          try {
+            const srcHandle = await srcDir.getFileHandle(oldName);
+            const finalName = await findAvailableName(destDir, oldName);
+            if (finalName !== oldName) renamedDueToConflict++;
+
+            const fileData = await srcHandle.getFile();
+            const buffer = await fileData.arrayBuffer();
+            const destHandle = await destDir.getFileHandle(finalName, { create: true });
+            const writable = await destHandle.createWritable();
+            await writable.write(buffer);
+            await writable.close();
+
+            // حذف من المصدر فقط بعد التأكد من نجاح النقل للوجهة
+            await srcDir.removeEntry(oldName);
+
+            r.migrated = true;
+            r.migratedName = finalName;
+            migratedCount++;
+          } catch (err) {
+            errors.push(`${oldName}: ${err.message}`);
+          }
+
+          await sleep(20);
+        }
+      } catch (fatalErr) {
+        errors.push(`خطأ عام: ${fatalErr.message}`);
+      }
+
+      S.migratedCount = (S.migratedCount || 0) + migratedCount;
+      remainingPending = S.results.filter(r => r.status === 'renamed' && !r.migrated).length;
+
+      let msg = `✅ تم نقل <strong>${migratedCount}</strong> ملف بنجاح إلى مسار الوجهة.`;
+      if (renamedDueToConflict) {
+        msg += ` منها <strong>${renamedDueToConflict}</strong> ملف تم تعديل اسمه (بإضافة _1, _2...) بسبب وجود اسم مطابق مسبقاً في الوجهة، مع الإبقاء على الملف القديم دون استبدال.`;
+      }
+      if (errors.length) {
+        msg += ` ⚠️ فشل نقل <strong>${errors.length}</strong> ملف: ${errors.slice(0, 5).map(esc).join(' | ')}`;
+        migrateInfo.style.color = 'var(--warning)';
+      } else {
+        migrateInfo.style.color = 'var(--success)';
+      }
+      migrateInfo.innerHTML = msg;
+    } catch (uiErr) {
+      // أي خطأ غير متوقع في تحديث الواجهة لا يجب أن يُبقي الزر معطّلاً للأبد
+      console.error('خطأ أثناء تحديث نتائج الترحيل:', uiErr);
+      migrateInfo.innerHTML = `⚠️ حدث خطأ غير متوقع أثناء تحديث النتائج، لكن الملفات التي تمت معالجتها (<strong>${migratedCount}</strong>) تم ترحيلها فعلياً. التفاصيل: ${esc(uiErr.message || String(uiErr))}`;
+      migrateInfo.style.color = 'var(--warning)';
+    } finally {
+      // ضمان إعادة تفعيل الزر دائماً، بغض النظر عن نجاح أو فشل أي خطوة لاحقة
+      migrateBtn.disabled = false;
+      migrateBtn.textContent = '🚚 الترحيل والنقل';
+      if (remainingPending === 0 && !errors.length) {
+        migrateBtn.disabled = true;
+        migrateBtn.textContent = '✅ تم ترحيل كل الملفات';
+      }
+    }
+
+    try {
+      renderResults();
+    } catch (e) {
+      console.error('خطأ أثناء عرض النتائج:', e);
+    }
+    try {
+      document.getElementById('migrateCount').textContent = remainingPending;
+    } catch (e) {
+      console.error('خطأ أثناء تحديث عدد الملفات المتبقية:', e);
     }
   });
 
@@ -1555,17 +1811,23 @@
   document.getElementById('resetBtn').addEventListener('click', () => {
     S.Excel = { wb: null, rows: [], cols: [], name: "" };
     S.Folder = { dirHandle: null, files: [], fileMap: {} };
+    S.Destination = { dirHandle: null };
     S.results = [];
     S.renamedCount = 0;
+    S.migratedCount = 0;
 
     document.getElementById('fileExcel').value = '';
     document.getElementById('infoExcel').textContent = 'لم يتم اختيار ملف';
     document.getElementById('infoExcel').className = 'file-info';
     document.getElementById('infoFolder').textContent = 'لم يتم اختيار مجلد';
     document.getElementById('infoFolder').className = 'file-info';
+    document.getElementById('infoDestination').textContent = 'لم يتم اختيار مسار (اختياري الآن)';
+    document.getElementById('infoDestination').className = 'file-info';
     document.getElementById('boxExcel').classList.remove('loaded');
     document.getElementById('boxFolder').classList.remove('loaded');
+    document.getElementById('boxDestination').classList.remove('loaded');
     document.getElementById('folderFileList').innerHTML = '';
+    document.getElementById('migrateArea').style.display = 'none';
     document.getElementById('sheetSelExcel').style.display = 'none';
     document.getElementById('sheetExcel').innerHTML = '';
     document.getElementById('nameColumn').innerHTML = '';
