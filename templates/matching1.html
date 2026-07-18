@@ -704,7 +704,7 @@
     <div class="three-col">
       <div class="file-box" id="boxExcel">
         <label>📄 ملف الإكسل (أسماء + أرقام)</label>
-        <button type="button" class="btn" id="pickExcelBtn" style="width:100%">📄 اختيار ملف</button>
+        <label for="fileExcel" class="btn" style="display:block;width:100%;text-align:center;cursor:pointer">📄 اختيار ملف</label>
         <input type="file" id="fileExcel" accept=".xlsx,.xls,.csv" style="display:none">
         <div class="file-info" id="infoExcel">لم يتم اختيار ملف</div>
         <div class="sheet-sel" id="sheetSelExcel">
@@ -742,17 +742,6 @@
           <label>🔢 عمود الترقيم (لإعادة التسمية):</label>
           <select id="numberColumn"></select>
           <div style="font-size:11px;color:var(--muted);margin-top:4px">سيتم استخدام هذه الأرقام لإعادة تسمية الملفات بعد المطابقة</div>
-        </div>
-        <div class="field">
-          <label>🗂️ نوع الوثيقة (لتحديث حالتها في الإكسل):</label>
-          <select id="docTypeSelect">
-            <option value="">— بدون تحديث حالة وثيقة —</option>
-          </select>
-          <div style="font-size:11px;color:var(--muted);margin-top:4px" id="docTypeColumnInfo">اختر نوع الوثيقة ليتم تحديد عمود الحالة المطابق له تلقائياً في الإكسل</div>
-          <div id="docTypeColumnFallback" style="display:none;margin-top:6px">
-            <label style="font-size:12px;color:var(--warning)">⚠️ لم يتم العثور على عمود بنفس الرمز تلقائياً، اختر العمود يدوياً:</label>
-            <select id="docTypeColumnManual" style="margin-top:4px"></select>
-          </div>
         </div>
       </div>
 
@@ -869,12 +858,10 @@
     </div>
 
     <div class="btn-row">
-      <button class="btn btn-success" id="saveDocStatusBtn" style="display:none">💾 حفظ حالة الوثيقة في ملف الإكسل الأصلي</button>
       <button class="btn" id="exportBtn">📥 تصدير النتائج إلى Excel</button>
       <button class="btn btn-ghost" id="exportMissingBtn">📋 تصدير المفقودين فقط</button>
       <button class="btn btn-ghost" id="resetBtn">🔄 مقارنة جديدة</button>
     </div>
-    <div style="font-size:12px;color:var(--muted);margin-top:6px" id="saveDocStatusInfo"></div>
   </div>
 
   <!-- نافذة تأكيد الترقيم -->
@@ -903,10 +890,10 @@
      الحالة العامة
      ============================================================ */
   const S = {
-    Excel: { wb: null, rows: [], cols: [], name: "", fileHandle: null },
+    Excel: { wb: null, rows: [], cols: [], name: "" },
     Folder: { dirHandle: null, files: [], fileMap: {} },
     Destination: { dirHandle: null },
-    results: [], // [{excelName, number, folderName, ext, path, status: 'found'|'missing'|'extra'|'renamed', newName, origIndex}]
+    results: [], // [{excelName, number, folderName, ext, path, status: 'found'|'missing'|'extra'|'renamed', newName}]
     nameColumn: "",
     numberColumn: "",
     matchMode: "exact",
@@ -914,90 +901,46 @@
     removeExt: true,
     normalize: true,
     renamedCount: 0,
-    migratedCount: 0,
-    docTypes: {},        // من doc_types.json: { "شهادة ميلاد": {code:"BC", name_ar:"...", ...}, ... }
-    docTypeCode: "",      // الرمز المختار حالياً (مثل BC)
-    docStatusColumn: "",  // اسم عمود الحالة الفعلي في الإكسل المطابق لهذا الرمز
-    docStatusSaved: true  // هل آخر تحديث لحالة الوثيقة تم حفظه فعلياً في الملف الأصلي؟
+    migratedCount: 0
   };
 
   let folderFileList = [];
 
-  // التحقق من دعم المتصفح لميزة الكتابة الفعلية على المجلد/الملف
+  // التحقق من دعم المتصفح لميزة الكتابة الفعلية على المجلد
   const SUPPORTS_FS_ACCESS = typeof window.showDirectoryPicker === 'function';
-  const SUPPORTS_FILE_FS_ACCESS = typeof window.showOpenFilePicker === 'function';
   if (!SUPPORTS_FS_ACCESS) {
     document.getElementById('infoFolder').textContent =
       '⚠️ متصفحك لا يدعم إعادة التسمية الفعلية للملفات. الرجاء استخدام Google Chrome أو Microsoft Edge على سطح المكتب.';
   }
 
   /* ============================================================
-     قراءة ملف الإكسل (مع الاحتفاظ بصلاحية الحفظ المباشر إن أمكن)
+     قراءة ملف الإكسل
      ============================================================ */
-  async function pickExcelFile() {
-    if (SUPPORTS_FILE_FS_ACCESS) {
-      let handle;
-      try {
-        [handle] = await window.showOpenFilePicker({
-          types: [{ description: 'Excel', accept: { 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet': ['.xlsx'], 'application/vnd.ms-excel': ['.xls'] } }],
-          excludeAcceptAllOption: false,
-          multiple: false
-        });
-      } catch (err) {
-        if (err.name === 'AbortError') return; // ألغى المستخدم
-        alert('تعذّر فتح ملف الإكسل: ' + err.message);
-        return;
-      }
-      const perm = await handle.requestPermission({ mode: 'readwrite' });
-      if (perm !== 'granted') {
-        alert('لم يتم منح صلاحية الحفظ المباشر على ملف الإكسل — سيتم فتحه للقراءة فقط، ولن يعمل زر "حفظ حالة الوثيقة في الملف الأصلي".');
-        S.Excel.fileHandle = null;
-      } else {
-        S.Excel.fileHandle = handle;
-      }
-      const file = await handle.getFile();
-      await processExcelFile(file);
-    } else {
-      // متصفح لا يدعم File System Access API → رجوع لطريقة اختيار ملف تقليدية (بدون حفظ مباشر)
-      document.getElementById('fileExcel').click();
-    }
-  }
-
-  async function readExcelFile() {
-    // مسار احتياطي (input تقليدي) للمتصفحات التي لا تدعم showOpenFilePicker
+  function readExcelFile() {
     const input = document.getElementById('fileExcel');
     const file = input.files[0];
     if (!file) return;
-    S.Excel.fileHandle = null;
-    await processExcelFile(file);
-  }
-
-  function processExcelFile(file) {
-    return new Promise((resolve) => {
-      const info = document.getElementById('infoExcel');
-      info.textContent = 'جارٍ القراءة...';
-      info.className = 'file-info';
-      const reader = new FileReader();
-      reader.onload = e => {
-        try {
-          const wb = XLSX.read(e.target.result, { type: 'array', cellText: true, raw: false });
-          S.Excel.wb = wb;
-          S.Excel.name = file.name;
-          const sel = document.getElementById('sheetExcel');
-          sel.innerHTML = wb.SheetNames.map(n => `<option>${n}</option>`).join('');
-          document.getElementById('sheetSelExcel').style.display = wb.SheetNames.length > 1 ? 'block' : 'none';
-          loadExcelSheet();
-          const writeNote = S.Excel.fileHandle ? ' — 💾 صلاحية الحفظ المباشر مفعّلة' : '';
-          info.textContent = `✓ ${file.name}${writeNote}`;
-          info.className = 'file-info ok';
-          document.getElementById('boxExcel').classList.add('loaded');
-        } catch (err) {
-          info.textContent = 'خطأ في قراءة الملف: ' + err.message;
-        }
-        resolve();
-      };
-      reader.readAsArrayBuffer(file);
-    });
+    const info = document.getElementById('infoExcel');
+    info.textContent = 'جارٍ القراءة...';
+    info.className = 'file-info';
+    const reader = new FileReader();
+    reader.onload = e => {
+      try {
+        const wb = XLSX.read(e.target.result, { type: 'array', cellText: true, raw: false });
+        S.Excel.wb = wb;
+        S.Excel.name = file.name;
+        const sel = document.getElementById('sheetExcel');
+        sel.innerHTML = wb.SheetNames.map(n => `<option>${n}</option>`).join('');
+        document.getElementById('sheetSelExcel').style.display = wb.SheetNames.length > 1 ? 'block' : 'none';
+        loadExcelSheet();
+        info.textContent = `✓ ${file.name}`;
+        info.className = 'file-info ok';
+        document.getElementById('boxExcel').classList.add('loaded');
+      } catch (err) {
+        info.textContent = 'خطأ في قراءة الملف: ' + err.message;
+      }
+    };
+    reader.readAsArrayBuffer(file);
   }
 
   function loadExcelSheet() {
@@ -1007,7 +950,6 @@
     S.Excel.rows = json;
     S.Excel.cols = json.length ? Object.keys(json[0]) : [];
     updateColumnSelects();
-    onDocTypeChange();
     checkReady();
   }
 
@@ -1024,73 +966,8 @@
     }
   }
 
-  /* ============================================================
-     نوع الوثيقة (من doc_types.json) وتحديد عمود الحالة تلقائياً
-     ============================================================ */
-  async function loadDocTypes() {
-    const sel = document.getElementById('docTypeSelect');
-    try {
-      const res = await fetch('/api/get-constants');
-      const data = await res.json();
-      if (!data.success) throw new Error(data.message || 'فشل تحميل الثوابت');
-      S.docTypes = data.document_types || {};
-      const entries = Object.values(S.docTypes).sort((a, b) => (a.order || 0) - (b.order || 0));
-      sel.innerHTML = '<option value="">— بدون تحديث حالة وثيقة —</option>' +
-        entries.map(d => `<option value="${esc(d.code)}">${esc(d.name_ar || d.code)} (${esc(d.code)})</option>`).join('');
-    } catch (err) {
-      document.getElementById('docTypeColumnInfo').textContent = '⚠️ تعذّر تحميل أنواع الوثائق من doc_types.json: ' + err.message;
-    }
-  }
-
-  function onDocTypeChange() {
-    const code = document.getElementById('docTypeSelect').value;
-    S.docTypeCode = code;
-    S.docStatusColumn = "";
-    S.docStatusSaved = true;
-    const infoEl = document.getElementById('docTypeColumnInfo');
-    const fallbackWrap = document.getElementById('docTypeColumnFallback');
-    const manualSel = document.getElementById('docTypeColumnManual');
-
-    if (!code) {
-      infoEl.textContent = 'اختر نوع الوثيقة ليتم تحديد عمود الحالة المطابق له تلقائياً في الإكسل';
-      fallbackWrap.style.display = 'none';
-      return;
-    }
-
-    // البحث عن عمود في الإكسل باسم مطابق تماماً لرمز الوثيقة (case-insensitive, trim)
-    const match = S.Excel.cols.find(c => String(c).trim().toUpperCase() === code.trim().toUpperCase());
-    if (match) {
-      S.docStatusColumn = match;
-      infoEl.innerHTML = `✅ سيتم تحديث عمود <strong>"${esc(match)}"</strong> في الإكسل إلى "نعم" لكل طالب تمت مطابقته`;
-      infoEl.style.color = 'var(--found-b)';
-      fallbackWrap.style.display = 'none';
-    } else {
-      infoEl.innerHTML = `⚠️ لا يوجد عمود باسم "${esc(code)}" في هذا الإكسل`;
-      infoEl.style.color = 'var(--warning)';
-      if (S.Excel.cols.length) {
-        manualSel.innerHTML = '<option value="">— اختر العمود يدوياً —</option>' +
-          S.Excel.cols.map(c => `<option value="${esc(c)}">${esc(c)}</option>`).join('');
-        fallbackWrap.style.display = 'block';
-      }
-    }
-  }
-
-  document.getElementById('docTypeColumnManual').addEventListener('change', function () {
-    S.docStatusColumn = this.value;
-    S.docStatusSaved = true;
-    const infoEl = document.getElementById('docTypeColumnInfo');
-    if (this.value) {
-      infoEl.innerHTML = `✅ تم تحديد عمود <strong>"${esc(this.value)}"</strong> يدوياً لتحديث حالة الوثيقة`;
-      infoEl.style.color = 'var(--found-b)';
-    }
-  });
-
-  document.getElementById('docTypeSelect').addEventListener('change', onDocTypeChange);
-  document.getElementById('pickExcelBtn').addEventListener('click', pickExcelFile);
   document.getElementById('fileExcel').addEventListener('change', readExcelFile);
   document.getElementById('sheetExcel').addEventListener('change', loadExcelSheet);
-
-  loadDocTypes();
 
   /* ============================================================
      اختيار المجلد (صلاحية قراءة وكتابة حقيقية)
@@ -1268,11 +1145,10 @@
     S.removeExt = document.getElementById('optRemoveExt').checked;
     S.normalize = document.getElementById('optNormalize').checked;
 
-    // تحضير بيانات الإكسل (مع الاحتفاظ بالفهرس الأصلي للصف لتحديث حالة الوثيقة لاحقاً)
-    const excelData = S.Excel.rows.map((row, idx) => ({
+    // تحضير بيانات الإكسل
+    const excelData = S.Excel.rows.map(row => ({
       name: String(row[nameCol] || '').trim(),
-      number: String(row[numCol] || '').trim(),
-      origIndex: idx
+      number: String(row[numCol] || '').trim()
     })).filter(d => d.name);
 
     if (!excelData.length) { alert('لا توجد أسماء في عمود الإكسل المحدد'); return; }
@@ -1423,8 +1299,7 @@
         status: matchType,
         matchedKey: matchedKey,
         newName: newName,
-        renamed: false,
-        origIndex: item.origIndex
+        renamed: false
       });
 
       processed++;
@@ -1476,7 +1351,6 @@
     S.results = results;
     S.renamedCount = 0;
     S.migratedCount = 0;
-    applyDocStatusToExcelRows();
     renderResults();
     updateRenameInfo();
     document.getElementById('migrateArea').style.display = 'none';
@@ -1487,84 +1361,6 @@
       runBtn.style.opacity = '1';
     }, 500);
   }
-
-  /* ============================================================
-     تحديث حالة نوع الوثيقة في صفوف الإكسل (في الذاكرة فقط حتى الحفظ)
-     لا يمس أي عمود أو صف آخر — يضع "نعم" فقط لصفوف الطلاب الذين تمت
-     مطابقة ملفاتهم بنجاح (status === 'found')، ولا يلمس صفوف "مفقود"
-     أو "إضافي" حتى لا تُفقد بيانات كانت موجودة مسبقاً بالخطأ.
-     ============================================================ */
-  function applyDocStatusToExcelRows() {
-    const saveBtn = document.getElementById('saveDocStatusBtn');
-    const info = document.getElementById('saveDocStatusInfo');
-
-    if (!S.docTypeCode || !S.docStatusColumn) {
-      saveBtn.style.display = 'none';
-      info.textContent = '';
-      return;
-    }
-
-    let updatedCount = 0;
-    for (const r of S.results) {
-      if (r.status === 'found' && typeof r.origIndex === 'number') {
-        S.Excel.rows[r.origIndex][S.docStatusColumn] = 'نعم';
-        updatedCount++;
-      }
-    }
-
-    S.docStatusSaved = false;
-    saveBtn.style.display = updatedCount ? 'inline-flex' : 'none';
-    info.textContent = updatedCount
-      ? `⚠️ تم تحديث عمود "${S.docStatusColumn}" لـ ${updatedCount} طالب في الذاكرة فقط — اضغط "حفظ حالة الوثيقة في ملف الإكسل الأصلي" لحفظها فعلياً على القرص.`
-      : '';
-  }
-
-  /* ============================================================
-     حفظ التعديلات مباشرة في ملف الإكسل الأصلي (بدون تصدير ملف جديد)
-     يعيد كتابة كل الصفوف/الأعمدة كما هي في S.Excel.rows، مع تعديل
-     عمود حالة الوثيقة المختار فقط — بقية بيانات الطالب لا تتغير.
-     ============================================================ */
-  async function saveDocStatusToOriginalFile() {
-    if (!S.Excel.fileHandle) {
-      alert('لا توجد صلاحية حفظ مباشر على هذا الملف.\nتأكد من اختيار ملف الإكسل عبر زر "اختيار ملف" في متصفح Chrome أو Edge، ومنح صلاحية الحفظ عند الطلب.');
-      return;
-    }
-    if (!S.docStatusColumn) {
-      alert('اختر نوع الوثيقة أولاً من الخطوة 2 حتى يتم تحديد عمود الحالة.');
-      return;
-    }
-
-    const foundCount = S.results.filter(r => r.status === 'found').length;
-    const ok = confirm(
-      `سيتم الآن الكتابة مباشرة فوق الملف الأصلي:\n"${S.Excel.name}"\n\n` +
-      `— تحديث عمود "${S.docStatusColumn}" إلى "نعم" لـ ${foundCount} طالب تمت مطابقة وثيقتهم.\n` +
-      `— باقي الأعمدة والصفوف تبقى كما هي دون أي حذف أو تعديل.\n\n` +
-      `هل تريد المتابعة والحفظ الآن؟`
-    );
-    if (!ok) return;
-
-    try {
-      const sheetName = document.getElementById('sheetExcel').value || S.Excel.wb.SheetNames[0];
-      // إعادة بناء الورقة من S.Excel.rows الحالية (تحتوي كل الأعمدة الأصلية + التحديث)
-      const newSheet = XLSX.utils.json_to_sheet(S.Excel.rows, { header: S.Excel.cols });
-      S.Excel.wb.Sheets[sheetName] = newSheet;
-
-      const outArrayBuffer = XLSX.write(S.Excel.wb, { bookType: 'xlsx', type: 'array' });
-
-      const writable = await S.Excel.fileHandle.createWritable();
-      await writable.write(outArrayBuffer);
-      await writable.close();
-
-      S.docStatusSaved = true;
-      const info = document.getElementById('saveDocStatusInfo');
-      info.textContent = `✅ تم حفظ التحديث في الملف الأصلي "${S.Excel.name}" بنجاح.`;
-      info.style.color = 'var(--found-b)';
-    } catch (err) {
-      alert('فشل حفظ الملف: ' + err.message);
-    }
-  }
-
-  document.getElementById('saveDocStatusBtn').addEventListener('click', saveDocStatusToOriginalFile);
 
   /* ============================================================
      عرض النتائج
@@ -2013,15 +1809,12 @@
      إعادة تعيين
      ============================================================ */
   document.getElementById('resetBtn').addEventListener('click', () => {
-    S.Excel = { wb: null, rows: [], cols: [], name: "", fileHandle: null };
+    S.Excel = { wb: null, rows: [], cols: [], name: "" };
     S.Folder = { dirHandle: null, files: [], fileMap: {} };
     S.Destination = { dirHandle: null };
     S.results = [];
     S.renamedCount = 0;
     S.migratedCount = 0;
-    S.docTypeCode = "";
-    S.docStatusColumn = "";
-    S.docStatusSaved = true;
 
     document.getElementById('fileExcel').value = '';
     document.getElementById('infoExcel').textContent = 'لم يتم اختيار ملف';
@@ -2039,10 +1832,6 @@
     document.getElementById('sheetExcel').innerHTML = '';
     document.getElementById('nameColumn').innerHTML = '';
     document.getElementById('numberColumn').innerHTML = '';
-    document.getElementById('docTypeSelect').value = '';
-    document.getElementById('docTypeColumnFallback').style.display = 'none';
-    document.getElementById('saveDocStatusBtn').style.display = 'none';
-    document.getElementById('saveDocStatusInfo').textContent = '';
     document.getElementById('step2').classList.add('hidden');
     document.getElementById('step3').classList.add('hidden');
     document.getElementById('summary').innerHTML = '';
