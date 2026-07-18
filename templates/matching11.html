@@ -808,31 +808,13 @@
   <!-- الخطوة 3: النتائج -->
   <div class="step hidden" id="step3">
     <div class="step-title"><span class="step-num">3</span> النتائج</div>
-    <div style="font-size:11px;color:var(--muted);margin-bottom:10px">📌 الجدول أدناه يعرض فقط ملفات المجلد الحالي (وليس كل قاعدة بيانات الإكسل) لتحسين الأداء مع الملفات الكبيرة.</div>
 
     <div class="summary" id="summary"></div>
-
-    <div class="missing-panel" id="missingPanel" style="display:none;margin-bottom:14px">
-      <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:10px 14px">
-        <span style="font-size:13px">⚠️ يوجد <strong id="missingTotalCount">0</strong> طالب بقاعدة الإكسل بدون ملف مطابق بالمجلد الحالي (غير معروضين بالجدول الرئيسي أدناه للحفاظ على الأداء).</span>
-        <button class="btn btn-ghost" id="toggleMissingListBtn" style="font-size:12px;white-space:nowrap">👁️ عرض القائمة الكاملة</button>
-      </div>
-      <div id="missingListWrap" style="display:none;margin-top:8px;max-height:280px;overflow:auto;border:1px solid var(--line);border-radius:8px">
-        <table style="width:100%;border-collapse:collapse">
-          <thead>
-            <tr style="position:sticky;top:0;background:var(--panel)">
-              <th style="text-align:right;padding:8px;font-size:12px;color:var(--muted)">الاسم بالإكسل</th>
-              <th style="text-align:right;padding:8px;font-size:12px;color:var(--muted)">الرقم</th>
-            </tr>
-          </thead>
-          <tbody id="missingTableBody"></tbody>
-        </table>
-      </div>
-    </div>
 
     <div class="filter-row">
       <span class="filter-chip active" data-f="all">الكل</span>
       <span class="filter-chip" data-f="found">✅ موجود</span>
+      <span class="filter-chip" data-f="missing">❌ مفقود</span>
       <span class="filter-chip" data-f="extra">➕ إضافي</span>
       <span class="filter-chip" data-f="renamed">🔄 مرقّم</span>
       <input type="text" class="search-box" id="searchBox" placeholder="🔎 بحث في الأسماء...">
@@ -939,8 +921,7 @@
     docTypeCode: "",      // الرمز المختار حالياً (مثل BC)
     docStatusColumn: "",  // اسم عمود الحالة الفعلي في الإكسل المطابق لهذا الرمز
     docStatusSaved: true, // هل آخر تحديث لحالة الوثيقة تم حفظه فعلياً في الملف الأصلي؟
-    autoCreatedColumns: {}, // { code: colName } — لتفادي إنشاء عمود جديد مكرر لنفس الرمز
-    missingItems: []       // طلاب بالإكسل بدون ملف مطابق — لا تُعرض بالجدول الرئيسي، فقط عند الطلب
+    autoCreatedColumns: {} // { code: colName } — لتفادي إنشاء عمود جديد مكرر لنفس الرمز
   };
 
   let folderFileList = [];
@@ -1531,7 +1512,6 @@
 
     // المطابقة
     const results = [];
-    const missingItems = [];
     const usedFiles = new Set();
     const total = excelData.length;
     let processed = 0;
@@ -1619,26 +1599,19 @@
         item.number + (match ? '.' + match.ext : '') :
         '';
 
-      // لا تُدرج الطلاب "المفقودين" (بدون ملف مطابق) بالجدول الرئيسي — قاعدة
-      // بيانات الإكسل قد تحوي آلاف السجلات، وعرضها كاملة يُبطئ المتصفح دون
-      // فائدة عملية. تُحفظ بقائمة خفيفة منفصلة (اسم + رقم فقط) تُعرض عند الطلب.
-      if (matchType === 'missing') {
-        missingItems.push({ name: item.name, number: item.number });
-      } else {
-        results.push({
-          excelName: item.name,
-          number: item.number,
-          folderName: match ? match.fullName : '',
-          ext: match ? match.ext : '',
-          path: match ? match.path : '',
-          file: match ? match.file : null,
-          status: matchType,
-          matchedKey: matchedKey,
-          newName: newName,
-          renamed: false,
-          origIndex: item.origIndex
-        });
-      }
+      results.push({
+        excelName: item.name,
+        number: item.number,
+        folderName: match ? match.fullName : '',
+        ext: match ? match.ext : '',
+        path: match ? match.path : '',
+        file: match ? match.file : null,
+        status: matchType,
+        matchedKey: matchedKey,
+        newName: newName,
+        renamed: false,
+        origIndex: item.origIndex
+      });
 
       processed++;
       if (processed % 10 === 0) {
@@ -1687,7 +1660,6 @@
 
     setProgress(100, 'اكتملت المطابقة ✓');
     S.results = results;
-    S.missingItems = missingItems;
     S.renamedCount = 0;
     S.migratedCount = 0;
     applyDocStatusToExcelRows();
@@ -1808,7 +1780,7 @@
     const results = S.results;
 
     const found = results.filter(r => r.status === 'found').length;
-    const missing = S.missingItems.length;
+    const missing = results.filter(r => r.status === 'missing').length;
     const extra = results.filter(r => r.status === 'extra').length;
     const renamed = results.filter(r => r.status === 'renamed').length;
 
@@ -1819,43 +1791,10 @@
       <div class="stat s-renamed"><div class="num">${renamed}</div><div class="lbl">🔄 مرقّم</div></div>
     `;
 
-    const missingPanel = document.getElementById('missingPanel');
-    if (missing > 0) {
-      document.getElementById('missingTotalCount').textContent = missing;
-      missingPanel.style.display = 'block';
-      // إخفاء القائمة التفصيلية دائماً عند مطابقة جديدة، وإفراغ الجدول لتُبنى فقط عند الطلب
-      document.getElementById('missingListWrap').style.display = 'none';
-      document.getElementById('toggleMissingListBtn').textContent = '👁️ عرض القائمة الكاملة';
-      document.getElementById('missingTableBody').innerHTML = '';
-    } else {
-      missingPanel.style.display = 'none';
-    }
-
     drawTable();
     document.getElementById('step3').classList.remove('hidden');
     document.getElementById('step3').scrollIntoView({ behavior: 'smooth' });
   }
-
-  // عرض/إخفاء قائمة الطلاب المفقودين — الجدول يُبنى فقط أول مرة يُفتح فيها
-  // (Lazy render) حتى لا يُبطئ عرض النتائج الرئيسي مهما كان عدد المفقودين كبيراً
-  document.getElementById('toggleMissingListBtn').addEventListener('click', () => {
-    const wrap = document.getElementById('missingListWrap');
-    const btn = document.getElementById('toggleMissingListBtn');
-    const isHidden = wrap.style.display === 'none';
-    if (isHidden) {
-      const tbody = document.getElementById('missingTableBody');
-      if (!tbody.children.length) {
-        tbody.innerHTML = S.missingItems.map(m =>
-          `<tr><td style="padding:6px 8px;border-top:1px solid var(--line)">${esc(m.name)}</td><td style="padding:6px 8px;border-top:1px solid var(--line)">${esc(m.number || '—')}</td></tr>`
-        ).join('');
-      }
-      wrap.style.display = 'block';
-      btn.textContent = '🙈 إخفاء القائمة';
-    } else {
-      wrap.style.display = 'none';
-      btn.textContent = '👁️ عرض القائمة الكاملة';
-    }
-  });
 
   function drawTable() {
     const filter = document.querySelector('.filter-chip.active').dataset.f;
@@ -2280,10 +2219,10 @@
   });
 
   document.getElementById('exportMissingBtn').addEventListener('click', () => {
-    const missing = S.missingItems;
+    const missing = S.results.filter(r => r.status === 'missing');
     if (!missing.length) { alert('لا يوجد أسماء مفقودة للتصدير'); return; }
     const data = missing.map(r => ({
-      'الاسم المفقود': r.name || '',
+      'الاسم المفقود': r.excelName || '',
       'الرقم': r.number || ''
     }));
     const ws = XLSX.utils.json_to_sheet(data);
@@ -2307,12 +2246,6 @@
     S.docStatusColumn = "";
     S.docStatusSaved = true;
     S.autoCreatedColumns = {};
-    S.missingItems = [];
-
-    document.getElementById('missingPanel').style.display = 'none';
-    document.getElementById('missingListWrap').style.display = 'none';
-    document.getElementById('missingTableBody').innerHTML = '';
-    document.getElementById('toggleMissingListBtn').textContent = '👁️ عرض القائمة الكاملة';
 
     document.getElementById('fileExcel').value = '';
     document.getElementById('infoExcel').textContent = 'لم يتم اختيار ملف';
