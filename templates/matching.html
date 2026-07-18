@@ -175,6 +175,21 @@
     margin-top: 10px;
     display: none;
   }
+  .sheet-sel.needs-attention {
+    background: #fff8e1;
+    border: 2px solid var(--warning, #d97706);
+    border-radius: 10px;
+    padding: 10px;
+    animation: sheetPulse 1.6s ease-in-out 2;
+  }
+  .sheet-sel.needs-attention label {
+    color: var(--warning, #d97706) !important;
+    font-weight: 700 !important;
+  }
+  @keyframes sheetPulse {
+    0%, 100% { box-shadow: 0 0 0 0 rgba(217,119,6,.35); }
+    50% { box-shadow: 0 0 0 6px rgba(217,119,6,0); }
+  }
 
   select,
   input[type=text] {
@@ -1009,12 +1024,31 @@
           S.Excel.name = file.name;
           const sel = document.getElementById('sheetExcel');
           sel.innerHTML = wb.SheetNames.map(n => `<option>${n}</option>`).join('');
-          document.getElementById('sheetSelExcel').style.display = wb.SheetNames.length > 1 ? 'block' : 'none';
-          loadExcelSheet();
+          const sheetSelWrap = document.getElementById('sheetSelExcel');
           const writeNote = S.Excel.fileHandle ? ' — 💾 صلاحية الحفظ المباشر مفعّلة' : '';
-          info.textContent = `✓ ${file.name}${writeNote}`;
-          info.className = 'file-info ok';
-          document.getElementById('boxExcel').classList.add('loaded');
+
+          if (wb.SheetNames.length > 1) {
+            // الملف يحتوي على أكثر من صفحة — لا نحمّل أي أعمدة تلقائياً حتى
+            // يختار المستخدم الصفحة الصحيحة صراحة (تجنّباً لعرض أعمدة خاطئة
+            // من صفحة افتراضية غير مقصودة، مثل لوحة معلومات بدل جدول الطلاب)
+            sheetSelWrap.style.display = 'block';
+            sheetSelWrap.classList.add('needs-attention');
+            sel.insertAdjacentHTML('afterbegin', '<option value="" disabled selected>— اختر الصفحة —</option>');
+            S.Excel.rows = [];
+            S.Excel.cols = [];
+            document.getElementById('step2').classList.add('hidden');
+            info.textContent = `✓ ${file.name}${writeNote} — يحتوي على ${wb.SheetNames.length} صفحات، اختر الصفحة الصحيحة أدناه للمتابعة ⬇️`;
+            info.className = 'file-info ok';
+            document.getElementById('boxExcel').classList.add('loaded');
+            sheetSelWrap.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          } else {
+            sheetSelWrap.style.display = 'none';
+            sheetSelWrap.classList.remove('needs-attention');
+            loadExcelSheet();
+            info.textContent = `✓ ${file.name}${writeNote}`;
+            info.className = 'file-info ok';
+            document.getElementById('boxExcel').classList.add('loaded');
+          }
         } catch (err) {
           info.textContent = 'خطأ في قراءة الملف: ' + err.message;
         }
@@ -1170,7 +1204,10 @@
   document.getElementById('numberColumn').addEventListener('change', () => { if (S.docTypeCode) onDocTypeChange(); });
   document.getElementById('pickExcelBtn').addEventListener('click', pickExcelFile);
   document.getElementById('fileExcel').addEventListener('change', readExcelFile);
-  document.getElementById('sheetExcel').addEventListener('change', loadExcelSheet);
+  document.getElementById('sheetExcel').addEventListener('change', () => {
+    document.getElementById('sheetSelExcel').classList.remove('needs-attention');
+    loadExcelSheet();
+  });
 
   loadDocTypes();
 
@@ -2327,6 +2364,7 @@
     document.getElementById('folderFileList').innerHTML = '';
     document.getElementById('migrateArea').style.display = 'none';
     document.getElementById('sheetSelExcel').style.display = 'none';
+    document.getElementById('sheetSelExcel').classList.remove('needs-attention');
     document.getElementById('sheetExcel').innerHTML = '';
     document.getElementById('nameColumn').innerHTML = '';
     document.getElementById('numberColumn').innerHTML = '';
