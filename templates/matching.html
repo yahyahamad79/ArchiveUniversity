@@ -907,7 +907,7 @@
 
     <div class="btn-row">
       <button class="btn" id="exportBtn">📥 تصدير النتائج إلى Excel</button>
-      <button class="btn btn-ghost" id="exportMissingBtn">📋 تصدير المفقودين فقط</button>
+      <button class="btn btn-ghost" id="exportMissingBtn">📋 تصدير الملفات غير المطابقة</button>
       <button class="btn btn-ghost" id="resetBtn">🔄 مقارنة جديدة</button>
     </div>
     <div style="font-size:12px;color:var(--muted);margin-top:6px" id="saveDocStatusInfo"></div>
@@ -2395,17 +2395,19 @@
   });
 
   document.getElementById('exportMissingBtn').addEventListener('click', () => {
-    const missing = S.missingItems;
-    if (!missing.length) { alert('لا يوجد أسماء مفقودة للتصدير'); return; }
-    const data = missing.map(r => ({
-      'الاسم المفقود': r.name || '',
-      'الرقم': r.number || ''
+    // "غير مطابق" هنا يقصد بها ملفات المجلد (صور/وثائق/PDF) التي لم يُعثر لها
+    // على صف مطابق بالإكسل (status === 'extra') — وليس طلاب الإكسل بلا ملف
+    const unmatchedFiles = S.results.filter(r => r.status === 'extra');
+    if (!unmatchedFiles.length) { alert('لا توجد ملفات غير مطابقة للتصدير'); return; }
+    const data = unmatchedFiles.map(r => ({
+      'اسم الملف غير المطابق': r.folderName || '',
+      'الامتداد': r.ext || ''
     }));
     const ws = XLSX.utils.json_to_sheet(data);
-    ws['!cols'] = [{ wch: 30 }, { wch: 15 }];
+    ws['!cols'] = [{ wch: 35 }, { wch: 12 }];
     const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, 'الأسماء المفقودة');
-    XLSX.writeFile(wb, 'الأسماء_المفقودة.xlsx');
+    XLSX.utils.book_append_sheet(wb, ws, 'ملفات غير مطابقة');
+    XLSX.writeFile(wb, 'ملفات_غير_مطابقة.xlsx');
   });
 
   /* ============================================================
