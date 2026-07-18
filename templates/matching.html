@@ -756,10 +756,6 @@
             <option value="">— بدون تحديث حالة وثيقة —</option>
           </select>
           <div style="font-size:11px;color:var(--muted);margin-top:4px" id="docTypeColumnInfo">اختر نوع الوثيقة ليتم تحديد عمود الحالة المطابق له تلقائياً في الإكسل</div>
-          <div id="docTypeColumnFallback" style="display:none;margin-top:6px">
-            <label style="font-size:12px;color:var(--warning)">⚠️ لم يتم العثور على عمود بنفس الرمز تلقائياً، اختر العمود يدوياً:</label>
-            <select id="docTypeColumnManual" style="margin-top:4px"></select>
-          </div>
         </div>
       </div>
 
@@ -924,7 +920,8 @@
     docTypes: {},        // من doc_types.json: { "شهادة ميلاد": {code:"BC", name_ar:"...", ...}, ... }
     docTypeCode: "",      // الرمز المختار حالياً (مثل BC)
     docStatusColumn: "",  // اسم عمود الحالة الفعلي في الإكسل المطابق لهذا الرمز
-    docStatusSaved: true  // هل آخر تحديث لحالة الوثيقة تم حفظه فعلياً في الملف الأصلي؟
+    docStatusSaved: true, // هل آخر تحديث لحالة الوثيقة تم حفظه فعلياً في الملف الأصلي؟
+    autoCreatedColumns: {} // { code: colName } — لتفادي إنشاء عمود جديد مكرر لنفس الرمز
   };
 
   let folderFileList = [];
@@ -1008,12 +1005,38 @@
     });
   }
 
+  /* ============================================================
+     الحقلان الأساسيان المحميان في ملف قاعدة البيانات (الإكسل)
+     العمود الأول (رقم الطالب) والعمود الثاني (اسم الطالب) — بحكم موقعهما
+     دائماً (أول عمودين بالترتيب)، بغض النظر عن أي اختيار بالقوائم المنسدلة.
+     يُمنع نهائياً: الكتابة فوقهما، اختيارهما كعمود حالة وثيقة، أو تغيير
+     نوع بياناتهما (يبقيان نصّاً دائماً، حتى لو كانت القيمة أرقاماً ظاهرياً).
+     ============================================================ */
+  function getProtectedColumns() {
+    return [S.Excel.cols[0], S.Excel.cols[1]].filter(c => c !== undefined);
+  }
+
+  function isProtectedColumn(colName) {
+    return getProtectedColumns().includes(colName);
+  }
+
   function loadExcelSheet() {
     const sheetName = document.getElementById('sheetExcel').value || S.Excel.wb.SheetNames[0];
     const ws = S.Excel.wb.Sheets[sheetName];
     const json = XLSX.utils.sheet_to_json(ws, { defval: '', raw: false, rawNumbers: false });
     S.Excel.rows = json;
     S.Excel.cols = json.length ? Object.keys(json[0]) : [];
+    S.autoCreatedColumns = {};
+
+    // فرض النوع النصي على العمودين المحميين (رقم الطالب + اسم الطالب) فور
+    // القراءة، لمنع أي تحويل ضمني لرقم (وفقدان أصفار بادئة مثلاً)
+    const protectedCols = getProtectedColumns();
+    for (const row of S.Excel.rows) {
+      for (const col of protectedCols) {
+        if (col in row) row[col] = String(row[col]);
+      }
+    }
+
     updateColumnSelects();
     onDocTypeChange();
     checkReady();
@@ -1050,50 +1073,82 @@
     }
   }
 
+  /* ============================================================
+     إنشاء عمود جديد وآمن لحالة نوع الوثيقة (عند عدم وجود عمود مطابق آمن)
+     يُدرج قبل آخر عمودين في الإكسل (نسبة الاكتمال، حالة الملف)، بقيمة
+     افتراضية "لا" لكل الصفوف. إذا كان اسم الرمز نفسه مستخدَماً أصلاً لعمود
+     آخر (تصادم أسماء)، يُختار اسم بديل فريد تلقائياً (مثل ID_2, ID_3...)
+     بدل الاصطدام بعمود موجود — هذا بالضبط ما تسبب بالخطأ السابق.
+     ============================================================ */
+  function getUniqueColumnName(code) {
+    if (!S.Excel.cols.includes(code)) return code;
+    let n = 2;
+    while (S.Excel.cols.includes(`${code}_${n}`)) n++;
+    return `${code}_${n}`;
+  }
+
+  function createDocStatusColumn(code) {
+    // إعادة استخدام نفس العمود لو سبق إنشاؤه لهذا الرمز بالجلسة الحالية (يمنع تكرار الإنشاء)
+    if (S.autoCreatedColumns[code] && S.Excel.cols.includes(S.autoCreatedColumns[code])) {
+      return S.autoCreatedColumns[code];
+    }
+    const colName = getUniqueColumnName(code);
+    const cols = S.Excel.cols;
+    const insertAt = cols.length >= 2 ? cols.length - 2 : cols.length;
+    cols.splice(insertAt, 0, colName);
+    for (const row of S.Excel.rows) {
+      if (!(colName in row)) row[colName] = 'لا';
+    }
+    S.autoCreatedColumns[code] = colName;
+    return colName;
+  }
+
   function onDocTypeChange() {
     const code = document.getElementById('docTypeSelect').value;
     S.docTypeCode = code;
     S.docStatusColumn = "";
     S.docStatusSaved = true;
     const infoEl = document.getElementById('docTypeColumnInfo');
-    const fallbackWrap = document.getElementById('docTypeColumnFallback');
-    const manualSel = document.getElementById('docTypeColumnManual');
 
     if (!code) {
       infoEl.textContent = 'اختر نوع الوثيقة ليتم تحديد عمود الحالة المطابق له تلقائياً في الإكسل';
-      fallbackWrap.style.display = 'none';
+      infoEl.style.color = '';
       return;
     }
 
-    // البحث عن عمود في الإكسل باسم مطابق تماماً لرمز الوثيقة (case-insensitive, trim)
-    const match = S.Excel.cols.find(c => String(c).trim().toUpperCase() === code.trim().toUpperCase());
+    // حاجز أمان: عمود حالة الوثيقة لا يمكن أبداً أن يكون نفس عمود الاسم أو
+    // عمود الرقم/الترقيم المختارين بالخطوة 2 — حتى لو تطابق اسمه حرفياً مع
+    // رمز الوثيقة (هذا بالضبط ما سبّب استبدال رقم الطالب سابقاً بالخطأ)،
+    // وكذلك لا يمكن أبداً أن يكون أول أو ثاني عمود بالإكسل (رقم الطالب/اسمه)
+    // بغض النظر عمّا هو مختار حالياً بالقوائم المنسدلة
+    const nameCol = document.getElementById('nameColumn').value;
+    const numCol = document.getElementById('numberColumn').value;
+
+    const match = S.Excel.cols.find(c => {
+      if (String(c).trim().toUpperCase() !== code.trim().toUpperCase()) return false;
+      if (c === nameCol || c === numCol) return false;
+      if (isProtectedColumn(c)) return false;
+      return true;
+    });
+
     if (match) {
       S.docStatusColumn = match;
       infoEl.innerHTML = `✅ سيتم تحديث عمود <strong>"${esc(match)}"</strong> في الإكسل إلى "نعم" لكل طالب تمت مطابقته`;
       infoEl.style.color = 'var(--found-b)';
-      fallbackWrap.style.display = 'none';
     } else {
-      infoEl.innerHTML = `⚠️ لا يوجد عمود باسم "${esc(code)}" في هذا الإكسل`;
-      infoEl.style.color = 'var(--warning)';
-      if (S.Excel.cols.length) {
-        manualSel.innerHTML = '<option value="">— اختر العمود يدوياً —</option>' +
-          S.Excel.cols.map(c => `<option value="${esc(c)}">${esc(c)}</option>`).join('');
-        fallbackWrap.style.display = 'block';
-      }
+      // لا يوجد عمود مطابق آمن → إنشاء عمود جديد تلقائياً بدل التخمين
+      const newCol = createDocStatusColumn(code);
+      S.docStatusColumn = newCol;
+      const note = newCol !== code ? ` (باسم "${esc(newCol)}" لتفادي تصادم مع عمود "${esc(code)}" موجود مسبقاً)` : '';
+      infoEl.innerHTML = `🆕 لا يوجد عمود آمن مطابق — تم إنشاء عمود جديد <strong>"${esc(newCol)}"</strong>${note} قبل عمودي "نسبة الاكتمال" و"حالة الملف"، وسيُحفظ عند تأكيد الترقيم.`;
+      infoEl.style.color = 'var(--found-b)';
     }
   }
 
-  document.getElementById('docTypeColumnManual').addEventListener('change', function () {
-    S.docStatusColumn = this.value;
-    S.docStatusSaved = true;
-    const infoEl = document.getElementById('docTypeColumnInfo');
-    if (this.value) {
-      infoEl.innerHTML = `✅ تم تحديد عمود <strong>"${esc(this.value)}"</strong> يدوياً لتحديث حالة الوثيقة`;
-      infoEl.style.color = 'var(--found-b)';
-    }
-  });
-
   document.getElementById('docTypeSelect').addEventListener('change', onDocTypeChange);
+  // إعادة التحقق من حاجز الأمان لو تغيّر عمود الاسم/الرقم بعد اختيار نوع الوثيقة
+  document.getElementById('nameColumn').addEventListener('change', () => { if (S.docTypeCode) onDocTypeChange(); });
+  document.getElementById('numberColumn').addEventListener('change', () => { if (S.docTypeCode) onDocTypeChange(); });
   document.getElementById('pickExcelBtn').addEventListener('click', pickExcelFile);
   document.getElementById('fileExcel').addEventListener('change', readExcelFile);
   document.getElementById('sheetExcel').addEventListener('change', loadExcelSheet);
@@ -1629,6 +1684,17 @@
   function applyDocStatusToExcelRows() {
     if (!S.docTypeCode || !S.docStatusColumn) return;
 
+    // حاجز أمان أخير (دفاع إضافي): ارفض الكتابة إطلاقاً لو تصادف أن عمود
+    // الحالة يساوي عمود الاسم أو عمود الرقم الحاليين، أو أول/ثاني عمود
+    // بالإكسل (رقم الطالب/اسمه) — مهما كان السبب
+    const nameCol = document.getElementById('nameColumn').value;
+    const numCol = document.getElementById('numberColumn').value;
+    if (S.docStatusColumn === nameCol || S.docStatusColumn === numCol || isProtectedColumn(S.docStatusColumn)) {
+      console.error('تم رفض تحديث عمود حالة الوثيقة لأنه يتطابق مع عمود محمي (رقم/اسم الطالب) — حماية من الكتابة فوق بيانات الطالب.');
+      S.docStatusColumn = '';
+      return;
+    }
+
     let updatedCount = 0;
     for (const r of S.results) {
       if (r.status === 'found' && typeof r.origIndex === 'number') {
@@ -1646,6 +1712,28 @@
      يعيد كتابة كل الصفوف/الأعمدة كما هي في S.Excel.rows، مع تعديل
      عمود حالة الوثيقة المختار فقط — بقية بيانات الطالب لا تتغير.
      ============================================================ */
+  // يفرض النوع النصي الحقيقي (t='s') وتنسيق نص ('@') على أعمدة بعينها داخل
+  // ورقة إكسل مبنية حديثاً — يمنع Excel نفسه من إعادة تفسيرها كأرقام لاحقاً
+  // (وبالتالي فقدان الأصفار البادئة) حتى لو بدت القيمة رقماً بحتاً
+  function forceTextColumnsInSheet(sheet, colNames, rows) {
+    const idxByName = {};
+    S.Excel.cols.forEach((c, i) => { idxByName[c] = i; });
+    for (const colName of colNames) {
+      const colIdx = idxByName[colName];
+      if (colIdx === undefined) continue;
+      const colLetter = XLSX.utils.encode_col(colIdx);
+      for (let r = 0; r < rows.length; r++) {
+        const addr = colLetter + (r + 2); // +2: صف العناوين رقم 1
+        const cell = sheet[addr];
+        if (cell) {
+          cell.v = String(cell.v);
+          cell.t = 's';
+          cell.z = '@';
+        }
+      }
+    }
+  }
+
   async function autoSaveDocStatusToOriginalFile() {
     const info = document.getElementById('saveDocStatusInfo');
     if (!info) return;
@@ -1663,6 +1751,11 @@
       const sheetName = document.getElementById('sheetExcel').value || S.Excel.wb.SheetNames[0];
       // إعادة بناء الورقة من S.Excel.rows الحالية (تحتوي كل الأعمدة الأصلية + التحديث)
       const newSheet = XLSX.utils.json_to_sheet(S.Excel.rows, { header: S.Excel.cols });
+
+      // حماية إلزامية: فرض النوع النصي على العمودين المحميين (رقم الطالب واسمه)
+      // في الملف المكتوب فعلياً على القرص، بغض النظر عن أي شيء آخر
+      forceTextColumnsInSheet(newSheet, getProtectedColumns(), S.Excel.rows);
+
       S.Excel.wb.Sheets[sheetName] = newSheet;
 
       const outArrayBuffer = XLSX.write(S.Excel.wb, { bookType: 'xlsx', type: 'array' });
@@ -2152,6 +2245,7 @@
     S.docTypeCode = "";
     S.docStatusColumn = "";
     S.docStatusSaved = true;
+    S.autoCreatedColumns = {};
 
     document.getElementById('fileExcel').value = '';
     document.getElementById('infoExcel').textContent = 'لم يتم اختيار ملف';
@@ -2170,7 +2264,6 @@
     document.getElementById('nameColumn').innerHTML = '';
     document.getElementById('numberColumn').innerHTML = '';
     document.getElementById('docTypeSelect').value = '';
-    document.getElementById('docTypeColumnFallback').style.display = 'none';
     document.getElementById('saveDocStatusInfo').textContent = '';
     document.getElementById('step2').classList.add('hidden');
     document.getElementById('step3').classList.add('hidden');
