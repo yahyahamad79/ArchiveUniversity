@@ -2107,6 +2107,8 @@
     const dirHandle = S.Folder.dirHandle;
     let renamedCount = 0;
     const errors = [];
+    let activationExpired = false;
+    let processedThisRun = 0;
 
     try {
       for (const r of toRename) {
@@ -2117,14 +2119,27 @@
           continue;
         }
 
+        // بمجرد أن تنتهي صلاحية "تفعيل المستخدم" (بعد نجاح دفعة من move())،
+        // كل محاولات move() اللاحقة بنفس هذه الجلسة ستفشل حتماً — نتوقف فوراً
+        // بدل تضييع وقت بمحاولات محكوم عليها بالفشل، ونترك الباقي لضغطة جديدة
+        if (activationExpired) break;
+
         try {
           const oldHandle = await dirHandle.getFileHandle(oldName);
 
           if (typeof oldHandle.move === 'function') {
-            // الطريقة المباشرة: إعادة تسمية حقيقية بدون نسخ
-            await oldHandle.move(newName);
+            try {
+              // الطريقة المباشرة الحقيقية دائماً — بدون أي نسخ
+              await oldHandle.move(newName);
+            } catch (moveErr) {
+              // فشل أثناء التنفيذ (غالباً انتهاء تفعيل المستخدم العابر بعد
+              // معالجة عدة ملفات) — نوقف الدفعة الحالية فوراً؛ ضغطة جديدة على
+              // الزر تمنح تفعيلاً جديداً فتنجح move() مجدداً للباقي تلقائياً
+              activationExpired = true;
+              break;
+            }
           } else {
-            // بديل: نسخ المحتوى لملف جديد بالاسم الجديد ثم حذف القديم
+            // فقط لو move() غير مدعومة إطلاقاً بهذا المتصفح (وليس فشلاً طارئاً)
             const fileData = await oldHandle.getFile();
             const buffer = await fileData.arrayBuffer();
             const newHandle = await dirHandle.getFileHandle(newName, { create: true });
@@ -2142,13 +2157,20 @@
           errors.push(`${oldName} ← ${err.message}`);
         }
 
-        await sleep(20);
+        processedThisRun++;
+        // نقطة تنفّس خفيفة للواجهة فقط كل عدة ملفات (بدل تأخير كل ملف) —
+        // للاستفادة من أطول وقت ممكن ضمن نافذة التفعيل القصيرة
+        if (processedThisRun % 8 === 0) await sleep(0);
       }
 
       S.renamedCount = renamedCount;
 
+      const remaining = toRename.filter(r => !r.renamed && r.newName && r.folderName !== r.newName).length;
       const renameInfo = document.getElementById('renameInfo');
-      if (errors.length) {
+      if (activationExpired && remaining > 0) {
+        renameInfo.innerHTML = `✅ تم ترقيم <strong>${renamedCount}</strong> ملف مباشرة. ⏸️ توقفت العملية مؤقتاً بسبب قيد أمان بمتصفح Chrome (صلاحية تفعيل قصيرة تنتهي بعد عدة ملفات) — بقي <strong>${remaining}</strong> ملف. اضغط "🔄 ترقيم الملفات" مرة أخرى لإكمالهم مباشرة (بدون نسخ) بضغطة جديدة.`;
+        renameInfo.style.color = 'var(--warning)';
+      } else if (errors.length) {
         renameInfo.innerHTML = `✅ تم ترقيم <strong>${renamedCount}</strong> ملف بنجاح. ⚠️ فشل ترقيم <strong>${errors.length}</strong> ملف: ${errors.slice(0, 5).map(esc).join(' | ')}`;
         renameInfo.style.color = 'var(--warning)';
       } else {
