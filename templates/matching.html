@@ -729,6 +729,7 @@
           <label style="font-size:13px;color:var(--muted);margin:8px 0 4px;display:block">اختر الورقة (Sheet):</label>
           <select id="sheetExcel"></select>
         </div>
+        <div style="font-size:11px;color:var(--found-b);background:#f0fdf4;border:1px solid #bbf7d0;border-radius:6px;padding:6px 8px;margin-top:6px;display:none" id="headerRowNote"></div>
       </div>
       <div class="file-box" id="boxFolder">
         <label>📁 المجلد (الملفات: صور، وثائق، PDF...)</label>
@@ -938,7 +939,7 @@
      الحالة العامة
      ============================================================ */
   const S = {
-    Excel: { wb: null, rows: [], cols: [], name: "", fileHandle: null },
+    Excel: { wb: null, rows: [], cols: [], name: "", fileHandle: null, headerRowIdx: 0 },
     Folder: { dirHandle: null, files: [], fileMap: {} },
     Destination: { dirHandle: null },
     results: [], // [{excelName, number, folderName, ext, path, status: 'found'|'missing'|'extra'|'renamed', newName, origIndex}]
@@ -1073,13 +1074,49 @@
     return getProtectedColumns().includes(colName);
   }
 
-  function loadExcelSheet() {
+  // يكتشف صف العناوين الحقيقي بدل افتراض أن الصف الأول دائماً هو العناوين —
+  // بعض الملفات تبدأ بصف عنوان/شعار مدمج (خلية واحدة فقط تحمل نصاً مثل
+  // "لوحة معلومات الطلبة") قبل صف العناوين الفعلي، ما يجعل SheetJS يولّد
+  // مفاتيح وهمية (__EMPTY, __EMPTY_1...) لبقية الأعمدة. الحل: فحص أول 15 صفاً
+  // خاماً واختيار الصف الذي يحوي أكبر عدد من الخلايا غير الفارغة كصف عناوين.
+  function detectHeaderRowIndex(ws) {
+    const raw = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '', raw: false, blankrows: false });
+    let bestIdx = 0, bestCount = -1;
+    for (let i = 0; i < Math.min(raw.length, 15); i++) {
+      const nonEmpty = (raw[i] || []).filter(c => String(c).trim() !== '').length;
+      if (nonEmpty > bestCount) { bestCount = nonEmpty; bestIdx = i; }
+    }
+    return bestIdx;
+  }
+
+  function loadExcelSheet(headerRowOverride) {
     const sheetName = document.getElementById('sheetExcel').value || S.Excel.wb.SheetNames[0];
     const ws = S.Excel.wb.Sheets[sheetName];
-    const json = XLSX.utils.sheet_to_json(ws, { defval: '', raw: false, rawNumbers: false });
+
+    const headerRowIdx = (typeof headerRowOverride === 'number')
+      ? headerRowOverride
+      : detectHeaderRowIndex(ws);
+
+    const json = XLSX.utils.sheet_to_json(ws, { range: headerRowIdx, defval: '', raw: false, rawNumbers: false });
     S.Excel.rows = json;
     S.Excel.cols = json.length ? Object.keys(json[0]) : [];
+    S.Excel.headerRowIdx = headerRowIdx;
     S.autoCreatedColumns = {};
+
+    // تنبيه المستخدم فقط لو تم تجاوز صف/أكثر (سلوك غير معتاد يستحق التوضيح)،
+    // مع إتاحة تصحيح الصف يدوياً لو أخطأ الاكتشاف التلقائي
+    const headerNote = document.getElementById('headerRowNote');
+    if (headerRowIdx > 0) {
+      headerNote.style.display = 'block';
+      headerNote.innerHTML = `ℹ️ تم تجاوز ${headerRowIdx} صف/صفوف غير صالحة كعناوين (مثل عنوان أو شعار)، واعتُبر الصف رقم ${headerRowIdx + 1} صف العناوين الفعلي. إذا كان هذا غير صحيح: <input type="number" id="headerRowManualInput" min="1" value="${headerRowIdx + 1}" style="width:60px;padding:2px 4px;margin:0 4px"><button type="button" class="btn btn-ghost" id="headerRowManualBtn" style="padding:3px 10px;font-size:11px">تحديث</button>`;
+      document.getElementById('headerRowManualBtn').onclick = () => {
+        const v = parseInt(document.getElementById('headerRowManualInput').value, 10);
+        if (v && v >= 1) loadExcelSheet(v - 1);
+      };
+    } else {
+      headerNote.style.display = 'none';
+      headerNote.innerHTML = '';
+    }
 
     // فرض النوع النصي على العمودين المحميين (رقم الطالب + اسم الطالب) فور
     // القراءة، لمنع أي تحويل ضمني لرقم (وفقدان أصفار بادئة مثلاً)
@@ -1799,6 +1836,42 @@
     }
   }
 
+  // لو تم تجاوز صف/صفوف بانر (مثل عنوان مدمج) قبل صف العناوين الحقيقي، يجب
+  // الحفاظ عليها كما هي بالملف المحفوظ — بدل فقدانها لأن json_to_sheet يبني
+  // دائماً من الصف 1. يدمج صفوف البانر الأصلية + بيانات الجدول الجديدة بإزاحة.
+  function mergeWithOriginalBannerRows(originalWs, dataSheet, headerRowIdx) {
+    if (!headerRowIdx) return dataSheet; // لا يوجد بانر، لا حاجة لأي دمج
+    const merged = {};
+    const origRange = originalWs['!ref'] ? XLSX.utils.decode_range(originalWs['!ref']) : null;
+    if (origRange) {
+      for (let R = origRange.s.r; R < headerRowIdx; R++) {
+        for (let C = origRange.s.c; C <= origRange.e.c; C++) {
+          const addr = XLSX.utils.encode_cell({ r: R, c: C });
+          if (originalWs[addr]) merged[addr] = originalWs[addr];
+        }
+      }
+    }
+    const dataRange = dataSheet['!ref'] ? XLSX.utils.decode_range(dataSheet['!ref']) : null;
+    let maxR = headerRowIdx - 1;
+    let maxC = origRange ? origRange.e.c : 0;
+    if (dataRange) {
+      for (let R = dataRange.s.r; R <= dataRange.e.r; R++) {
+        for (let C = dataRange.s.c; C <= dataRange.e.c; C++) {
+          const srcAddr = XLSX.utils.encode_cell({ r: R, c: C });
+          if (dataSheet[srcAddr]) {
+            const dstAddr = XLSX.utils.encode_cell({ r: R + headerRowIdx, c: C });
+            merged[dstAddr] = dataSheet[srcAddr];
+          }
+        }
+      }
+      maxR = Math.max(maxR, dataRange.e.r + headerRowIdx);
+      maxC = Math.max(maxC, dataRange.e.c);
+    }
+    merged['!ref'] = XLSX.utils.encode_range({ s: { r: 0, c: 0 }, e: { r: maxR, c: maxC } });
+    if (originalWs['!merges']) merged['!merges'] = originalWs['!merges'];
+    return merged;
+  }
+
   async function autoSaveDocStatusToOriginalFile() {
     const info = document.getElementById('saveDocStatusInfo');
     if (!info) return;
@@ -1814,12 +1887,17 @@
 
     try {
       const sheetName = document.getElementById('sheetExcel').value || S.Excel.wb.SheetNames[0];
+      const originalWs = S.Excel.wb.Sheets[sheetName];
+
       // إعادة بناء الورقة من S.Excel.rows الحالية (تحتوي كل الأعمدة الأصلية + التحديث)
-      const newSheet = XLSX.utils.json_to_sheet(S.Excel.rows, { header: S.Excel.cols });
+      let newSheet = XLSX.utils.json_to_sheet(S.Excel.rows, { header: S.Excel.cols });
 
       // حماية إلزامية: فرض النوع النصي على العمودين المحميين (رقم الطالب واسمه)
       // في الملف المكتوب فعلياً على القرص، بغض النظر عن أي شيء آخر
       forceTextColumnsInSheet(newSheet, getProtectedColumns(), S.Excel.rows);
+
+      // الحفاظ على أي صف/صفوف بانر أعلى صف العناوين الفعلي (لا تُفقد أبداً)
+      newSheet = mergeWithOriginalBannerRows(originalWs, newSheet, S.Excel.headerRowIdx || 0);
 
       S.Excel.wb.Sheets[sheetName] = newSheet;
 
@@ -2334,7 +2412,7 @@
      إعادة تعيين
      ============================================================ */
   document.getElementById('resetBtn').addEventListener('click', () => {
-    S.Excel = { wb: null, rows: [], cols: [], name: "", fileHandle: null };
+    S.Excel = { wb: null, rows: [], cols: [], name: "", fileHandle: null, headerRowIdx: 0 };
     S.Folder = { dirHandle: null, files: [], fileMap: {} };
     S.Destination = { dirHandle: null };
     S.results = [];
@@ -2365,6 +2443,8 @@
     document.getElementById('migrateArea').style.display = 'none';
     document.getElementById('sheetSelExcel').style.display = 'none';
     document.getElementById('sheetSelExcel').classList.remove('needs-attention');
+    document.getElementById('headerRowNote').style.display = 'none';
+    document.getElementById('headerRowNote').innerHTML = '';
     document.getElementById('sheetExcel').innerHTML = '';
     document.getElementById('nameColumn').innerHTML = '';
     document.getElementById('numberColumn').innerHTML = '';
