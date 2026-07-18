@@ -876,6 +876,7 @@
     </div>
 
     <div class="btn-row">
+      <button class="btn btn-success" id="saveDocStatusBtn" style="display:none">💾 حفظ حالة الوثيقة في ملف الإكسل الأصلي</button>
       <button class="btn" id="exportBtn">📥 تصدير النتائج إلى Excel</button>
       <button class="btn btn-ghost" id="exportMissingBtn">📋 تصدير المفقودين فقط</button>
       <button class="btn btn-ghost" id="resetBtn">🔄 مقارنة جديدة</button>
@@ -1620,14 +1621,20 @@
   }
 
   /* ============================================================
-     تحديث حالة نوع الوثيقة في صفوف الإكسل (في الذاكرة فقط)
+     تحديث حالة نوع الوثيقة في صفوف الإكسل (في الذاكرة فقط حتى الحفظ)
      لا يمس أي عمود أو صف آخر — يضع "نعم" فقط لصفوف الطلاب الذين تمت
      مطابقة ملفاتهم بنجاح (status === 'found')، ولا يلمس صفوف "مفقود"
      أو "إضافي" حتى لا تُفقد بيانات كانت موجودة مسبقاً بالخطأ.
-     الحفظ الفعلي على القرص يحدث تلقائياً عند تأكيد الترقيم (وليس هنا).
      ============================================================ */
   function applyDocStatusToExcelRows() {
-    if (!S.docTypeCode || !S.docStatusColumn) return;
+    const saveBtn = document.getElementById('saveDocStatusBtn');
+    const info = document.getElementById('saveDocStatusInfo');
+
+    if (!S.docTypeCode || !S.docStatusColumn) {
+      saveBtn.style.display = 'none';
+      info.textContent = '';
+      return;
+    }
 
     let updatedCount = 0;
     for (const r of S.results) {
@@ -1636,28 +1643,37 @@
         updatedCount++;
       }
     }
+
     S.docStatusSaved = false;
+    saveBtn.style.display = updatedCount ? 'inline-flex' : 'none';
+    info.textContent = updatedCount
+      ? `⚠️ تم تحديث عمود "${S.docStatusColumn}" لـ ${updatedCount} طالب في الذاكرة فقط — اضغط "حفظ حالة الوثيقة في ملف الإكسل الأصلي" لحفظها فعلياً على القرص.`
+      : '';
   }
 
   /* ============================================================
      حفظ التعديلات مباشرة في ملف الإكسل الأصلي (بدون تصدير ملف جديد)
-     تُستدعى تلقائياً بعد نجاح الترقيم — لا يوجد زر منفصل لها ولا نافذة
-     تأكيد إضافية، لأن ضغط "✅ تأكيد الترقيم" نفسه هو التأكيد المطلوب.
      يعيد كتابة كل الصفوف/الأعمدة كما هي في S.Excel.rows، مع تعديل
      عمود حالة الوثيقة المختار فقط — بقية بيانات الطالب لا تتغير.
      ============================================================ */
-  async function autoSaveDocStatusToOriginalFile() {
-    const info = document.getElementById('saveDocStatusInfo');
-    if (!info) return;
-
-    // لا يوجد نوع وثيقة محدد أصلاً → لا شيء لحفظه، تجاهل بصمت
-    if (!S.docTypeCode || !S.docStatusColumn) { info.textContent = ''; return; }
-
+  async function saveDocStatusToOriginalFile() {
     if (!S.Excel.fileHandle) {
-      info.textContent = '⚠️ تم تحديث حالة الوثيقة في الذاكرة، لكن تعذّر حفظها في الملف الأصلي (لا توجد صلاحية حفظ مباشر — تأكد من اختيار ملف الإكسل عبر Chrome/Edge مع منح صلاحية الحفظ).';
-      info.style.color = 'var(--warning)';
+      alert('لا توجد صلاحية حفظ مباشر على هذا الملف.\nتأكد من اختيار ملف الإكسل عبر زر "اختيار ملف" في متصفح Chrome أو Edge، ومنح صلاحية الحفظ عند الطلب.');
       return;
     }
+    if (!S.docStatusColumn) {
+      alert('اختر نوع الوثيقة أولاً من الخطوة 2 حتى يتم تحديد عمود الحالة.');
+      return;
+    }
+
+    const foundCount = S.results.filter(r => r.status === 'found').length;
+    const ok = confirm(
+      `سيتم الآن الكتابة مباشرة فوق الملف الأصلي:\n"${S.Excel.name}"\n\n` +
+      `— تحديث عمود "${S.docStatusColumn}" إلى "نعم" لـ ${foundCount} طالب تمت مطابقة وثيقتهم.\n` +
+      `— باقي الأعمدة والصفوف تبقى كما هي دون أي حذف أو تعديل.\n\n` +
+      `هل تريد المتابعة والحفظ الآن؟`
+    );
+    if (!ok) return;
 
     try {
       const sheetName = document.getElementById('sheetExcel').value || S.Excel.wb.SheetNames[0];
@@ -1672,13 +1688,15 @@
       await writable.close();
 
       S.docStatusSaved = true;
-      info.textContent = `✅ تم تحديث عمود "${S.docStatusColumn}" وحفظه تلقائياً في الملف الأصلي "${S.Excel.name}".`;
+      const info = document.getElementById('saveDocStatusInfo');
+      info.textContent = `✅ تم حفظ التحديث في الملف الأصلي "${S.Excel.name}" بنجاح.`;
       info.style.color = 'var(--found-b)';
     } catch (err) {
-      info.textContent = '⚠️ تم تحديث حالة الوثيقة في الذاكرة، لكن فشل الحفظ التلقائي في الملف الأصلي: ' + err.message;
-      info.style.color = 'var(--warning)';
+      alert('فشل حفظ الملف: ' + err.message);
     }
   }
+
+  document.getElementById('saveDocStatusBtn').addEventListener('click', saveDocStatusToOriginalFile);
 
   /* ============================================================
      عرض النتائج
@@ -1912,16 +1930,6 @@
       updateMigrateInfo();
     } catch (e) {
       console.error('خطأ أثناء تحديث معلومات الترحيل:', e);
-    }
-
-    // حفظ تلقائي لحالة نوع الوثيقة في ملف الإكسل الأصلي فور نجاح الترقيم —
-    // بدون زر منفصل وبدون نافذة تأكيد إضافية
-    if (renamedCount > 0) {
-      try {
-        await autoSaveDocStatusToOriginalFile();
-      } catch (e) {
-        console.error('خطأ أثناء الحفظ التلقائي لحالة الوثيقة:', e);
-      }
     }
 
     // الانتقال تلقائياً إلى قسم الترحيل عند وجود ملفات مرقّمة بانتظار النقل
@@ -2171,6 +2179,7 @@
     document.getElementById('numberColumn').innerHTML = '';
     document.getElementById('docTypeSelect').value = '';
     document.getElementById('docTypeColumnFallback').style.display = 'none';
+    document.getElementById('saveDocStatusBtn').style.display = 'none';
     document.getElementById('saveDocStatusInfo').textContent = '';
     document.getElementById('step2').classList.add('hidden');
     document.getElementById('step3').classList.add('hidden');
@@ -2184,20 +2193,7 @@
     const allChip = document.querySelector('.filter-chip[data-f="all"]');
     if (allChip) allChip.classList.add('active');
     folderFileList = [];
-
-    // إعادة ضبط عناصر الاسترجاع التلقائي (الأسماء المحفوظة + أزرار إعادة التأكيد)
-    document.getElementById('savedPathExcelFile').textContent = '';
-    document.getElementById('savedPathWorkspaceFolder').textContent = '';
-    document.getElementById('savedPathArchiveFolder').textContent = '';
-    document.getElementById('reconnectExcelFile').style.display = 'none';
-    document.getElementById('reconnectWorkspaceFolder').style.display = 'none';
-    document.getElementById('reconnectArchiveFolder').style.display = 'none';
-
     window.scrollTo({ top: 0, behavior: 'smooth' });
-
-    // "مقارنة جديدة" يجب أن تبدو تماماً كأول دخول للشاشة — لذلك نعيد تشغيل نفس
-    // منطق الاسترجاع التلقائي من paths.html (الإكسل + المجلد + مسار الوجهة)
-    restoreSavedHandles();
   });
 
   /* ============================================================
