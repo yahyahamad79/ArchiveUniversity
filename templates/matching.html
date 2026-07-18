@@ -2278,6 +2278,23 @@
     if (allChip) allChip.classList.add('active');
     folderFileList = [];
 
+    // إعادة ضبط زر تنفيذ المطابقة وشريط التقدم — كانا يبقيان معطّلَين/ظاهرَين
+    // بحالة "اكتملت المطابقة" من الجلسة السابقة لو لم يُلمسا هنا صراحة
+    const runBtn = document.getElementById('runBtn');
+    runBtn.disabled = false;
+    runBtn.style.opacity = '1';
+    document.getElementById('progressWrap').style.display = 'none';
+    document.getElementById('progressFill').style.width = '0%';
+    document.getElementById('progressPct').textContent = '0%';
+    document.getElementById('progressLabel').textContent = 'جارٍ المطابقة...';
+
+    const renameBtn = document.getElementById('renameBtn');
+    renameBtn.disabled = false;
+    renameBtn.textContent = '🔄 ترقيم الملفات';
+    const migrateBtn = document.getElementById('migrateBtn');
+    migrateBtn.disabled = false;
+    migrateBtn.textContent = '🚚 الترحيل والنقل';
+
     // إعادة ضبط عناصر الاسترجاع التلقائي (الأسماء المحفوظة + أزرار إعادة التأكيد)
     document.getElementById('savedPathExcelFile').textContent = '';
     document.getElementById('savedPathWorkspaceFolder').textContent = '';
