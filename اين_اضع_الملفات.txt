@@ -1,0 +1,48 @@
+دليل وضع الملفات — مشروع ArchiveUniversity
+==================================================
+
+الملفات المُرفقة الآن وأين تضعها داخل مجلد المشروع (E:\MyProjects\ArchiveUniversity أو
+أي مسار مشابه عندك):
+
+1) app.py
+   المكان: جذر المشروع مباشرة (استبدل الملف الموجود)
+   ArchiveUniversity/app.py
+
+2) matching.html
+   المكان: داخل مجلد templates الموجود أصلاً (استبدل الملف الموجود)
+   ArchiveUniversity/templates/matching.html
+
+3) paths.html
+   المكان: داخل مجلد templates الموجود أصلاً (استبدل الملف الموجود)
+   ArchiveUniversity/templates/paths.html
+
+4) handle-store.js
+   المكان: مجلد جديد اسمه "static" — غير موجود حالياً بمشروعك، أنشئه بجذر المشروع
+   بجانب app.py مباشرة (وليس داخل templates)
+   ArchiveUniversity/static/handle-store.js
+   ⚠️ مجلد جديد: static/  — لازم تنشئه، لم يكن موجوداً بالمستودع سابقاً.
+
+5) paths.json
+   المكان: داخل مجلد database الموجود أصلاً (بجانب doc_types.json)
+   ArchiveUniversity/database/paths.json
+   ملاحظة: إذا كان عندك ملف paths.json موجود مسبقاً بنفس الاسم من تجربة سابقة، لا
+   تستبدله إذا كان فيه بيانات محفوظة تريد الاحتفاظ بها — هذا الملف هنا نسخة فارغة
+   فقط لبدء التشغيل.
+
+الشكل النهائي المتوقع لمجلد المشروع بعد النسخ:
+
+ArchiveUniversity/
+├── app.py                     ← (1) استبدال
+├── static/                    ← مجلد جديد
+│   └── handle-store.js        ← (4)
+├── templates/
+│   ├── index.html
+│   ├── paths.html             ← (3) استبدال
+│   ├── constants.html
+│   └── matching.html          ← (2) استبدال
+└── database/
+    ├── doc_types.json
+    └── paths.json              ← (5) جديد
+
+بعد النسخ: أعد تشغيل السيرفر (python app.py) حتى يتعرف Flask على مجلد static
+والمسارات الجديدة.

@@ -6,6 +6,7 @@
 <title>مطابقة وترقيم الملفات</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script src="https://cdn.tailwindcss.com"></script>
+<script src="/static/handle-store.js"></script>
 <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@300;400;600;700&display=swap" rel="stylesheet">
 <style>
   :root {
@@ -707,6 +708,8 @@
         <button type="button" class="btn" id="pickExcelBtn" style="width:100%">📄 اختيار ملف</button>
         <input type="file" id="fileExcel" accept=".xlsx,.xls,.csv" style="display:none">
         <div class="file-info" id="infoExcel">لم يتم اختيار ملف</div>
+        <div style="font-size:11px;color:var(--muted);margin-top:4px" id="savedPathExcelFile"></div>
+        <button type="button" class="btn btn-ghost" id="reconnectExcelFile" style="display:none;width:100%;margin-top:6px;font-size:12px">🔓 تأكيد الوصول للملف المحفوظ</button>
         <div class="sheet-sel" id="sheetSelExcel">
           <label style="font-size:13px;color:var(--muted);margin:8px 0 4px;display:block">اختر الورقة (Sheet):</label>
           <select id="sheetExcel"></select>
@@ -716,12 +719,16 @@
         <label>📁 المجلد (الملفات: صور، وثائق، PDF...)</label>
         <button type="button" class="btn" id="pickFolderBtn" style="width:100%">📂 اختيار المجلد</button>
         <div class="file-info" id="infoFolder">لم يتم اختيار مجلد</div>
+        <div style="font-size:11px;color:var(--muted);margin-top:4px" id="savedPathWorkspaceFolder"></div>
+        <button type="button" class="btn btn-ghost" id="reconnectWorkspaceFolder" style="display:none;width:100%;margin-top:6px;font-size:12px">🔓 تأكيد الوصول للمجلد المحفوظ</button>
         <div class="file-list" id="folderFileList"></div>
       </div>
       <div class="file-box" id="boxDestination">
         <label>🚚 مسار الوجهة (نقل الملفات المرقمة إليه)</label>
         <button type="button" class="btn" id="pickDestinationBtn" style="width:100%">📂 اختيار مسار الوجهة</button>
         <div class="file-info" id="infoDestination">لم يتم اختيار مسار (اختياري الآن)</div>
+        <div style="font-size:11px;color:var(--muted);margin-top:4px" id="savedPathArchiveFolder"></div>
+        <button type="button" class="btn btn-ghost" id="reconnectArchiveFolder" style="display:none;width:100%;margin-top:6px;font-size:12px">🔓 تأكيد الوصول لمسار الوجهة المحفوظ</button>
       </div>
     </div>
   </div>
@@ -954,6 +961,8 @@
         S.Excel.fileHandle = null;
       } else {
         S.Excel.fileHandle = handle;
+        await saveHandle('excelFile', handle);
+        await saveSharedPaths({ excelFile: { name: handle.name, kind: 'file', updated_at: new Date().toISOString() } });
       }
       const file = await handle.getFile();
       await processExcelFile(file);
@@ -1095,6 +1104,30 @@
   /* ============================================================
      اختيار المجلد (صلاحية قراءة وكتابة حقيقية)
      ============================================================ */
+  async function scanWorkspaceDirHandle(dirHandle) {
+    const list = [];
+    for await (const entry of dirHandle.values()) {
+      if (entry.kind === 'file') {
+        list.push({ name: entry.name });
+      }
+    }
+    return list;
+  }
+
+  // إعادة مسح صامتة لمجلد العمل الحالي (تُستدعى قبل المطابقة/الترقيم/الترحيل
+  // لضمان العمل على أحدث نسخة من الملفات على القرص في كل مرة)
+  async function rescanWorkspaceFolderSilently() {
+    if (!S.Folder.dirHandle) return;
+    try {
+      folderFileList = await scanWorkspaceDirHandle(S.Folder.dirHandle);
+      const info = document.getElementById('infoFolder');
+      info.innerHTML = `✓ تم اختيار مجلد يحتوي على <span class="count">${folderFileList.length}</span> ملف`;
+      info.className = 'file-info ok';
+    } catch (err) {
+      console.warn('تعذّرت إعادة مسح المجلد:', err);
+    }
+  }
+
   async function pickFolder() {
     if (!SUPPORTS_FS_ACCESS) {
       alert('متصفحك لا يدعم هذه الميزة. الرجاء استخدام Google Chrome أو Microsoft Edge على سطح المكتب.');
@@ -1119,14 +1152,12 @@
     const info = document.getElementById('infoFolder');
     info.textContent = 'جارٍ قراءة المجلد...';
 
-    folderFileList = [];
-    for await (const entry of dirHandle.values()) {
-      if (entry.kind === 'file') {
-        folderFileList.push({ name: entry.name });
-      }
-    }
-
+    folderFileList = await scanWorkspaceDirHandle(dirHandle);
     S.Folder.dirHandle = dirHandle;
+
+    await saveHandle('workspaceFolder', dirHandle);
+    await saveSharedPaths({ workspaceFolder: { name: dirHandle.name, kind: 'directory', updated_at: new Date().toISOString() } });
+    document.getElementById('reconnectWorkspaceFolder').style.display = 'none';
 
     info.innerHTML = `✓ تم اختيار مجلد يحتوي على <span class="count">${folderFileList.length}</span> ملف`;
     info.className = 'file-info ok';
@@ -1163,6 +1194,10 @@
 
     S.Destination.dirHandle = dirHandle;
 
+    await saveHandle('archiveFolder', dirHandle);
+    await saveSharedPaths({ archiveFolder: { name: dirHandle.name, kind: 'directory', updated_at: new Date().toISOString() } });
+    document.getElementById('reconnectArchiveFolder').style.display = 'none';
+
     const info = document.getElementById('infoDestination');
     info.innerHTML = `✓ تم اختيار مسار الوجهة: <strong>${esc(dirHandle.name)}</strong>`;
     info.className = 'file-info ok';
@@ -1170,6 +1205,100 @@
   }
 
   document.getElementById('pickDestinationBtn').addEventListener('click', pickDestinationFolder);
+
+  /* ============================================================
+     استرجاع المسارات المحفوظة سابقاً (من paths.html) تلقائياً
+     ============================================================ */
+  async function restoreSavedHandles() {
+    // 1) عرض الأسماء المحفوظة على السيرفر فوراً (بغض النظر عن دعم المتصفح)
+    const shared = await fetchSharedPaths();
+    const labelMap = { excelFile: 'savedPathExcelFile', workspaceFolder: 'savedPathWorkspaceFolder', archiveFolder: 'savedPathArchiveFolder' };
+    for (const key of Object.keys(labelMap)) {
+      const el = document.getElementById(labelMap[key]);
+      if (shared[key] && shared[key].name) {
+        el.textContent = `🗂️ محفوظ من شاشة المسارات: ${shared[key].name}`;
+      }
+    }
+
+    if (!SUPPORTS_FS_ACCESS) return;
+
+    // 2) ملف الإكسل
+    const excelHandle = await getHandle('excelFile');
+    if (excelHandle) {
+      const perm = await checkHandlePermission(excelHandle, 'readwrite');
+      if (perm === 'granted') {
+        S.Excel.fileHandle = excelHandle;
+        const file = await excelHandle.getFile();
+        await processExcelFile(file);
+      } else {
+        const btn = document.getElementById('reconnectExcelFile');
+        btn.style.display = 'block';
+        btn.onclick = async () => {
+          const p = await requestHandlePermission(excelHandle, 'readwrite');
+          if (p === 'granted') {
+            S.Excel.fileHandle = excelHandle;
+            const file = await excelHandle.getFile();
+            await processExcelFile(file);
+            btn.style.display = 'none';
+          } else {
+            alert('لم يتم منح الصلاحية.');
+          }
+        };
+      }
+    }
+
+    // 3) مجلد العمل (الملفات: صور، وثائق)
+    const workspaceHandle = await getHandle('workspaceFolder');
+    if (workspaceHandle) {
+      const perm = await checkHandlePermission(workspaceHandle, 'readwrite');
+      const useIt = async () => {
+        S.Folder.dirHandle = workspaceHandle;
+        folderFileList = await scanWorkspaceDirHandle(workspaceHandle);
+        const info = document.getElementById('infoFolder');
+        info.innerHTML = `✓ تم استرجاع مجلد "${esc(workspaceHandle.name)}" ويحتوي على <span class="count">${folderFileList.length}</span> ملف`;
+        info.className = 'file-info ok';
+        document.getElementById('boxFolder').classList.add('loaded');
+        checkReady();
+      };
+      if (perm === 'granted') {
+        await useIt();
+      } else {
+        const btn = document.getElementById('reconnectWorkspaceFolder');
+        btn.style.display = 'block';
+        btn.onclick = async () => {
+          const p = await requestHandlePermission(workspaceHandle, 'readwrite');
+          if (p === 'granted') { await useIt(); btn.style.display = 'none'; }
+          else alert('لم يتم منح الصلاحية.');
+        };
+      }
+    }
+
+    // 4) مسار الوجهة
+    const archiveHandle = await getHandle('archiveFolder');
+    if (archiveHandle) {
+      const perm = await checkHandlePermission(archiveHandle, 'readwrite');
+      const useIt = () => {
+        S.Destination.dirHandle = archiveHandle;
+        const info = document.getElementById('infoDestination');
+        info.innerHTML = `✓ تم استرجاع مسار الوجهة: <strong>${esc(archiveHandle.name)}</strong>`;
+        info.className = 'file-info ok';
+        document.getElementById('boxDestination').classList.add('loaded');
+      };
+      if (perm === 'granted') {
+        useIt();
+      } else {
+        const btn = document.getElementById('reconnectArchiveFolder');
+        btn.style.display = 'block';
+        btn.onclick = async () => {
+          const p = await requestHandlePermission(archiveHandle, 'readwrite');
+          if (p === 'granted') { useIt(); btn.style.display = 'none'; }
+          else alert('لم يتم منح الصلاحية.');
+        };
+      }
+    }
+  }
+
+  restoreSavedHandles();
 
   /* ============================================================
      التحقق من الجاهزية
@@ -1254,6 +1383,9 @@
   }
 
   async function runMatch() {
+    // مزامنة صامتة لمجلد العمل قبل المطابقة، لضمان العمل على أحدث نسخة من الملفات على القرص
+    await rescanWorkspaceFolderSilently();
+
     const nameCol = document.getElementById('nameColumn').value;
     const numCol = document.getElementById('numberColumn').value;
     if (!nameCol) { alert('اختر عمود الأسماء في ملف الإكسل'); return; }
@@ -1673,7 +1805,10 @@
   /* ============================================================
      ترقيم الملفات
      ============================================================ */
-  document.getElementById('renameBtn').addEventListener('click', () => {
+  document.getElementById('renameBtn').addEventListener('click', async () => {
+    // مزامنة صامتة لمجلد العمل قبل الترقيم
+    await rescanWorkspaceFolderSilently();
+
     const toRename = S.results.filter(r =>
       r.status === 'found' && r.number && r.folderName && !r.renamed
     );
@@ -1859,6 +1994,9 @@
   document.getElementById('migrateBtn').addEventListener('click', async () => {
     const migrateInfo = document.getElementById('migrateInfo');
     const migrateBtn = document.getElementById('migrateBtn');
+
+    // مزامنة صامتة لمجلد العمل قبل الترحيل
+    await rescanWorkspaceFolderSilently();
 
     if (!S.Destination.dirHandle) {
       migrateInfo.innerHTML = '⚠️ يجب اختيار مسار الوجهة أولاً من الأعلى قبل الترحيل.';
