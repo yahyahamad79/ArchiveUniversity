@@ -137,14 +137,21 @@
     background:#20262E;border-radius:10px;display:flex;align-items:center;justify-content:center;
     min-height:440px;max-height:60vh;overflow:auto;position:relative;
   }
+  .viewer-stage.image-stage{min-height:560px;max-height:78vh;justify-content:flex-start;align-items:flex-start;padding:16px}
   .viewer-stage canvas{max-width:100%;display:block}
+  .viewer-stage.image-stage canvas{max-width:none;margin:auto}
   .editor-tools{display:flex;gap:8px;flex-wrap:wrap;margin-top:14px;align-items:center}
   .tool-group{display:flex;gap:6px;align-items:center;background:#F5F6F8;border-radius:8px;padding:6px 10px}
   .tool-group label{font-size:12px;color:var(--text-dim);white-space:nowrap}
   .tool-group input[type=range]{width:110px}
+  .zoom-label{font-size:12.5px;color:var(--text-dim);min-width:42px;text-align:center;display:inline-block}
   .pdf-pager{display:flex;align-items:center;gap:8px;font-size:13px;color:var(--text-dim)}
 
   .crop-overlay{position:absolute;border:2px dashed #fff;background:rgba(255,255,255,.12);cursor:move;display:none}
+  .crop-handle{
+    position:absolute;width:16px;height:16px;background:#fff;border:2px solid var(--primary);
+    border-radius:50%;cursor:nwse-resize;display:none;transform:translate(-50%,-50%);z-index:2;
+  }
 
   .warn-note{font-size:12.5px;color:var(--danger);background:var(--danger-tint);padding:8px 12px;border-radius:8px;margin-top:12px;display:none}
   .warn-note.show{display:block}
@@ -239,7 +246,7 @@
     <span id="bulkCount">تم تحديد 0 ملف</span>
     <div style="display:flex;gap:8px">
       <button class="btn btn-white btn-sm" id="clearSelectionBtn">إلغاء التحديد</button>
-      <button class="btn btn-white btn-sm" id="bulkEditBtn">✏️ تعديل شامل (استبدال نص)</button>
+      <button class="btn btn-white btn-sm" id="bulkEditBtn">💾 تعديل شامل (حفظ الأسماء المحددة)</button>
     </div>
   </div>
 
@@ -253,11 +260,18 @@
       <button class="modal-close" data-close="imgOverlay">✕</button>
     </div>
     <div class="modal-body">
-      <div class="viewer-stage" id="imgStage">
+      <div class="viewer-stage image-stage" id="imgStage">
         <canvas id="imgCanvas"></canvas>
         <div class="crop-overlay" id="cropOverlay"></div>
+        <div class="crop-handle" id="cropHandle"></div>
       </div>
       <div class="editor-tools">
+        <div class="tool-group">
+          <button class="btn btn-ghost btn-sm" id="zoomOutBtn">🔍－</button>
+          <span class="zoom-label" id="zoomLabel">100%</span>
+          <button class="btn btn-ghost btn-sm" id="zoomInBtn">🔍＋</button>
+          <button class="btn btn-ghost btn-sm" id="zoomFitBtn">ملاءمة الإطار</button>
+        </div>
         <div class="tool-group">
           <button class="btn btn-ghost btn-sm" id="rotateLeftBtn">↺ تدوير يسار</button>
           <button class="btn btn-ghost btn-sm" id="rotateRightBtn">↻ تدوير يمين</button>
@@ -325,33 +339,6 @@
     <div class="modal-footer">
       <button class="btn btn-ghost" data-close="pdfOverlay">إغلاق</button>
       <button class="btn btn-primary" id="pdfSaveBtn">💾 حفظ التدوير على الملف</button>
-    </div>
-  </div>
-</div>
-
-<!-- ===== Bulk Find & Replace Modal ===== -->
-<div class="overlay" id="bulkOverlay">
-  <div class="modal">
-    <div class="modal-header">
-      <h2>✏️ تعديل شامل — استبدال نص في الأسماء</h2>
-      <button class="modal-close" data-close="bulkOverlay">✕</button>
-    </div>
-    <div class="modal-body">
-      <div class="field">
-        <label>النص المطلوب استبداله</label>
-        <input type="text" id="findText" placeholder="مثال: احمد">
-      </div>
-      <div class="field">
-        <label>استبداله بـ (اتركه فارغاً للحذف)</label>
-        <input type="text" id="replaceText" placeholder="مثال: أحمد">
-      </div>
-      <button class="btn btn-ghost btn-sm" id="previewBulkBtn">🔍 معاينة النتيجة</button>
-      <div class="preview-list" id="bulkPreviewList" style="display:none"></div>
-      <div class="warn-note" id="bulkWarnNote"></div>
-    </div>
-    <div class="modal-footer">
-      <button class="btn btn-ghost" data-close="bulkOverlay">إلغاء</button>
-      <button class="btn btn-primary" id="bulkExecuteBtn" disabled>تنفيذ التعديل الشامل</button>
     </div>
   </div>
 </div>
@@ -612,7 +599,7 @@ async function renameSingle(entry, newBase, rowEl){
 
 /* ---------------- Image Viewer/Editor ---------------- */
 
-let imgState = null; // {entry, canvas, ctx, origBitmap, cropping, cropRect, brightness, contrast}
+let imgState = null; // {entry, canvas, ctx, origBitmap, cropping, zoom}
 
 async function openViewer(entry){
   if(IMG_EXT.includes(entry.ext)) return openImageEditor(entry);
@@ -635,8 +622,10 @@ async function openImageEditor(entry){
   const ctx = canvas.getContext('2d');
   ctx.drawImage(bitmap, 0, 0);
 
-  imgState = {entry, canvas, ctx, origBitmap: bitmap, cropping:false, cropRect:null};
+  imgState = {entry, canvas, ctx, origBitmap: bitmap, cropping:false, zoom:1};
   applyFiltersPreview();
+  endCropMode();
+  fitZoom();
 }
 
 function applyFiltersPreview(){
@@ -645,6 +634,31 @@ function applyFiltersPreview(){
 }
 $('brightnessSlider').addEventListener('input', applyFiltersPreview);
 $('contrastSlider').addEventListener('input', applyFiltersPreview);
+
+/* zoom */
+function applyZoom(){
+  const canvas = imgState.canvas;
+  canvas.style.width = Math.round(canvas.width * imgState.zoom) + 'px';
+  canvas.style.height = Math.round(canvas.height * imgState.zoom) + 'px';
+  $('zoomLabel').textContent = Math.round(imgState.zoom * 100) + '%';
+}
+function fitZoom(){
+  const stage = $('imgStage');
+  const canvas = imgState.canvas;
+  const availW = stage.clientWidth - 32, availH = stage.clientHeight - 32;
+  const fit = Math.min(1, availW / canvas.width, availH / canvas.height);
+  imgState.zoom = Math.max(0.1, fit);
+  applyZoom();
+}
+$('zoomInBtn').addEventListener('click', ()=>{
+  imgState.zoom = Math.min(4, imgState.zoom * 1.25);
+  applyZoom(); endCropMode();
+});
+$('zoomOutBtn').addEventListener('click', ()=>{
+  imgState.zoom = Math.max(0.1, imgState.zoom / 1.25);
+  applyZoom(); endCropMode();
+});
+$('zoomFitBtn').addEventListener('click', ()=>{ fitZoom(); endCropMode(); });
 
 function rotateCanvas90(dir){
   const canvas = imgState.canvas;
@@ -663,6 +677,8 @@ function rotateCanvas90(dir){
   }
   ctx.drawImage(tmp, 0, 0);
   ctx.restore();
+  endCropMode();
+  applyZoom();
 }
 $('rotateLeftBtn').addEventListener('click', ()=> rotateCanvas90('left'));
 $('rotateRightBtn').addEventListener('click', ()=> rotateCanvas90('right'));
@@ -675,10 +691,32 @@ $('resetEditBtn').addEventListener('click', ()=>{
   $('brightnessSlider').value = 100;
   $('contrastSlider').value = 100;
   applyFiltersPreview();
+  endCropMode();
+  fitZoom();
 });
 
-/* crop */
+/* crop — draw a new box by dragging on empty stage area, move it by dragging
+   inside the box, or resize it from the bottom-right handle */
 let cropDrag = null;
+
+function boxRect(){
+  const ov = $('cropOverlay');
+  return {
+    left: parseFloat(ov.style.left)||0,
+    top: parseFloat(ov.style.top)||0,
+    width: parseFloat(ov.style.width)||0,
+    height: parseFloat(ov.style.height)||0
+  };
+}
+function positionHandle(){
+  const b = boxRect();
+  const h = $('cropHandle');
+  if(b.width < 1 || b.height < 1){ h.style.display = 'none'; return; }
+  h.style.display = 'block';
+  h.style.left = (b.left + b.width) + 'px';
+  h.style.top = (b.top + b.height) + 'px';
+}
+
 $('cropToggleBtn').addEventListener('click', ()=>{
   imgState.cropping = true;
   $('cropOverlay').style.display = 'block';
@@ -688,51 +726,76 @@ $('cropToggleBtn').addEventListener('click', ()=>{
 });
 $('cropCancelBtn').addEventListener('click', endCropMode);
 function endCropMode(){
-  imgState.cropping = false;
+  if(imgState) imgState.cropping = false;
   $('cropOverlay').style.display = 'none';
-  $('cropOverlay').style.width = 0; $('cropOverlay').style.height = 0;
+  $('cropOverlay').style.width = '0px'; $('cropOverlay').style.height = '0px';
+  $('cropHandle').style.display = 'none';
   $('cropToggleBtn').style.display = 'inline-flex';
   $('cropApplyBtn').style.display = 'none';
   $('cropCancelBtn').style.display = 'none';
 }
+
 $('imgStage').addEventListener('mousedown', e=>{
   if(!imgState || !imgState.cropping) return;
   const stageRect = $('imgStage').getBoundingClientRect();
-  cropDrag = {startX: e.clientX - stageRect.left, startY: e.clientY - stageRect.top};
-  const ov = $('cropOverlay');
-  ov.style.left = cropDrag.startX+'px'; ov.style.top = cropDrag.startY+'px';
-  ov.style.width='0px'; ov.style.height='0px';
+  const x = e.clientX - stageRect.left + $('imgStage').scrollLeft;
+  const y = e.clientY - stageRect.top + $('imgStage').scrollTop;
+  const b = boxRect();
+  const nearHandle = b.width > 1 && Math.hypot(x-(b.left+b.width), y-(b.top+b.height)) < 14;
+  const insideBox = b.width > 1 && x > b.left && x < b.left+b.width && y > b.top && y < b.top+b.height;
+
+  if(nearHandle){
+    cropDrag = {mode:'resize', boxLeft:b.left, boxTop:b.top};
+  } else if(insideBox){
+    cropDrag = {mode:'move', startX:x, startY:y, boxLeft:b.left, boxTop:b.top};
+  } else {
+    cropDrag = {mode:'draw', startX:x, startY:y};
+    const ov = $('cropOverlay');
+    ov.style.left = x+'px'; ov.style.top = y+'px'; ov.style.width='0px'; ov.style.height='0px';
+  }
+  e.preventDefault();
 });
 document.addEventListener('mousemove', e=>{
-  if(!cropDrag) return;
+  if(!cropDrag || !imgState) return;
   const stageRect = $('imgStage').getBoundingClientRect();
-  const x = e.clientX - stageRect.left, y = e.clientY - stageRect.top;
+  const x = e.clientX - stageRect.left + $('imgStage').scrollLeft;
+  const y = e.clientY - stageRect.top + $('imgStage').scrollTop;
   const ov = $('cropOverlay');
-  ov.style.left = Math.min(x, cropDrag.startX)+'px';
-  ov.style.top = Math.min(y, cropDrag.startY)+'px';
-  ov.style.width = Math.abs(x-cropDrag.startX)+'px';
-  ov.style.height = Math.abs(y-cropDrag.startY)+'px';
+
+  if(cropDrag.mode === 'draw'){
+    ov.style.left = Math.min(x, cropDrag.startX)+'px';
+    ov.style.top = Math.min(y, cropDrag.startY)+'px';
+    ov.style.width = Math.abs(x-cropDrag.startX)+'px';
+    ov.style.height = Math.abs(y-cropDrag.startY)+'px';
+  } else if(cropDrag.mode === 'move'){
+    const dx = x - cropDrag.startX, dy = y - cropDrag.startY;
+    ov.style.left = (cropDrag.boxLeft + dx) + 'px';
+    ov.style.top = (cropDrag.boxTop + dy) + 'px';
+  } else if(cropDrag.mode === 'resize'){
+    ov.style.width = Math.max(10, x - cropDrag.boxLeft) + 'px';
+    ov.style.height = Math.max(10, y - cropDrag.boxTop) + 'px';
+  }
+  positionHandle();
 });
 document.addEventListener('mouseup', ()=>{ cropDrag = null; });
 
 $('cropApplyBtn').addEventListener('click', ()=>{
   const canvas = imgState.canvas;
-  const stageRect = $('imgStage').getBoundingClientRect();
+  const stageEl = $('imgStage');
+  const stageRect = stageEl.getBoundingClientRect();
   const canvasRect = canvas.getBoundingClientRect();
-  const ov = $('cropOverlay');
-  const ovLeft = parseFloat(ov.style.left)||0, ovTop = parseFloat(ov.style.top)||0;
-  const ovW = parseFloat(ov.style.width)||0, ovH = parseFloat(ov.style.height)||0;
-  if(ovW < 5 || ovH < 5){ toast('حدد منطقة قص أولاً بالسحب على الصورة', 'err'); return; }
+  const b = boxRect();
+  if(b.width < 5 || b.height < 5){ toast('حدد منطقة قص أولاً بالسحب على الصورة', 'err'); return; }
 
   const scaleX = canvas.width / canvasRect.width;
   const scaleY = canvas.height / canvasRect.height;
-  const offsetX = canvasRect.left - stageRect.left;
-  const offsetY = canvasRect.top - stageRect.top;
+  const offsetX = (canvasRect.left - stageRect.left) + stageEl.scrollLeft;
+  const offsetY = (canvasRect.top - stageRect.top) + stageEl.scrollTop;
 
-  const sx = Math.max(0, (ovLeft - offsetX) * scaleX);
-  const sy = Math.max(0, (ovTop - offsetY) * scaleY);
-  const sw = Math.min(canvas.width - sx, ovW * scaleX);
-  const sh = Math.min(canvas.height - sy, ovH * scaleY);
+  const sx = Math.max(0, (b.left - offsetX) * scaleX);
+  const sy = Math.max(0, (b.top - offsetY) * scaleY);
+  const sw = Math.min(canvas.width - sx, b.width * scaleX);
+  const sh = Math.min(canvas.height - sy, b.height * scaleY);
   if(sw < 5 || sh < 5){ toast('منطقة القص خارج حدود الصورة', 'err'); return; }
 
   const tmp = document.createElement('canvas');
@@ -742,6 +805,7 @@ $('cropApplyBtn').addEventListener('click', ()=>{
   canvas.getContext('2d').drawImage(tmp, 0, 0);
 
   endCropMode();
+  applyZoom();
   toast('تم تطبيق القص — اضغط "حفظ التعديلات" لاعتماده على الملف', 'ok');
 });
 
@@ -855,83 +919,47 @@ $('pdfConfirmSaveBtn').addEventListener('click', async ()=>{
   }
 });
 
-/* ---------------- Bulk Find & Replace ---------------- */
+/* ---------------- Bulk Save (same job as per-row save, for all selected rows) ---------------- */
 
-$('bulkEditBtn').addEventListener('click', ()=>{
-  $('findText').value = '';
-  $('replaceText').value = '';
-  $('bulkPreviewList').style.display = 'none';
-  $('bulkPreviewList').innerHTML = '';
-  $('bulkWarnNote').classList.remove('show');
-  $('bulkExecuteBtn').disabled = true;
-  $('bulkOverlay').classList.add('show');
-});
-
-let bulkPreviewData = null;
-
-$('previewBulkBtn').addEventListener('click', ()=>{
-  const find = $('findText').value;
-  const replace = $('replaceText').value;
-  if(!find){ toast('أدخل النص المطلوب استبداله', 'err'); return; }
-
+$('bulkEditBtn').addEventListener('click', async ()=>{
   const selectedEntries = entries.filter(e => selected.has(e.fullName));
-  const otherNames = new Set(entries.filter(e=>!selected.has(e.fullName)).map(e=>e.fullName));
-  const usedInBatch = new Set();
+  if(selectedEntries.length === 0) return;
 
-  const rows = [];
-  selectedEntries.forEach(entry => {
-    const newBase = entry.baseName.split(find).join(replace);
-    const newFull = newBase + '.' + entry.ext;
-    let status = 'ok', reason = '';
-    if(newFull === entry.fullName){ status='nochange'; reason='لا يوجد تغيير'; }
-    else if(validateBaseName(newBase)){ status='bad'; reason = validateBaseName(newBase); }
-    else if(otherNames.has(newFull) || usedInBatch.has(newFull)){ status='bad'; reason = `تعارض مع "${newFull}"`; }
-
-    if(status==='ok') usedInBatch.add(newFull);
-    rows.push({entry, newBase, newFull, status, reason});
-  });
-
-  bulkPreviewData = rows;
-  const list = $('bulkPreviewList');
-  list.innerHTML = rows.map(r => `
-    <div class="preview-row ${r.status==='bad'?'conflict':''}">
-      <span class="old">${r.entry.fullName}</span>
-      <span class="arrow">←</span>
-      <span class="new">${r.newFull}</span>
-      <span class="flag ${r.status==='ok'?'flag-ok':(r.status==='nochange'?'':'flag-bad')}">
-        ${r.status==='ok' ? 'جاهز' : (r.status==='nochange' ? 'بدون تغيير' : 'سيُتخطى: '+r.reason)}
-      </span>
-    </div>
-  `).join('');
-  list.style.display = 'block';
-
-  const willChange = rows.filter(r=>r.status==='ok').length;
-  const willSkip = rows.filter(r=>r.status==='bad').length;
-  $('bulkWarnNote').textContent = `سيتم تعديل ${willChange} ملف، وتخطي ${willSkip} بسبب تعارض أو رموز غير مسموحة.`;
-  $('bulkWarnNote').classList.add('show');
-  $('bulkExecuteBtn').disabled = willChange === 0;
-});
-
-$('bulkExecuteBtn').addEventListener('click', async ()=>{
-  if(!bulkPreviewData) return;
   const report = [];
-  for(const row of bulkPreviewData){
-    if(row.status === 'nochange') continue;
-    if(row.status === 'bad'){
-      report.push({icon:'⚠️', text: `تخطي "${row.entry.fullName}" — ${row.reason}`});
+  for(const entry of selectedEntries){
+    const rowEl = document.querySelector(`tr[data-name="${CSS.escape(entry.fullName)}"]`);
+    const nameInput = rowEl ? rowEl.querySelector('.name-input') : null;
+    if(!nameInput){
+      report.push({icon:'⚠️', text:`تعذّر العثور على السجل: ${entry.fullName}`});
+      continue;
+    }
+    const newBase = nameInput.value;
+    const newFullName = newBase + '.' + entry.ext;
+
+    if(newFullName === entry.fullName){
+      report.push({icon:'ℹ️', text:`بدون تغيير: ${entry.fullName}`});
+      continue;
+    }
+    const err = validateBaseName(newBase);
+    if(err){
+      report.push({icon:'⚠️', text:`تخطي "${entry.fullName}" — ${err}`});
+      continue;
+    }
+    if(await nameExists(newFullName, entry.handle)){
+      report.push({icon:'⚠️', text:`تخطي "${entry.fullName}" — يوجد ملف آخر بنفس الاسم "${newFullName}"`});
       continue;
     }
     try{
-      await row.entry.handle.move(row.newFull);
-      row.entry.fullName = row.newFull;
-      row.entry.baseName = row.newBase;
-      report.push({icon:'✅', text: `تم: "${row.newBase}" ← ${row.newFull}`});
+      await entry.handle.move(newFullName);
+      const oldName = entry.fullName;
+      entry.fullName = newFullName;
+      entry.baseName = newBase;
+      report.push({icon:'✅', text:`تم الحفظ: "${oldName}" ← "${newFullName}"`});
     }catch(e){
-      report.push({icon:'⚠️', text: `فشل تعديل "${row.entry.fullName}": ${e.message}`});
+      report.push({icon:'⚠️', text:`فشل تعديل "${entry.fullName}": ${e.message}`});
     }
   }
 
-  closeModal('bulkOverlay');
   selected.clear();
   renderTable();
   updateBulkBar();
