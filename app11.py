@@ -45,10 +45,6 @@ def constants_screen():
 def matching_screen():
     return render_template('matching.html')
 
-@app.route('/documents-check')
-def documents_check_screen():
-    return render_template('documents_check.html')
-
 # ==========================================
 # APIs العمليات والخدمات الخلفية (الثوابت فقط)
 # ==========================================
