@@ -1,8 +1,6 @@
 import os
 import json
-import tempfile
 from flask import Flask, render_template, request, jsonify
-from document_extractor import extract_document_info, SUPPORTED_EXTENSIONS
 
 app = Flask(__name__)
 
@@ -113,38 +111,6 @@ def save_paths():
         return jsonify({"success": True, "message": "تم حفظ المسار بنجاح!", "paths": current})
     except Exception as e:
         return jsonify({"success": False, "message": str(e)}), 500
-
-# ==========================================
-# API استخراج الاسم ونوع الوثيقة محلياً (PaddleOCR + قواعد نصية)
-# يعمل بالكامل دون إنترنت — الملف يُحفظ مؤقتاً ثم يُحذف فوراً بعد المعالجة
-# ==========================================
-@app.route('/api/extract-document-info', methods=['POST'])
-def extract_document_info_route():
-    if 'file' not in request.files:
-        return jsonify({"success": False, "message": "لم يتم إرفاق ملف"}), 400
-
-    file = request.files['file']
-    ext = os.path.splitext(file.filename)[1].lower()
-    if ext not in SUPPORTED_EXTENSIONS:
-        return jsonify({"success": False, "message": f"نوع الملف غير مدعوم: {ext}"}), 400
-
-    tmp_path = None
-    try:
-        fd, tmp_path = tempfile.mkstemp(suffix=ext)
-        os.close(fd)
-        file.save(tmp_path)
-
-        doc_types = load_doc_types()
-        result = extract_document_info(tmp_path, doc_types)
-        return jsonify({"success": True, **result})
-    except Exception as e:
-        return jsonify({"success": False, "message": str(e)}), 500
-    finally:
-        if tmp_path and os.path.exists(tmp_path):
-            try:
-                os.unlink(tmp_path)
-            except Exception:
-                pass
 
 if __name__ == '__main__':
     app.run(debug=True, port=5000)

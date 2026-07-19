@@ -218,11 +218,6 @@
     <span class="count-badge" id="countBadge"></span>
   </div>
 
-  <div style="background:#FFF7ED;border:1px solid #FED7AA;border-radius:8px;padding:9px 14px;font-size:12px;color:#9A3412;margin-bottom:14px;display:flex;align-items:center;gap:8px">
-    <span>☁️</span>
-    <span>عرض/تحرير/إعادة تسمية الملفات يتم محلياً بالكامل. زر "استخراج تلقائي" فقط يرسل صورة الملف المحدَّد إلى خدمة Claude Vision السحابية لقراءة الاسم تلقائياً — استخدمه اختيارياً حسب الحاجة.</span>
-  </div>
-
   <div class="panel" id="panelArea">
     <div class="empty-state" id="emptyState">
       <div class="big">🗂️</div>
@@ -541,7 +536,6 @@ function renderTable(){
       <td>
         <div class="row-actions">
           <button class="btn btn-ghost btn-sm" data-action="view">عرض</button>
-          <button class="btn btn-ghost btn-sm" data-action="extract">🔎 استخراج تلقائي</button>
           <button class="btn btn-primary btn-sm" data-action="save">حفظ</button>
         </div>
       </td>
@@ -551,7 +545,6 @@ function renderTable(){
       updateBulkBar();
     });
     tr.querySelector('[data-action="view"]').addEventListener('click', ()=> openViewer(entry));
-    tr.querySelector('[data-action="extract"]').addEventListener('click', (e)=> runAutoExtract(entry, tr, e.currentTarget));
     tr.querySelector('[data-action="save"]').addEventListener('click', ()=>{
       const newBase = tr.querySelector('.name-input').value;
       renameSingle(entry, newBase, tr);
@@ -580,42 +573,6 @@ function updateBulkBar(){
 $('clearSelectionBtn').addEventListener('click', ()=>{ selected.clear(); renderTable(); updateBulkBar(); });
 
 /* ---------------- Rename (single) ---------------- */
-
-/* ---------------- Auto-extract (PaddleOCR backend, per file, on demand) ---------------- */
-
-async function runAutoExtract(entry, rowEl, btnEl){
-  const originalLabel = btnEl.textContent;
-  btnEl.disabled = true;
-  btnEl.textContent = '⏳ جارٍ القراءة...';
-  try{
-    const file = await entry.handle.getFile();
-    const form = new FormData();
-    form.append('file', file, entry.fullName);
-
-    const res = await fetch('/api/extract-document-info', {method:'POST', body: form});
-    const data = await res.json();
-
-    if(!data.success){
-      toast('تعذّر الاستخراج: ' + (data.message || 'خطأ غير معروف'), 'err');
-      return;
-    }
-    if(data.error || !data.name){
-      toast('لم يتم العثور على اسم واضح في هذه الوثيقة: ' + (data.error || ''), 'err');
-      return;
-    }
-
-    const nameInput = rowEl.querySelector('.name-input');
-    nameInput.value = data.name;
-    nameInput.focus();
-
-    toast(`تم اقتراح الاسم (ثقة: ${data.confidence}) — نوع الوثيقة المرجّح: ${data.doc_type}. راجع الاسم ثم اضغط "حفظ"`, 'ok');
-  }catch(e){
-    toast('فشل الاتصال بخدمة الاستخراج: ' + e.message, 'err');
-  }finally{
-    btnEl.disabled = false;
-    btnEl.textContent = originalLabel;
-  }
-}
 
 async function nameExists(fullName, excludeHandle){
   for(const e of entries){
