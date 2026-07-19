@@ -133,6 +133,11 @@
   .modal-footer{padding:14px 22px;border-top:1px solid var(--border);display:flex;justify-content:flex-end;gap:10px}
 
   .viewer-modal{max-width:1100px}
+  #imgOverlay .modal{
+    resize:both;overflow:hidden;
+    min-width:480px;min-height:420px;max-width:96vw;max-height:96vh;
+  }
+  #imgOverlay .modal-header{cursor:move;user-select:none}
   .viewer-stage{
     background:#20262E;border-radius:10px;display:flex;align-items:center;justify-content:center;
     min-height:440px;max-height:60vh;overflow:auto;position:relative;
@@ -608,6 +613,7 @@ async function openViewer(entry){
 
 async function openImageEditor(entry){
   $('imgModalTitle').textContent = 'معاينة وتحرير: ' + entry.fullName;
+  resetImgModalFrame();
   $('imgOverlay').classList.add('show');
   $('imgSaveWarn').style.display = 'none';
   $('brightnessSlider').value = 100;
@@ -627,6 +633,42 @@ async function openImageEditor(entry){
   endCropMode();
   fitZoom();
 }
+
+/* draggable + resizable window for the image editor */
+function resetImgModalFrame(){
+  const modalEl = document.querySelector('#imgOverlay .modal');
+  modalEl.style.position = '';
+  modalEl.style.left = '';
+  modalEl.style.top = '';
+  modalEl.style.margin = '';
+  modalEl.style.width = '';
+  modalEl.style.height = '';
+}
+(function setupImgModalDrag(){
+  const header = document.querySelector('#imgOverlay .modal-header');
+  const modalEl = document.querySelector('#imgOverlay .modal');
+  let drag = null;
+  header.addEventListener('mousedown', e=>{
+    if(e.target.closest('.modal-close')) return;
+    const rect = modalEl.getBoundingClientRect();
+    drag = {offsetX: e.clientX - rect.left, offsetY: e.clientY - rect.top};
+    modalEl.style.position = 'fixed';
+    modalEl.style.margin = '0';
+    modalEl.style.left = rect.left + 'px';
+    modalEl.style.top = rect.top + 'px';
+    document.body.style.userSelect = 'none';
+  });
+  document.addEventListener('mousemove', e=>{
+    if(!drag) return;
+    const maxLeft = window.innerWidth - 80;
+    const maxTop = window.innerHeight - 40;
+    modalEl.style.left = Math.min(Math.max(-modalEl.offsetWidth+80, e.clientX - drag.offsetX), maxLeft) + 'px';
+    modalEl.style.top = Math.min(Math.max(0, e.clientY - drag.offsetY), maxTop) + 'px';
+  });
+  document.addEventListener('mouseup', ()=>{
+    if(drag){ drag = null; document.body.style.userSelect = ''; }
+  });
+})();
 
 function applyFiltersPreview(){
   const canvas = $('imgCanvas');
