@@ -1,9 +1,9 @@
 """
-document_extractor.py — استخراج الاسم العربي ونوع الوثيقة عبر Claude Vision (سحابي)
-=====================================================================================
-⚠️ يرسل صورة الوثيقة فعلياً إلى Anthropic API عبر الإنترنت (تم اعتماد هذا
-المسار بدل PaddleOCR المحلي بسبب موارد جهاز محدودة). يتطلب:
-  - متغيّر بيئة ANTHROPIC_API_KEY مضبوطاً على الجهاز
+document_extractor.py — استخراج الاسم العربي ونوع الوثيقة عبر Gemini Flash (سحابي، مجاني)
+============================================================================================
+⚠️ يرسل صورة الوثيقة فعلياً إلى Google Gemini API عبر الإنترنت. يتطلب:
+  - متغيّر بيئة GEMINI_API_KEY مضبوطاً على الجهاز (مفتاح مجاني من aistudio.google.com،
+    بدون بطاقة ائتمان — ضمن حدود الاستخدام اليومي المجاني لنموذج Flash)
   - اتصال إنترنت وقت الاستخراج فقط (وليس طوال تشغيل النظام)
 
 قواعد تنظيف الاسم (إزالة الألقاب، توحيد الأسماء المركّبة، تنظيف المسافات)
@@ -145,14 +145,15 @@ def prepare_image(file_path: str) -> str:
 
 
 # =========================================================
-# محرك الاستخراج — Claude Vision (سحابي)
-# ⚠️ يرسل صورة الوثيقة الفعلية إلى Anthropic API عبر الإنترنت.
-# يتطلب متغيّر بيئة ANTHROPIC_API_KEY مضبوطاً على الجهاز.
+# محرك الاستخراج — Gemini Flash (سحابي، مجاني ضمن الحدود اليومية)
+# ⚠️ يرسل صورة الوثيقة الفعلية إلى Google Gemini API عبر الإنترنت.
+# يتطلب متغيّر بيئة GEMINI_API_KEY مضبوطاً على الجهاز (مفتاح مجاني
+# من aistudio.google.com بدون بطاقة ائتمان).
 # =========================================================
 import base64
+import os
 
-MODEL = "claude-opus-4-5"
-MAX_TOKENS = 250
+GEMINI_MODEL = "gemini-2.5-flash"
 
 EXTRACTION_PROMPT = """أنت خبير OCR متخصص في قراءة المستندات الرسمية العربية.
 
@@ -178,29 +179,30 @@ EXTRACTION_PROMPT = """أنت خبير OCR متخصص في قراءة المست
 نوع الوثيقة: [كما هو مكتوب على الوثيقة، أو غير محدد]"""
 
 
-def call_claude_vision(image_path: str) -> str:
-    import anthropic
+def call_gemini_vision(image_path: str) -> str:
+    from google import genai
+    from google.genai import types
+
+    api_key = os.environ.get("GEMINI_API_KEY")
+    if not api_key:
+        raise RuntimeError("متغيّر البيئة GEMINI_API_KEY غير مضبوط على السيرفر")
 
     ext = Path(image_path).suffix.lower()
     media_map = {".jpg": "image/jpeg", ".jpeg": "image/jpeg", ".png": "image/png", ".webp": "image/webp"}
     media_type = media_map.get(ext, "image/jpeg")
 
     with open(image_path, "rb") as f:
-        img_b64 = base64.b64encode(f.read()).decode()
+        img_bytes = f.read()
 
-    client = anthropic.Anthropic()  # يقرأ المفتاح تلقائياً من ANTHROPIC_API_KEY
-    response = client.messages.create(
-        model=MODEL,
-        max_tokens=MAX_TOKENS,
-        messages=[{
-            "role": "user",
-            "content": [
-                {"type": "image", "source": {"type": "base64", "media_type": media_type, "data": img_b64}},
-                {"type": "text", "text": EXTRACTION_PROMPT},
-            ],
-        }],
+    client = genai.Client(api_key=api_key)
+    response = client.models.generate_content(
+        model=GEMINI_MODEL,
+        contents=[
+            EXTRACTION_PROMPT,
+            types.Part.from_bytes(data=img_bytes, mime_type=media_type),
+        ],
     )
-    return response.content[0].text.strip()
+    return (response.text or "").strip()
 
 
 def parse_vision_output(raw_output: str):
@@ -263,7 +265,7 @@ def extract_document_info(file_path: str, doc_types: dict = None) -> dict:
     }
     try:
         image_path = prepare_image(file_path)
-        raw_output = call_claude_vision(image_path)
+        raw_output = call_gemini_vision(image_path)
         result["raw_lines"] = [raw_output]
 
         raw_name, raw_doc_type = parse_vision_output(raw_output)
