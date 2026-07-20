@@ -4,6 +4,7 @@
 storage_secure/
 node_modules/
 files/
+GEMINI.txt
 *.xlsx
 *.xls
 *.csv
