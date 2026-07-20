@@ -153,7 +153,7 @@ def prepare_image(file_path: str) -> str:
 import base64
 import os
 
-GEMINI_MODEL = "gemini-2.5-flash"
+GEMINI_MODEL = "gemini-3.1-flash-lite"
 
 EXTRACTION_PROMPT = """أنت خبير OCR متخصص في قراءة المستندات الرسمية العربية.
 
