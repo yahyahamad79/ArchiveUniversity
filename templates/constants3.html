@@ -243,18 +243,6 @@
         }
 
         // يتحقق من وجود مجلد الرمز الحالي فعلياً داخل الأرشيف، أو ينشئه إن لم يكن موجوداً
-        // النواة المشتركة: تتحقق من مجلد الرمز أو تنشئه، وتُستخدم من الزر اليدوي وتلقائياً عند الحفظ
-        async function ensureStorageFolder(code){
-            const root = await getArchiveRootHandle();
-            let existedBefore = false;
-            try{
-                await root.getDirectoryHandle(code, {create:false});
-                existedBefore = true;
-            }catch(e){ /* غير موجود بعد — سيُنشأ */ }
-            await root.getDirectoryHandle(code, {create:true});
-            return {rootName: root.name, existedBefore};
-        }
-
         async function verifyOrCreateStorageFolder(){
             const code = document.getElementById('doc_code').value.trim().toUpperCase();
             const statusEl = document.getElementById('storage_status');
@@ -264,11 +252,18 @@
             }
             statusEl.textContent = '⏳ جارٍ التحقق من المجلد على القرص...';
             try{
-                const {rootName, existedBefore} = await ensureStorageFolder(code);
+                const root = await getArchiveRootHandle();
+                let existedBefore = false;
+                try{
+                    await root.getDirectoryHandle(code, {create:false});
+                    existedBefore = true;
+                }catch(e){ /* غير موجود بعد — سيُنشأ */ }
+
+                await root.getDirectoryHandle(code, {create:true});
                 document.getElementById('doc_storage').value = code;
                 statusEl.innerHTML = existedBefore
-                    ? `✅ المجلد "${code}" موجود فعلاً داخل الأرشيف (${rootName}) — مرتبط وجاهز.`
-                    : `✅ تم إنشاء المجلد "${code}" داخل الأرشيف (${rootName}) وربطه بنجاح.`;
+                    ? `✅ المجلد "${code}" موجود فعلاً داخل الأرشيف (${root.name}) — مرتبط وجاهز.`
+                    : `✅ تم إنشاء المجلد "${code}" داخل الأرشيف (${root.name}) وربطه بنجاح.`;
                 statusEl.className = 'text-[9px] text-emerald-600 font-bold block mt-1';
             }catch(e){
                 if(e.name !== 'AbortError'){
@@ -479,24 +474,7 @@
 
                 const result = await response.json();
                 if(result.success) {
-                    // تزامن تلقائي مع مجلد الأرشيف الفعلي بعد نجاح الحفظ في الخادم
-                    let folderMsg = '';
-                    try{
-                        const oldDoc = originalName ? systemDocuments[originalName] : null;
-                        const oldCode = oldDoc ? (oldDoc.code || '').toUpperCase() : null;
-                        const {rootName, existedBefore} = await ensureStorageFolder(code);
-                        folderMsg = existedBefore
-                            ? ` وتم التأكد من مجلده الفعلي "${code}" في الأرشيف.`
-                            : ` وتم إنشاء مجلده الفعلي "${code}" في الأرشيف (${rootName}).`;
-                        if(oldCode && oldCode !== code){
-                            folderMsg += ` ⚠️ تنبيه: الرمز تغيّر من "${oldCode}" إلى "${code}" — المجلد القديم "${oldCode}" لم يُحذف ولم تُنقل محتوياته تلقائياً (لتفادي فقدان أي وثائق مؤرشفة بداخله)، راجعه يدوياً إن لزم.`;
-                        }
-                    }catch(folderErr){
-                        if(folderErr.name !== 'AbortError'){
-                            folderMsg = ` ⚠️ لكن تعذّر تزامن المجلد الفعلي: ${folderErr.message}`;
-                        }
-                    }
-                    showAlert(result.message + folderMsg, true);
+                    showAlert(result.message, true);
                     resetForm();
                     loadConstantsFromServer();
                 } else {
@@ -507,28 +485,28 @@
             }
         }
 
-        // 5. حذف وثيقة من النظام (المجلد الفعلي لا يُحذف تلقائياً أبداً — حفاظاً على أي وثائق مؤرشفة بداخله)
+        // 5. حذف وثيقة من النظام ومن ملف الإكسل
         async function deleteDocument(key) {
-            const docBeingDeleted = systemDocuments[key];
-            const codeBeingDeleted = docBeingDeleted ? (docBeingDeleted.code || '').toUpperCase() : '';
-
-            if(!confirm(`هل أنت متأكد تماماً من رغبتك في حذف الوثيقة (${key}) نهائياً من قائمة الأنواع؟\n\nملاحظة: مجلدها الفعلي في الأرشيف ("${codeBeingDeleted}") لن يُحذف تلقائياً ولن يُلمس، ويبقى موجوداً كما هو.`)) {
+            if(!confirm(`هل أنت متأكد تماماً من رغبتك في حذف الوثيقة (${key}) نهائياً؟ سيؤدي ذلك أيضاً لحذف العمود الخاص بها من ملف الإكسل!`)) {
                 return;
             }
+
+            // جلب مسار ملف الإكسل لإجراء عملية تنظيف للعمود المحذوف
+            const excelPath = localStorage.getItem('excel_path') || '';
 
             try {
                 const response = await fetch('/api/delete-constant', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ doc_key: key })
+                    body: JSON.stringify({ 
+                        doc_key: key,
+                        excel_path: excelPath // تمرير المسار لحذف العمود المقابل
+                    })
                 });
 
                 const result = await response.json();
                 if(result.success) {
-                    const folderNote = codeBeingDeleted
-                        ? ` (تذكير: مجلده "${codeBeingDeleted}" لا يزال موجوداً فعلياً في الأرشيف ولم يُحذف)`
-                        : '';
-                    showAlert(result.message + folderNote, true);
+                    showAlert(result.message, true);
                     loadConstantsFromServer();
                 } else {
                     showAlert(result.message, false);

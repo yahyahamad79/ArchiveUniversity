@@ -79,61 +79,6 @@ def save_constants():
     except Exception as e:
         return jsonify({"success": False, "message": str(e)}), 500
 
-# حفظ/تعديل نوع وثيقة واحد فقط — هذا ما تستدعيه فعلياً شاشة constants.html
-# (original_name: المفتاح القديم عند التعديل، doc_key: المفتاح الجديد، doc_data: بيانات النوع)
-@app.route('/api/save-constant', methods=['POST'])
-def save_constant():
-    data = request.json or {}
-    original_name = (data.get('original_name') or '').strip()
-    doc_key = (data.get('doc_key') or '').strip()
-    doc_data = data.get('doc_data', {})
-
-    if not doc_key:
-        return jsonify({"success": False, "message": "اسم الوثيقة بالعربية مطلوب"}), 400
-
-    try:
-        doc_types = load_doc_types()
-
-        # تعديل مع تغيير الاسم العربي (المفتاح) → احذف المفتاح القديم أولاً
-        if original_name and original_name != doc_key and original_name in doc_types:
-            del doc_types[original_name]
-
-        doc_types[doc_key] = doc_data
-
-        if not os.path.exists(DB_DIR):
-            os.makedirs(DB_DIR)
-        with open(JSON_PATH, 'w', encoding='utf-8') as f:
-            json.dump({"document_types": doc_types}, f, ensure_ascii=False, indent=4)
-
-        return jsonify({"success": True, "message": f'تم حفظ الوثيقة "{doc_key}" بنجاح!'})
-    except Exception as e:
-        return jsonify({"success": False, "message": str(e)}), 500
-
-# حذف نوع وثيقة واحد بالمفتاح (الاسم العربي)
-@app.route('/api/delete-constant', methods=['POST'])
-def delete_constant():
-    data = request.json or {}
-    doc_key = (data.get('doc_key') or '').strip()
-
-    if not doc_key:
-        return jsonify({"success": False, "message": "لم يُحدَّد مفتاح الوثيقة المطلوب حذفها"}), 400
-
-    try:
-        doc_types = load_doc_types()
-        if doc_key not in doc_types:
-            return jsonify({"success": False, "message": f'الوثيقة "{doc_key}" غير موجودة أصلاً'}), 404
-
-        del doc_types[doc_key]
-
-        if not os.path.exists(DB_DIR):
-            os.makedirs(DB_DIR)
-        with open(JSON_PATH, 'w', encoding='utf-8') as f:
-            json.dump({"document_types": doc_types}, f, ensure_ascii=False, indent=4)
-
-        return jsonify({"success": True, "message": f'تم حذف الوثيقة "{doc_key}" بنجاح!'})
-    except Exception as e:
-        return jsonify({"success": False, "message": str(e)}), 500
-
 # ==========================================
 # APIs مسارات العمل المشتركة (workspace / archive / excel)
 # مصدر واحد للأسماء/الحالة يُقرأ من كل الشاشات (paths, matching)
