@@ -58,7 +58,7 @@
                     <div class="grid grid-cols-2 gap-3">
                         <div>
                             <label class="block text-[11px] font-bold text-slate-650 mb-1">الرمز الفريد (Code):</label>
-                            <input type="text" id="doc_code" required placeholder="مثال: HS" oninput="syncStoragePathFromCode()"
+                            <input type="text" id="doc_code" required placeholder="مثال: HS" 
                                    class="w-full text-xs px-3 py-2 border border-slate-300 rounded-lg outline-none focus:ring-2 focus:ring-amber-500 font-mono uppercase">
                             <span class="text-[9px] text-rose-500 block mt-1">يمنع التكرار نهائياً!</span>
                         </div>
@@ -71,18 +71,9 @@
                     </div>
 
                     <div>
-                        <label class="block text-[11px] font-bold text-slate-650 mb-1">مجلد التخزين الفعلي في الأرشيف:</label>
-                        <div class="flex gap-2">
-                            <input type="text" id="doc_storage" required readonly placeholder="يُشتق تلقائياً من الرمز أعلاه"
-                                   class="w-full text-xs px-3 py-2 border border-slate-200 bg-slate-50 text-slate-500 rounded-lg outline-none font-mono cursor-not-allowed">
-                            <button type="button" onclick="verifyOrCreateStorageFolder()"
-                                    class="bg-emerald-50 hover:bg-emerald-100 text-emerald-700 text-[10px] font-bold px-3 py-2 rounded-lg border border-emerald-200 whitespace-nowrap transition-all">
-                                🔗 تحقق/أنشئ
-                            </button>
-                        </div>
-                        <span id="storage_status" class="text-[9px] text-slate-400 block mt-1">
-                            مرتبط بمجلد الأرشيف الفعلي (نفس المجلد المستخدم في شاشة "فحص الوثائق") — اضغط "تحقق/أنشئ" للتأكد من وجوده فعلياً على القرص أو إنشائه.
-                        </span>
+                        <label class="block text-[11px] font-bold text-slate-650 mb-1">مسار المجلد الفرعي (Storage Path):</label>
+                        <input type="text" id="doc_storage" required placeholder="مثال: HS/" 
+                               class="w-full text-xs px-3 py-2 border border-slate-300 rounded-lg outline-none focus:ring-2 focus:ring-amber-500 font-mono">
                     </div>
 
                     <div class="grid grid-cols-2 gap-3">
@@ -168,110 +159,6 @@
 
     <script>
         let systemDocuments = {};
-        let archiveRootHandle = null;
-
-        // تحديث حقل مسار التخزين تلقائياً من الرمز الفريد (منع أي تعارض مسارات يدوي كما حدث سابقاً)
-        function syncStoragePathFromCode() {
-            const code = document.getElementById('doc_code').value.trim().toUpperCase();
-            document.getElementById('doc_storage').value = code;
-            document.getElementById('storage_status').textContent = code
-                ? `سيُخزَّن في مجلد باسم "${code}" داخل الأرشيف — اضغط "تحقق/أنشئ" للتأكد من وجوده فعلياً.`
-                : 'مرتبط بمجلد الأرشيف الفعلي — أدخل الرمز أولاً.';
-        }
-
-        // ==========================================
-        // IndexedDB — نفس مخزن مجلد الأرشيف الجذري المستخدم في شاشة "فحص الوثائق"
-        // (نفس الاسم بالضبط حتى يُستخدم نفس المجلد المحفوظ عبر كل شاشات النظام)
-        // ==========================================
-        const HANDLE_DB_NAME = 'archiveUniversityHandles';
-        const HANDLE_STORE = 'handles';
-        const ARCHIVE_ROOT_KEY = 'storageSecureRoot';
-
-        function openHandleDB(){
-            return new Promise((resolve, reject) => {
-                const req = indexedDB.open(HANDLE_DB_NAME, 1);
-                req.onupgradeneeded = () => {
-                    if(!req.result.objectStoreNames.contains(HANDLE_STORE)){
-                        req.result.createObjectStore(HANDLE_STORE);
-                    }
-                };
-                req.onsuccess = () => resolve(req.result);
-                req.onerror = () => reject(req.error);
-            });
-        }
-        async function idbGetHandle(key){
-            try{
-                const db = await openHandleDB();
-                return await new Promise((resolve, reject) => {
-                    const tx = db.transaction(HANDLE_STORE, 'readonly');
-                    const req = tx.objectStore(HANDLE_STORE).get(key);
-                    req.onsuccess = () => resolve(req.result || null);
-                    req.onerror = () => reject(req.error);
-                });
-            }catch(e){ return null; }
-        }
-        async function idbSetHandle(key, handle){
-            try{
-                const db = await openHandleDB();
-                await new Promise((resolve, reject) => {
-                    const tx = db.transaction(HANDLE_STORE, 'readwrite');
-                    tx.objectStore(HANDLE_STORE).put(handle, key);
-                    tx.oncomplete = () => resolve();
-                    tx.onerror = () => reject(tx.error);
-                });
-            }catch(e){ console.warn('تعذّر حفظ صلاحية مجلد الأرشيف:', e); }
-        }
-
-        async function getArchiveRootHandle(){
-            if(archiveRootHandle){
-                const perm = await archiveRootHandle.queryPermission({mode:'readwrite'});
-                if(perm === 'granted') return archiveRootHandle;
-                const reconfirm = await archiveRootHandle.requestPermission({mode:'readwrite'});
-                if(reconfirm === 'granted') return archiveRootHandle;
-            }
-            const saved = await idbGetHandle(ARCHIVE_ROOT_KEY);
-            if(saved){
-                const perm = await saved.requestPermission({mode:'readwrite'});
-                if(perm === 'granted'){ archiveRootHandle = saved; return archiveRootHandle; }
-            }
-            showAlert('لم يتم ربط مجلد الأرشيف بعد — اذهب أولاً لشاشة "فحص الوثائق" ونفّذ أي عملية ترحيل لربط المجلد، أو اختره الآن من النافذة التي ستظهر.', false);
-            archiveRootHandle = await window.showDirectoryPicker();
-            const perm = await archiveRootHandle.requestPermission({mode:'readwrite'});
-            if(perm !== 'granted'){ archiveRootHandle = null; throw new Error('لم تُمنح صلاحية الكتابة على مجلد الأرشيف'); }
-            await idbSetHandle(ARCHIVE_ROOT_KEY, archiveRootHandle);
-            return archiveRootHandle;
-        }
-
-        // يتحقق من وجود مجلد الرمز الحالي فعلياً داخل الأرشيف، أو ينشئه إن لم يكن موجوداً
-        async function verifyOrCreateStorageFolder(){
-            const code = document.getElementById('doc_code').value.trim().toUpperCase();
-            const statusEl = document.getElementById('storage_status');
-            if(!code){
-                showAlert('أدخل الرمز الفريد أولاً قبل التحقق من المجلد', false);
-                return;
-            }
-            statusEl.textContent = '⏳ جارٍ التحقق من المجلد على القرص...';
-            try{
-                const root = await getArchiveRootHandle();
-                let existedBefore = false;
-                try{
-                    await root.getDirectoryHandle(code, {create:false});
-                    existedBefore = true;
-                }catch(e){ /* غير موجود بعد — سيُنشأ */ }
-
-                await root.getDirectoryHandle(code, {create:true});
-                document.getElementById('doc_storage').value = code;
-                statusEl.innerHTML = existedBefore
-                    ? `✅ المجلد "${code}" موجود فعلاً داخل الأرشيف (${root.name}) — مرتبط وجاهز.`
-                    : `✅ تم إنشاء المجلد "${code}" داخل الأرشيف (${root.name}) وربطه بنجاح.`;
-                statusEl.className = 'text-[9px] text-emerald-600 font-bold block mt-1';
-            }catch(e){
-                if(e.name !== 'AbortError'){
-                    statusEl.textContent = '❌ تعذّر الربط: ' + e.message;
-                    statusEl.className = 'text-[9px] text-rose-500 font-bold block mt-1';
-                }
-            }
-        }
 
         window.addEventListener('DOMContentLoaded', loadConstantsFromServer);
 
@@ -395,9 +282,6 @@
             document.getElementById('doc_size').value = doc.max_size_mb;
             document.getElementById('doc_required').value = doc.required.toString();
             document.getElementById('doc_exts').value = doc.allowed_extensions.join(', ');
-            document.getElementById('storage_status').innerHTML =
-                `المسار الحالي المخزَّن: <span class="font-mono">${doc.storage_path}</span> — اضغط "تحقق/أنشئ" لتحديثه وربطه بمجلد الأرشيف الفعلي.`;
-            document.getElementById('storage_status').className = 'text-[9px] text-slate-400 block mt-1';
             document.getElementById('doc_keywords').value = doc.ocr_keywords ? doc.ocr_keywords.join(', ') : '';
         }
 
@@ -521,8 +405,6 @@
             document.getElementById('doc_form').reset();
             document.getElementById('original_name').value = "";
             document.getElementById('form_title').innerHTML = `➕ إضافة وثيقة جديدة للنظام`;
-            document.getElementById('storage_status').textContent = 'مرتبط بمجلد الأرشيف الفعلي — أدخل الرمز أولاً.';
-            document.getElementById('storage_status').className = 'text-[9px] text-slate-400 block mt-1';
         }
 
         function showAlert(text, isSuccess) {
