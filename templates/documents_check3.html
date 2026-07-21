@@ -422,23 +422,6 @@ function subfolderNameFromPath(storagePath){
   return parts.length ? parts[parts.length - 1] : null;
 }
 
-/* نفس منطق تطبيع الأسماء العربية المعتمد في أدوات المطابقة الأخرى بالمشروع:
-   يوحّد أشكال الألف والهمزة، يعادل ة/ه و ى/ي، ويزيل التشكيل والتطويل والمسافات الزائدة،
-   بحيث "أحمد" و"احمد" و"احمة" تُعتبر نفس الاسم عند فحص التكرار. */
-function normalizeArabicName(str){
-  if(!str) return '';
-  let s = str;
-  s = s.replace(/[\u064B-\u065F\u0670\u0640]/g, ''); // إزالة التشكيل والتطويل
-  s = s.replace(/[إأآا]/g, 'ا');                      // توحيد أشكال الألف/الهمزة
-  s = s.replace(/ؤ/g, 'و');
-  s = s.replace(/ئ/g, 'ي');
-  s = s.replace(/ء/g, '');
-  s = s.replace(/ة/g, 'ه');                            // معادلة ة/ه
-  s = s.replace(/ى/g, 'ي');                            // معادلة ى/ي
-  s = s.replace(/\s+/g, ' ').trim();
-  return s;
-}
-
 /* ---------------- IndexedDB — تخزين دائم لمجلد الأرشيف بين الجلسات ---------------- */
 
 const HANDLE_DB_NAME = 'archiveUniversityHandles';
@@ -675,10 +658,8 @@ function refreshMigrateButton(entry, tr){
   if(!btn) return;
   const saved = isRowSaved(entry, tr);
   const hasType = !!entry.selectedDocType && !!docTypes[entry.selectedDocType];
-  btn.disabled = false; // يبقى قابلاً للضغط دائماً — runMigrate() يوضّح للمستخدم أي شرط ناقص
-  btn.classList.toggle('btn-primary', saved && hasType);
-  btn.classList.toggle('btn-ghost', !(saved && hasType));
-  btn.title = !saved ? 'احفظ الاسم أولاً' : (!hasType ? 'اختر نوع الوثيقة أولاً' : 'جاهز للترحيل');
+  btn.disabled = !(saved && hasType);
+  btn.title = !saved ? 'احفظ الاسم أولاً' : (!hasType ? 'اختر نوع الوثيقة أولاً' : '');
 }
 
 function renderTable(){
@@ -723,7 +704,7 @@ function renderTable(){
           <button class="btn btn-ghost btn-sm" data-action="view">عرض</button>
           <button class="btn btn-ghost btn-sm" data-action="extract">🔎 استخراج تلقائي</button>
           <button class="btn btn-primary btn-sm" data-action="save">حفظ</button>
-          <button class="btn btn-ghost btn-sm" data-action="migrate">📦 ترحيل</button>
+          <button class="btn btn-ghost btn-sm" data-action="migrate" disabled>📦 ترحيل</button>
         </div>
       </td>
     `;
@@ -835,19 +816,13 @@ async function runMigrate(entry, rowEl, btnEl){
     const root = await getArchiveRootHandle();
     const destDir = await root.getDirectoryHandle(subfolder, {create: true});
 
-    // تحقّق من التعارض في الوجهة بمقارنة الأسماء بعد التطبيع (تجاهل الهمزة/ة-ه/ى-ي)
-    // وليس مطابقة حرفية صارمة، لأن نفس الاسم قد يُكتب بأشكال مختلفة قليلاً
-    const targetNormalized = normalizeArabicName(entry.baseName);
-    let conflictName = null;
+    // تحقّق من التعارض في الوجهة قبل النقل
+    let conflict = false;
     for await (const [name] of destDir.entries()){
-      const {base: existingBase} = splitName(name);
-      if(normalizeArabicName(existingBase) === targetNormalized){
-        conflictName = name;
-        break;
-      }
+      if(name === entry.fullName){ conflict = true; break; }
     }
-    if(conflictName){
-      toast(`تعذّر الترحيل: يوجد ملف بنفس الاسم تقريباً "${conflictName}" في مجلد الوجهة "${subfolder}" مسبقاً`, 'err');
+    if(conflict){
+      toast(`تعذّر الترحيل: يوجد ملف بنفس الاسم "${entry.fullName}" في مجلد الوجهة "${subfolder}" مسبقاً`, 'err');
       return;
     }
 
