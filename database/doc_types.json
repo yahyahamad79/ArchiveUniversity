@@ -7,11 +7,7 @@
       "required": true,
       "order": 4,
       "storage_path": "E:\\MyProjects\\ArchiveUniversity\\database\\storage_secure\\PH",
-      "allowed_extensions": [
-        "jpg",
-        "jpeg",
-        "png"
-      ],
+      "allowed_extensions": ["jpg", "jpeg", "png"],
       "max_size_mb": 2,
       "ocr_keywords": [],
       "description_ar": "صورة شخصية حديثة بخلفية بيضاء"
@@ -23,18 +19,9 @@
       "required": true,
       "order": 5,
       "storage_path": "E:\\MyProjects\\ArchiveUniversity\\database\\storage_secure\\TR",
-      "allowed_extensions": [
-        "pdf",
-        "jpg",
-        "jpeg"
-      ],
+      "allowed_extensions": ["pdf", "jpg", "jpeg"],
       "max_size_mb": 10,
-      "ocr_keywords": [
-        "كشف درجات",
-        "السجل الأكاديمي",
-        "الدرجات",
-        "المقررات"
-      ],
+      "ocr_keywords": ["كشف درجات", "السجل الأكاديمي", "الدرجات", "المقررات"],
       "description_ar": "كشف درجات تفصيلي للمواد السابقة"
     },
     "شهادة صحية": {
@@ -44,18 +31,9 @@
       "required": false,
       "order": 7,
       "storage_path": "E:\\MyProjects\\ArchiveUniversity\\database\\storage_secure\\HC",
-      "allowed_extensions": [
-        "pdf",
-        "jpg",
-        "jpeg"
-      ],
+      "allowed_extensions": ["pdf", "jpg", "jpeg"],
       "max_size_mb": 3,
-      "ocr_keywords": [
-        "تقرير طبي",
-        "خال من الأمراض",
-        "الفحص الطبي",
-        "مستشفى"
-      ],
+      "ocr_keywords": ["تقرير طبي", "خال من الأمراض", "الفحص الطبي", "مستشفى"],
       "description_ar": "شهادة اللياقة الطبية الصادرة من جهة رسمية معتمدة"
     },
     "شهادة ميلاد": {
@@ -64,19 +42,10 @@
       "code": "BC",
       "required": true,
       "order": 2,
-      "storage_path": "E:\\MyProjects\\ArchiveUniversity\\database\\storage_secure\\HC",
-      "allowed_extensions": [
-        "pdf",
-        "jpg",
-        "jpeg"
-      ],
+      "storage_path": "E:\\MyProjects\\ArchiveUniversity\\database\\storage_secure\\BC",
+      "allowed_extensions": ["pdf", "jpg", "jpeg"],
       "max_size_mb": 3,
-      "ocr_keywords": [
-        "شهادة ميلاد",
-        "الرقم الوطني",
-        "وزارة الصحة",
-        "مولود"
-      ]
+      "ocr_keywords": ["شهادة ميلاد", "الرقم الوطني", "وزارة الصحة", "مولود"]
     },
     "شهادة ثانوية عامة": {
       "name_ar": "شهادة ثانوية عامة",
@@ -85,16 +54,9 @@
       "required": true,
       "order": 1,
       "storage_path": "E:\\MyProjects\\ArchiveUniversity\\database\\storage_secure\\HS",
-      "allowed_extensions": [
-        "pdf",
-        "jpg",
-        "jpeg",
-        "png"
-      ],
+      "allowed_extensions": ["pdf", "jpg", "jpeg", "png"],
       "max_size_mb": 5,
-      "ocr_keywords": [
-        "رقم الجلوس ، اسم الطالب ، المعدل ، التربية والتعليم،وزارة التربية والتعليم"
-      ]
+      "ocr_keywords": ["رقم الجلوس ، اسم الطالب ، المعدل ، التربية والتعليم،وزارة التربية والتعليم"]
     },
     "حسن سير وسلوك": {
       "name_ar": "حسن سير وسلوك",
@@ -103,17 +65,9 @@
       "required": false,
       "order": 8,
       "storage_path": "E:\\MyProjects\\ArchiveUniversity\\database\\storage_secure\\ATHICS",
-      "allowed_extensions": [
-        "pdf",
-        "jpg",
-        "jpeg",
-        "png",
-        "pdf"
-      ],
+      "allowed_extensions": ["pdf", "jpg", "jpeg", "png", "pdf"],
       "max_size_mb": 5,
-      "ocr_keywords": [
-        "وزارة الداخلة ، حسن سير وسلوك"
-      ]
+      "ocr_keywords": ["وزارة الداخلة ، حسن سير وسلوك"]
     },
     "الاحتساب": {
       "name_ar": "الاحتساب",
@@ -122,9 +76,7 @@
       "required": true,
       "order": 8,
       "storage_path": "E:\\MyProjects\\ArchiveUniversity\\database\\storage_secure\\QOU",
-      "allowed_extensions": [
-        "pdf"
-      ],
+      "allowed_extensions": ["pdf"],
       "max_size_mb": 5,
       "ocr_keywords": []
     },
@@ -135,18 +87,9 @@
       "required": true,
       "order": 3,
       "storage_path": "E:\\MyProjects\\ArchiveUniversity\\database\\storage_secure\\ID",
-      "allowed_extensions": [
-        "pdf",
-        "jpg",
-        "jpeg"
-      ],
+      "allowed_extensions": ["pdf", "jpg", "jpeg"],
       "max_size_mb": 3,
-      "ocr_keywords": [
-        "الهوية الوطنية",
-        "البطاقة الشخصية",
-        "رقم الهوية",
-        "جواز سفر"
-      ]
+      "ocr_keywords": ["الهوية الوطنية", "البطاقة الشخصية", "رقم الهوية", "جواز سفر"]
     }
   }
 }

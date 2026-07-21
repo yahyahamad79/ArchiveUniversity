@@ -106,16 +106,6 @@
 
   .checkbox{width:16px;height:16px;cursor:pointer;accent-color:var(--primary)}
 
-  .doctype-cell{display:flex;flex-direction:column;gap:4px}
-  .doctype-select{
-    padding:6px 8px;border:1px solid var(--border);border-radius:6px;font-family:inherit;
-    font-size:12.5px;background:#fff;color:var(--text);width:100%;
-  }
-  .doctype-select:focus{outline:none;border-color:var(--primary)}
-  .doctype-meta{font-size:11px;color:var(--text-dim);display:flex;gap:6px;flex-wrap:wrap}
-  .doctype-meta .code-badge{background:#F0F2F5;padding:1px 6px;border-radius:4px;font-weight:700}
-  .doctype-meta .path-badge{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:150px}
-
   .empty-state{padding:70px 20px;text-align:center;color:var(--text-dim)}
   .empty-state .big{font-size:40px;margin-bottom:10px}
   .empty-state h3{color:var(--text);margin-bottom:6px}
@@ -222,7 +212,6 @@
   <div class="toolbar">
     <button class="btn btn-primary" id="pickFolderBtn">📁 اختيار المجلد</button>
     <span class="folder-label" id="folderLabel"></span>
-    <span class="folder-label" id="archiveRootLabel" style="color:var(--accent)"></span>
     <div class="search-box">
       <input type="text" id="searchInput" placeholder="🔎 البحث عن اسم ملف..." disabled>
     </div>
@@ -255,8 +244,7 @@
             <th style="width:70px">النوع</th>
             <th style="width:80px">الحجم</th>
             <th style="width:140px">آخر تعديل</th>
-            <th style="width:190px">نوع الوثيقة</th>
-            <th style="width:200px">إجراءات</th>
+            <th style="width:150px">إجراءات</th>
           </tr>
         </thead>
         <tbody id="tableBody"></tbody>
@@ -400,121 +388,7 @@ let entries = [];        // {handle, fullName, baseName, ext, size, lastModified
 let selected = new Set(); // fullName set
 let searchTerm = '';
 
-let docTypes = {};        // من /api/get-constants — {name_ar: {code, storage_path, ...}}
-let archiveRootHandle = null; // مجلد storage_secure الجذري (يُطلب مرة واحدة لكل جلسة)
-
 const $ = id => document.getElementById(id);
-
-async function loadDocTypes(){
-  try{
-    const res = await fetch('/api/get-constants');
-    const data = await res.json();
-    if(data.success) docTypes = data.document_types || {};
-  }catch(e){
-    console.warn('تعذّر جلب أنواع الوثائق:', e);
-  }
-}
-loadDocTypes();
-
-function subfolderNameFromPath(storagePath){
-  if(!storagePath) return null;
-  const parts = storagePath.split(/[\\/]/).filter(Boolean);
-  return parts.length ? parts[parts.length - 1] : null;
-}
-
-/* ---------------- IndexedDB — تخزين دائم لمجلد الأرشيف بين الجلسات ---------------- */
-
-const HANDLE_DB_NAME = 'archiveUniversityHandles';
-const HANDLE_STORE = 'handles';
-const ARCHIVE_ROOT_KEY = 'storageSecureRoot';
-
-function openHandleDB(){
-  return new Promise((resolve, reject) => {
-    const req = indexedDB.open(HANDLE_DB_NAME, 1);
-    req.onupgradeneeded = () => {
-      if(!req.result.objectStoreNames.contains(HANDLE_STORE)){
-        req.result.createObjectStore(HANDLE_STORE);
-      }
-    };
-    req.onsuccess = () => resolve(req.result);
-    req.onerror = () => reject(req.error);
-  });
-}
-
-async function idbGetHandle(key){
-  try{
-    const db = await openHandleDB();
-    return await new Promise((resolve, reject) => {
-      const tx = db.transaction(HANDLE_STORE, 'readonly');
-      const req = tx.objectStore(HANDLE_STORE).get(key);
-      req.onsuccess = () => resolve(req.result || null);
-      req.onerror = () => reject(req.error);
-    });
-  }catch(e){ return null; }
-}
-
-async function idbSetHandle(key, handle){
-  try{
-    const db = await openHandleDB();
-    await new Promise((resolve, reject) => {
-      const tx = db.transaction(HANDLE_STORE, 'readwrite');
-      tx.objectStore(HANDLE_STORE).put(handle, key);
-      tx.oncomplete = () => resolve();
-      tx.onerror = () => reject(tx.error);
-    });
-  }catch(e){ console.warn('تعذّر حفظ صلاحية مجلد الأرشيف:', e); }
-}
-
-/* عند فتح الصفحة: حاول استعادة مجلد الأرشيف بصمت (بدون أي نافذة) إن كانت الصلاحية لا تزال سارية */
-(async function restoreArchiveRootSilently(){
-  const saved = await idbGetHandle(ARCHIVE_ROOT_KEY);
-  if(!saved) return;
-  try{
-    const perm = await saved.queryPermission({mode:'readwrite'});
-    if(perm === 'granted'){
-      archiveRootHandle = saved;
-      $('archiveRootLabel').textContent = 'مجلد الأرشيف: ' + saved.name;
-    } else {
-      $('archiveRootLabel').textContent = 'مجلد الأرشيف محفوظ (' + saved.name + ') — يحتاج تأكيداً عند أول ترحيل';
-    }
-  }catch(e){ /* الصلاحية انتهت أو المجلد لم يعد متاحاً — سيُطلب اختياره من جديد عند الحاجة */ }
-})();
-
-async function getArchiveRootHandle(){
-  if(archiveRootHandle){
-    const perm = await archiveRootHandle.queryPermission({mode:'readwrite'});
-    if(perm === 'granted') return archiveRootHandle;
-    // الصلاحية تحتاج تأكيداً فقط (نفس المجلد المحفوظ) — لا حاجة لإعادة التصفح الكامل
-    const reconfirm = await archiveRootHandle.requestPermission({mode:'readwrite'});
-    if(reconfirm === 'granted'){
-      $('archiveRootLabel').textContent = 'مجلد الأرشيف: ' + archiveRootHandle.name;
-      return archiveRootHandle;
-    }
-  }
-
-  const savedHandle = await idbGetHandle(ARCHIVE_ROOT_KEY);
-  if(savedHandle){
-    try{
-      const perm = await savedHandle.requestPermission({mode:'readwrite'});
-      if(perm === 'granted'){
-        archiveRootHandle = savedHandle;
-        $('archiveRootLabel').textContent = 'مجلد الأرشيف: ' + savedHandle.name;
-        return archiveRootHandle;
-      }
-    }catch(e){ /* المجلد لم يعد متاحاً — ننتقل لاختيار مجلد جديد */ }
-  }
-
-  toast('اختر مجلد الأرشيف الجذري (storage_secure) للمتابعة');
-  archiveRootHandle = await window.showDirectoryPicker();
-  const perm = await archiveRootHandle.requestPermission({mode:'readwrite'});
-  if(perm !== 'granted'){
-    archiveRootHandle = null;
-    throw new Error('لم يتم منح صلاحية الكتابة على مجلد الأرشيف');
-  }
-  await idbSetHandle(ARCHIVE_ROOT_KEY, archiveRootHandle);
-  $('archiveRootLabel').textContent = 'مجلد الأرشيف: ' + archiveRootHandle.name;
-  return archiveRootHandle;
-}
 
 function toast(msg, type=''){
   const el = document.createElement('div');
@@ -636,32 +510,6 @@ function getFilteredEntries(){
   return entries.filter(e => e.fullName.toLowerCase().includes(t));
 }
 
-function docTypeOptionsHtml(selectedKey){
-  let html = '<option value="">— اختر —</option>';
-  for(const key of Object.keys(docTypes)){
-    const info = docTypes[key] || {};
-    const label = (info.name_ar || key).replace(/"/g,'&quot;');
-    html += `<option value="${key.replace(/"/g,'&quot;')}" ${key===selectedKey?'selected':''}>${label}</option>`;
-  }
-  return html;
-}
-
-function isRowSaved(entry, tr){
-  const nameInput = tr.querySelector('.name-input');
-  if(!nameInput) return false;
-  const currentFull = nameInput.value + '.' + entry.ext;
-  return currentFull === entry.fullName;
-}
-
-function refreshMigrateButton(entry, tr){
-  const btn = tr.querySelector('[data-action="migrate"]');
-  if(!btn) return;
-  const saved = isRowSaved(entry, tr);
-  const hasType = !!entry.selectedDocType && !!docTypes[entry.selectedDocType];
-  btn.disabled = !(saved && hasType);
-  btn.title = !saved ? 'احفظ الاسم أولاً' : (!hasType ? 'اختر نوع الوثيقة أولاً' : '');
-}
-
 function renderTable(){
   const filtered = getFilteredEntries();
   $('countBadge').textContent = searchTerm
@@ -675,7 +523,6 @@ function renderTable(){
     const tr = document.createElement('tr');
     tr.dataset.name = entry.fullName;
     const isImg = IMG_EXT.includes(entry.ext);
-    const info = entry.selectedDocType ? docTypes[entry.selectedDocType] : null;
     tr.innerHTML = `
       <td><input type="checkbox" class="checkbox row-chk" ${selected.has(entry.fullName)?'checked':''}></td>
       <td>${idx+1}</td>
@@ -692,19 +539,10 @@ function renderTable(){
       <td>${fmtSize(entry.size)}</td>
       <td>${fmtDate(entry.lastModified)}</td>
       <td>
-        <div class="doctype-cell">
-          <select class="doctype-select" data-action="doctype"></select>
-          <div class="doctype-meta">
-            ${info ? `<span class="code-badge">${info.code || ''}</span><span class="path-badge" title="${(info.storage_path||'').replace(/"/g,'&quot;')}">${subfolderNameFromPath(info.storage_path) || ''}</span>` : ''}
-          </div>
-        </div>
-      </td>
-      <td>
         <div class="row-actions">
           <button class="btn btn-ghost btn-sm" data-action="view">عرض</button>
           <button class="btn btn-ghost btn-sm" data-action="extract">🔎 استخراج تلقائي</button>
           <button class="btn btn-primary btn-sm" data-action="save">حفظ</button>
-          <button class="btn btn-ghost btn-sm" data-action="migrate" disabled>📦 ترحيل</button>
         </div>
       </td>
     `;
@@ -718,18 +556,6 @@ function renderTable(){
       const newBase = tr.querySelector('.name-input').value;
       renameSingle(entry, newBase, tr);
     });
-    tr.querySelector('.name-input').addEventListener('input', ()=> refreshMigrateButton(entry, tr));
-
-    const docSelect = tr.querySelector('[data-action="doctype"]');
-    docSelect.innerHTML = docTypeOptionsHtml(entry.selectedDocType);
-    docSelect.addEventListener('change', e=>{
-      entry.selectedDocType = e.target.value || null;
-      renderTable();
-    });
-
-    tr.querySelector('[data-action="migrate"]').addEventListener('click', (e)=> runMigrate(entry, tr, e.currentTarget));
-
-    refreshMigrateButton(entry, tr);
     body.appendChild(tr);
   });
 }
@@ -788,58 +614,6 @@ async function runAutoExtract(entry, rowEl, btnEl){
   }finally{
     btnEl.disabled = false;
     btnEl.textContent = originalLabel;
-  }
-}
-
-/* ---------------- Migrate (move file to its document-type archive folder) ---------------- */
-
-async function runMigrate(entry, rowEl, btnEl){
-  if(!isRowSaved(entry, rowEl)){
-    toast('احفظ الاسم أولاً قبل الترحيل', 'err');
-    return;
-  }
-  const info = entry.selectedDocType ? docTypes[entry.selectedDocType] : null;
-  if(!info){
-    toast('اختر نوع الوثيقة أولاً', 'err');
-    return;
-  }
-  const subfolder = subfolderNameFromPath(info.storage_path);
-  if(!subfolder){
-    toast('نوع الوثيقة هذا لا يملك مساراً صالحاً في doc_types.json', 'err');
-    return;
-  }
-
-  const originalLabel = btnEl.textContent;
-  btnEl.disabled = true;
-  btnEl.textContent = '⏳ جارٍ الترحيل...';
-  try{
-    const root = await getArchiveRootHandle();
-    const destDir = await root.getDirectoryHandle(subfolder, {create: true});
-
-    // تحقّق من التعارض في الوجهة قبل النقل
-    let conflict = false;
-    for await (const [name] of destDir.entries()){
-      if(name === entry.fullName){ conflict = true; break; }
-    }
-    if(conflict){
-      toast(`تعذّر الترحيل: يوجد ملف بنفس الاسم "${entry.fullName}" في مجلد الوجهة "${subfolder}" مسبقاً`, 'err');
-      return;
-    }
-
-    await entry.handle.move(destDir);
-    toast(`تم ترحيل "${entry.fullName}" إلى مجلد "${subfolder}" بنجاح`, 'ok');
-
-    entries = entries.filter(e => e !== entry);
-    selected.delete(entry.fullName);
-    renderTable();
-    updateBulkBar();
-  }catch(e){
-    if(e.name !== 'AbortError') toast('فشل الترحيل: ' + e.message, 'err');
-  }finally{
-    if(btnEl.isConnected){
-      btnEl.disabled = false;
-      btnEl.textContent = originalLabel;
-    }
   }
 }
 
