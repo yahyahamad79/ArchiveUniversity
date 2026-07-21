@@ -221,6 +221,7 @@
 
   <div class="toolbar">
     <button class="btn btn-primary" id="pickFolderBtn">📁 اختيار المجلد</button>
+    <a href="#" id="changeFolderLink" style="display:none;font-size:12px;color:var(--text-dim);text-decoration:underline">تغيير المجلد</a>
     <span class="folder-label" id="folderLabel"></span>
     <span class="folder-label" id="archiveRootLabel" style="color:var(--accent)"></span>
     <div class="search-box">
@@ -567,18 +568,40 @@ function validateBaseName(base){
 
 /* ---------------- Folder loading ---------------- */
 
+async function pickNewFolder(){
+  dirHandle = await window.showDirectoryPicker();
+  const perm = await dirHandle.requestPermission({mode:'readwrite'});
+  if(perm !== 'granted'){
+    toast('لم يتم منح صلاحية الكتابة على المجلد', 'err');
+    dirHandle = null;
+    return;
+  }
+  $('folderLabel').innerHTML = 'المجلد: <span class="folder-name">'+dirHandle.name+'</span>';
+  $('pickFolderBtn').textContent = '🔄 تحديث المجلد';
+  $('changeFolderLink').style.display = 'inline';
+  await loadEntries();
+}
+
 $('pickFolderBtn').addEventListener('click', async () => {
   try{
-    dirHandle = await window.showDirectoryPicker();
-    const perm = await dirHandle.requestPermission({mode:'readwrite'});
-    if(perm !== 'granted'){
-      toast('لم يتم منح صلاحية الكتابة على المجلد', 'err');
-      return;
+    if(dirHandle){
+      // مجلد مُختار بالفعل — أعد قراءته فقط لتحديث القائمة (ملفات أُضيفت/حُذفت خارجياً)
+      await loadEntries();
+      toast('تم تحديث قائمة الملفات', 'ok');
+    } else {
+      await pickNewFolder();
     }
-    $('folderLabel').innerHTML = 'المجلد: <span class="folder-name">'+dirHandle.name+'</span>';
-    await loadEntries();
   }catch(e){
-    if(e.name !== 'AbortError') toast('تعذّر فتح المجلد: '+e.message, 'err');
+    if(e.name !== 'AbortError') toast('تعذّر تحديث المجلد: '+e.message, 'err');
+  }
+});
+
+$('changeFolderLink').addEventListener('click', async (e) => {
+  e.preventDefault();
+  try{
+    await pickNewFolder();
+  }catch(err){
+    if(err.name !== 'AbortError') toast('تعذّر فتح المجلد: '+err.message, 'err');
   }
 });
 
