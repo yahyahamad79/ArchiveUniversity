@@ -266,9 +266,12 @@
 
   <div class="bulkbar" id="bulkBar">
     <span id="bulkCount">تم تحديد 0 ملف</span>
-    <div style="display:flex;gap:8px">
-      <button class="btn btn-white btn-sm" id="clearSelectionBtn">إلغاء التحديد</button>
+    <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+      <select class="doctype-select" id="bulkDocTypeSelect" style="max-width:170px"></select>
+      <button class="btn btn-white btn-sm" id="bulkAssignTypeBtn">تعيين النوع للمحدد</button>
       <button class="btn btn-white btn-sm" id="bulkEditBtn">💾 تعديل شامل (حفظ الأسماء المحددة)</button>
+      <button class="btn btn-white btn-sm" id="bulkMigrateBtn">📦 ترحيل الكل</button>
+      <button class="btn btn-white btn-sm" id="clearSelectionBtn">إلغاء التحديد</button>
     </div>
   </div>
 
@@ -410,6 +413,7 @@ async function loadDocTypes(){
     const res = await fetch('/api/get-constants');
     const data = await res.json();
     if(data.success) docTypes = data.document_types || {};
+    populateBulkDocTypeSelect();
   }catch(e){
     console.warn('تعذّر جلب أنواع الوثائق:', e);
   }
@@ -774,7 +778,7 @@ $('clearSelectionBtn').addEventListener('click', ()=>{ selected.clear(); renderT
 
 /* ---------------- Rename (single) ---------------- */
 
-/* ---------------- Auto-extract (PaddleOCR backend, per file, on demand) ---------------- */
+/* ---------------- Auto-extract (Gemini backend, per file, on demand) ---------------- */
 
 async function runAutoExtract(entry, rowEl, btnEl){
   const originalLabel = btnEl.textContent;
@@ -812,31 +816,26 @@ async function runAutoExtract(entry, rowEl, btnEl){
 
 /* ---------------- Migrate (move file to its document-type archive folder) ---------------- */
 
-async function runMigrate(entry, rowEl, btnEl){
-  if(!isRowSaved(entry, rowEl)){
-    toast('احفظ الاسم أولاً قبل الترحيل', 'err');
-    return;
+/* الدالة الأساسية: تُرحّل ملفاً واحداً حسب نوعه، وتُستخدم من الزر الفردي والزر الجماعي معاً.
+   لا تلمس واجهة الأزرار — فقط تُرجع نتيجة نصية واضحة (نجاح/تخطٍّ مع السبب). */
+async function migrateOneEntry(entry, tr){
+  if(!isRowSaved(entry, tr)){
+    return {ok:false, message:`تخطي "${entry.fullName}" — لم يُحفَظ الاسم بعد`};
   }
   const info = entry.selectedDocType ? docTypes[entry.selectedDocType] : null;
   if(!info){
-    toast('اختر نوع الوثيقة أولاً', 'err');
-    return;
+    return {ok:false, message:`تخطي "${entry.fullName}" — لم يُحدَّد نوع الوثيقة`};
   }
   const subfolder = subfolderNameFromPath(info.storage_path);
   if(!subfolder){
-    toast('نوع الوثيقة هذا لا يملك مساراً صالحاً في doc_types.json', 'err');
-    return;
+    return {ok:false, message:`تخطي "${entry.fullName}" — نوع الوثيقة بلا مسار صالح في doc_types.json`};
   }
 
-  const originalLabel = btnEl.textContent;
-  btnEl.disabled = true;
-  btnEl.textContent = '⏳ جارٍ الترحيل...';
   try{
     const root = await getArchiveRootHandle();
     const destDir = await root.getDirectoryHandle(subfolder, {create: true});
 
     // تحقّق من التعارض في الوجهة بمقارنة الأسماء بعد التطبيع (تجاهل الهمزة/ة-ه/ى-ي)
-    // وليس مطابقة حرفية صارمة، لأن نفس الاسم قد يُكتب بأشكال مختلفة قليلاً
     const targetNormalized = normalizeArabicName(entry.baseName);
     let conflictName = null;
     for await (const [name] of destDir.entries()){
@@ -847,26 +846,88 @@ async function runMigrate(entry, rowEl, btnEl){
       }
     }
     if(conflictName){
-      toast(`تعذّر الترحيل: يوجد ملف بنفس الاسم تقريباً "${conflictName}" في مجلد الوجهة "${subfolder}" مسبقاً`, 'err');
-      return;
+      return {ok:false, message:`تخطي "${entry.fullName}" — تعارض مع "${conflictName}" الموجود مسبقاً في مجلد "${subfolder}"`};
     }
 
     await entry.handle.move(destDir);
-    toast(`تم ترحيل "${entry.fullName}" إلى مجلد "${subfolder}" بنجاح`, 'ok');
+    return {ok:true, message:`تم ترحيل "${entry.fullName}" إلى مجلد "${subfolder}" بنجاح`};
+  }catch(e){
+    return {ok:false, message:`فشل ترحيل "${entry.fullName}": ${e.message}`};
+  }
+}
 
+async function runMigrate(entry, tr, btnEl){
+  const originalLabel = btnEl.textContent;
+  btnEl.disabled = true;
+  btnEl.textContent = '⏳ جارٍ الترحيل...';
+
+  const result = await migrateOneEntry(entry, tr);
+
+  if(result.ok){
+    toast(result.message, 'ok');
     entries = entries.filter(e => e !== entry);
     selected.delete(entry.fullName);
     renderTable();
     updateBulkBar();
-  }catch(e){
-    if(e.name !== 'AbortError') toast('فشل الترحيل: ' + e.message, 'err');
-  }finally{
+  } else {
+    toast(result.message, 'err');
     if(btnEl.isConnected){
       btnEl.disabled = false;
       btnEl.textContent = originalLabel;
     }
   }
 }
+
+/* ---------------- الترحيل الجماعي: كل ملف إلى مجلده الخاص حسب نوعه ---------------- */
+
+function populateBulkDocTypeSelect(){
+  const sel = $('bulkDocTypeSelect');
+  if(sel) sel.innerHTML = docTypeOptionsHtml(null);
+}
+
+$('bulkAssignTypeBtn').addEventListener('click', ()=>{
+  const val = $('bulkDocTypeSelect').value;
+  if(!val){ toast('اختر نوع الوثيقة أولاً من القائمة', 'err'); return; }
+  if(selected.size === 0) return;
+  entries.forEach(e => { if(selected.has(e.fullName)) e.selectedDocType = val; });
+  renderTable();
+  toast(`تم تعيين النوع "${docTypes[val]?.name_ar || val}" لـ ${selected.size} ملف — يمكنك تعديل أي منها فردياً بعد ذلك`, 'ok');
+});
+
+$('bulkMigrateBtn').addEventListener('click', async ()=>{
+  const selectedEntries = entries.filter(e => selected.has(e.fullName));
+  if(selectedEntries.length === 0) return;
+
+  // حساب عدد الجاهز فعلاً للترحيل الآن قبل السؤال، حتى يعرف المستخدم ما سيحدث فعلياً
+  let readyCount = 0;
+  for(const entry of selectedEntries){
+    const tr = document.querySelector(`tr[data-name="${CSS.escape(entry.fullName)}"]`);
+    if(tr && isRowSaved(entry, tr) && entry.selectedDocType && docTypes[entry.selectedDocType]){
+      readyCount++;
+    }
+  }
+  const confirmMsg = `من أصل ${selectedEntries.length} ملف محدد، ${readyCount} جاهز للترحيل الآن (اسم محفوظ + نوع محدد)، وسيُتخطى الباقي مع توضيح السبب في التقرير النهائي.\n\nهل تريد المتابعة؟`;
+  if(!window.confirm(confirmMsg)) return;
+
+  const report = [];
+  for(const entry of selectedEntries){
+    const tr = document.querySelector(`tr[data-name="${CSS.escape(entry.fullName)}"]`);
+    if(!tr){
+      report.push({icon:'⚠️', text:`تعذّر العثور على السجل: ${entry.fullName}`});
+      continue;
+    }
+    const result = await migrateOneEntry(entry, tr);
+    report.push({icon: result.ok ? '✅' : '⚠️', text: result.message});
+    if(result.ok){
+      entries = entries.filter(e => e !== entry);
+      selected.delete(entry.fullName);
+    }
+  }
+
+  renderTable();
+  updateBulkBar();
+  showReport(report);
+});
 
 async function nameExists(fullName, excludeHandle){
   for(const e of entries){
