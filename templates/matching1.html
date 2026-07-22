@@ -769,9 +769,9 @@
         <div class="field">
           <label>🗂️ نوع الوثيقة (لتحديث حالتها في الإكسل):</label>
           <select id="docTypeSelect">
-            <option value="" disabled selected>— اختر نوع الوثيقة (إلزامي) —</option>
+            <option value="">— بدون تحديث حالة وثيقة —</option>
           </select>
-          <div style="font-size:11px;color:var(--muted);margin-top:4px" id="docTypeColumnInfo">⚠️ اختيار نوع الوثيقة إلزامي — لن يعمل زر "تنفيذ المطابقة" قبل تحديده</div>
+          <div style="font-size:11px;color:var(--muted);margin-top:4px" id="docTypeColumnInfo">اختر نوع الوثيقة ليتم تحديد عمود الحالة المطابق له تلقائياً في الإكسل</div>
         </div>
       </div>
 
@@ -858,7 +858,6 @@
       <table id="resultTable">
         <thead>
           <tr>
-            <th style="width:40px">#</th>
             <th style="width:80px">الحالة</th>
             <th style="min-width:120px">الاسم في الإكسل</th>
             <th style="min-width:100px">الرقم</th>
@@ -1196,7 +1195,7 @@
       if (!data.success) throw new Error(data.message || 'فشل تحميل الثوابت');
       S.docTypes = data.document_types || {};
       const entries = Object.values(S.docTypes).sort((a, b) => (a.order || 0) - (b.order || 0));
-      sel.innerHTML = '<option value="" disabled selected>— اختر نوع الوثيقة (إلزامي) —</option>' +
+      sel.innerHTML = '<option value="">— بدون تحديث حالة وثيقة —</option>' +
         entries.map(d => `<option value="${esc(d.code)}">${esc(d.name_ar || d.code)} (${esc(d.code)})</option>`).join('');
     } catch (err) {
       document.getElementById('docTypeColumnInfo').textContent = '⚠️ تعذّر تحميل أنواع الوثائق من doc_types.json: ' + err.message;
@@ -1243,8 +1242,8 @@
     const infoEl = document.getElementById('docTypeColumnInfo');
 
     if (!code) {
-      infoEl.textContent = '⚠️ اختيار نوع الوثيقة إلزامي — لن يعمل زر "تنفيذ المطابقة" قبل تحديده';
-      infoEl.style.color = 'var(--warning)';
+      infoEl.textContent = 'اختر نوع الوثيقة ليتم تحديد عمود الحالة المطابق له تلقائياً في الإكسل';
+      infoEl.style.color = '';
       return;
     }
 
@@ -1579,7 +1578,6 @@
     const numCol = document.getElementById('numberColumn').value;
     if (!nameCol) { alert('اختر عمود الأسماء في ملف الإكسل'); return; }
     if (!numCol) { alert('اختر عمود الترقيم في ملف الإكسل'); return; }
-    if (!document.getElementById('docTypeSelect').value) { alert('اختيار نوع الوثيقة إلزامي — لتحديث حالتها في ملف الإكسل'); return; }
 
     S.nameColumn = nameCol;
     S.numberColumn = numCol;
@@ -2033,7 +2031,7 @@
 
     const tbody = document.querySelector('#resultTable tbody');
     if (!filtered.length) {
-      tbody.innerHTML = '<tr><td colspan="7"><div class="empty">لا توجد نتائج مطابقة للمرشّح</div></td></tr>';
+      tbody.innerHTML = '<tr><td colspan="6"><div class="empty">لا توجد نتائج مطابقة للمرشّح</div></td></tr>';
       return;
     }
 
@@ -2044,14 +2042,13 @@
       'renamed': { class: 'r-renamed', tag: 'tag-renamed', label: '🔄 مرقّم' }
     };
 
-    tbody.innerHTML = filtered.map((r, idx) => {
+    tbody.innerHTML = filtered.map(r => {
       const st = statusMap[r.status] || statusMap.missing;
       const newNameDisplay = r.newName || '—';
       const extDisplay = r.ext || '—';
       const numDisplay = r.number || '—';
       const label = r.migrated ? `${st.label} 🚚` : st.label;
       return `<tr class="${st.class}">
-        <td>${idx + 1}</td>
         <td><span class="tag ${st.tag}">${label}</span></td>
         <td>${esc(r.excelName || '—')}</td>
         <td>${esc(numDisplay)}</td>
