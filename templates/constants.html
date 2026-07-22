@@ -81,7 +81,7 @@
                             </button>
                         </div>
                         <span id="storage_status" class="text-[9px] text-slate-400 block mt-1">
-                            مرتبط بمجلد الأرشيف الفعلي (نفس المجلد المستخدم في شاشة "فحص الوثائق") — اضغط "تحقق/أنشئ" للتأكد من وجوده فعلياً على القرص أو إنشائه.
+                            مرتبط بمجلد الأرشيف الفعلي (نفس المجلد المحدَّد في شاشة "تهيئة مسارات النظام") — اضغط "تحقق/أنشئ" للتأكد من وجوده فعلياً على القرص أو إنشائه.
                         </span>
                     </div>
 
@@ -185,71 +185,33 @@
         }
 
         // ==========================================
-        // IndexedDB — نفس مخزن مجلد الأرشيف الجذري المستخدم في شاشة "فحص الوثائق"
-        // (نفس الاسم بالضبط حتى يُستخدم نفس المجلد المحفوظ عبر كل شاشات النظام)
+        // مجلد الأرشيف الجذري: المرجع الوحيد له الآن هو شاشة "تهيئة مسارات
+        // النظام" (paths.html) — مفتاح "archiveFolder" المشترك عبر
+        // handle-store.js. هذه الشاشة لا تفتح منتقي مجلد خاص بها إطلاقاً
+        // ولا تحتفظ بمخزن IndexedDB منفصل، حتى لا يتفرّع مرجعان مختلفان
+        // لنفس المجلد عبر شاشات النظام (وهذا بالضبط ما كان يسبب الخطأ سابقاً).
         // ==========================================
-        const HANDLE_DB_NAME = 'archiveUniversityHandles';
-        const HANDLE_STORE = 'handles';
-        const ARCHIVE_ROOT_KEY = 'storageSecureRoot';
-
-        function openHandleDB(){
-            return new Promise((resolve, reject) => {
-                const req = indexedDB.open(HANDLE_DB_NAME, 1);
-                req.onupgradeneeded = () => {
-                    if(!req.result.objectStoreNames.contains(HANDLE_STORE)){
-                        req.result.createObjectStore(HANDLE_STORE);
-                    }
-                };
-                req.onsuccess = () => resolve(req.result);
-                req.onerror = () => reject(req.error);
-            });
-        }
-        async function idbGetHandle(key){
-            try{
-                const db = await openHandleDB();
-                return await new Promise((resolve, reject) => {
-                    const tx = db.transaction(HANDLE_STORE, 'readonly');
-                    const req = tx.objectStore(HANDLE_STORE).get(key);
-                    req.onsuccess = () => resolve(req.result || null);
-                    req.onerror = () => reject(req.error);
-                });
-            }catch(e){ return null; }
-        }
-        async function idbSetHandle(key, handle){
-            try{
-                const db = await openHandleDB();
-                await new Promise((resolve, reject) => {
-                    const tx = db.transaction(HANDLE_STORE, 'readwrite');
-                    tx.objectStore(HANDLE_STORE).put(handle, key);
-                    tx.oncomplete = () => resolve();
-                    tx.onerror = () => reject(tx.error);
-                });
-            }catch(e){ console.warn('تعذّر حفظ صلاحية مجلد الأرشيف:', e); }
-        }
-
         async function getArchiveRootHandle(){
+            await ensureHandleStoreLoaded();
+
             if(archiveRootHandle){
-                const perm = await archiveRootHandle.queryPermission({mode:'readwrite'});
+                const perm = await checkHandlePermission(archiveRootHandle, 'readwrite');
                 if(perm === 'granted') return archiveRootHandle;
-                const reconfirm = await archiveRootHandle.requestPermission({mode:'readwrite'});
-                if(reconfirm === 'granted') return archiveRootHandle;
             }
-            const saved = await idbGetHandle(ARCHIVE_ROOT_KEY);
-            if(saved){
-                const perm = await saved.requestPermission({mode:'readwrite'});
-                if(perm === 'granted'){ archiveRootHandle = saved; return archiveRootHandle; }
+
+            const saved = await getHandle('archiveFolder');
+            if(!saved){
+                showAlert('لم يتم تحديد "مجلد الأرشيف الفعلي" بعد. مصدره الوحيد الآن شاشة "تهيئة مسارات النظام" — اذهب إليها واختر المجلد من هناك أولاً، ثم عُد لهذه الشاشة.', false);
+                throw new Error('مجلد الأرشيف غير محدد من شاشة "تهيئة مسارات النظام" بعد');
             }
-            showAlert('لم يتم ربط مجلد الأرشيف بعد — اذهب أولاً لشاشة "فحص الوثائق" ونفّذ أي عملية ترحيل لربط المجلد، أو اختره الآن من النافذة التي ستظهر.', false);
-            archiveRootHandle = await window.showDirectoryPicker();
-            const perm = await archiveRootHandle.requestPermission({mode:'readwrite'});
-            if(perm !== 'granted'){ archiveRootHandle = null; throw new Error('لم تُمنح صلاحية الكتابة على مجلد الأرشيف'); }
-            await idbSetHandle(ARCHIVE_ROOT_KEY, archiveRootHandle);
 
-            // مزامنة شاملة تلقائية فور اختيار/ربط مجلد الأرشيف الرئيسي لأول مرة
-            // (أو بعد تغييره، لأن هذا الفرع من الكود لا يُنفَّذ إلا حينها)
-            syncEverything();
+            const perm = await checkHandlePermission(saved, 'readwrite');
+            if(perm === 'granted'){ archiveRootHandle = saved; return archiveRootHandle; }
 
-            return archiveRootHandle;
+            const reconfirm = await requestHandlePermission(saved, 'readwrite');
+            if(reconfirm === 'granted'){ archiveRootHandle = saved; return archiveRootHandle; }
+
+            throw new Error('لم تُمنح صلاحية الكتابة على مجلد الأرشيف المحفوظ من شاشة "تهيئة مسارات النظام" — أعد تأكيدها من هناك.');
         }
 
         // يتحقق من وجود مجلد الرمز الحالي فعلياً داخل الأرشيف، أو ينشئه إن لم يكن موجوداً
@@ -288,7 +250,14 @@
             }
         }
 
-        window.addEventListener('DOMContentLoaded', loadConstantsFromServer);
+        window.addEventListener('DOMContentLoaded', () => {
+            loadConstantsFromServer();
+
+            // مزامنة شاملة تلقائية صامتة في الخلفية عند فتح الشاشة (تلتقط أي
+            // تغيير حصل في مجلد الأرشيف من شاشة "تهيئة مسارات النظام") —
+            // لا تنتظرها ولا توقف عرض جدول الوثائق، فقط تحدّث شريط الحالة
+            syncEverything();
+        });
 
         // 1. جلب بيانات doc_types.json من الخادم
         async function loadConstantsFromServer() {
@@ -574,13 +543,21 @@
             });
         }
 
-        async function ensureSyncDependenciesLoaded() {
+        async function ensureXlsxLoaded() {
             if (typeof XLSX === 'undefined') {
                 await loadScriptOnce('https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js');
             }
+        }
+
+        async function ensureHandleStoreLoaded() {
             if (typeof getHandle === 'undefined') {
                 await loadScriptOnce('/static/handle-store.js');
             }
+        }
+
+        async function ensureSyncDependenciesLoaded() {
+            await ensureXlsxLoaded();
+            await ensureHandleStoreLoaded();
         }
 
         /* ============================================================
