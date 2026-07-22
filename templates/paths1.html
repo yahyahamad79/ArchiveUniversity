@@ -5,7 +5,6 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>إعداد المسارات المحلية - نظام الأرشفة</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@300;400;600;700&display=swap" rel="stylesheet">
     <script src="/static/handle-store.js"></script>
     <style>
@@ -81,12 +80,6 @@
                     <span class="text-[11px] text-slate-500">نفس ملف الإكسل المستخدم في شاشة المطابقة.</span>
                     <span id="badge_excelFile" class="text-[10px] font-bold text-rose-600 bg-rose-50 px-2 py-0.5 rounded">غير محدد</span>
                 </div>
-
-                <div id="excelSheetSelWrap" class="hidden mt-3 p-3 bg-amber-50 border-2 border-amber-400 rounded-lg">
-                    <label class="block text-xs font-bold text-amber-700 mb-1">📄 اختر الصفحة (Sheet) الصحيحة من ملف الإكسل — هذا الاختيار سيُستخدم تلقائياً في شاشتي "المطابقة" و"إدارة الثوابت":</label>
-                    <select id="excelSheetSelect" class="w-full text-xs px-3 py-2 border border-slate-300 rounded-lg outline-none"></select>
-                    <div id="excelHeaderRowNote" class="text-[11px] text-slate-600 mt-2"></div>
-                </div>
             </div>
 
             <div id="path_alert" class="hidden p-4 rounded-xl text-xs font-semibold"></div>
@@ -129,86 +122,10 @@
                 document.getElementById('name_' + key).textContent = handle.name;
                 if (perm === 'granted') {
                     updateBadge(key, true, "متصل ونشط 🟢");
-                    if (key === 'excelFile') {
-                        const storedSheet = shared.excelFile && shared.excelFile.sheetName;
-                        try {
-                            await analyzeAndSaveExcelSheet(handle, storedSheet);
-                        } catch (e) {
-                            console.warn('تعذّر تحليل صفحة ملف الإكسل المسترجَع:', e);
-                        }
-                    }
                 } else {
                     updateBadge(key, 'warn', "يحتاج إعادة تأكيد");
                 }
             }
-        }
-
-        /* ============================================================
-           اكتشاف صف العناوين الحقيقي (نفس منطق شاشة المطابقة بالضبط) —
-           بعض الملفات تبدأ بصف عنوان/شعار مدمج قبل صف العناوين الفعلي
-           ============================================================ */
-        function detectHeaderRowIndex(ws) {
-            const raw = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '', raw: false, blankrows: false });
-            let bestIdx = 0, bestCount = -1;
-            for (let i = 0; i < Math.min(raw.length, 15); i++) {
-                const nonEmpty = (raw[i] || []).filter(c => String(c).trim() !== '').length;
-                if (nonEmpty > bestCount) { bestCount = nonEmpty; bestIdx = i; }
-            }
-            return bestIdx;
-        }
-
-        let currentExcelWb = null;
-
-        // يقرأ ملف الإكسل، ويعرض قائمة اختيار الصفحة لو أكثر من صفحة، ثم يحفظ
-        // (اسم الصفحة + رقم صف العناوين) في paths.json ليُستخدما تلقائياً
-        // في شاشتي "المطابقة" و"إدارة الثوابت" بدل تخمينهما من الصفر
-        async function analyzeAndSaveExcelSheet(handle, preSelectedSheet) {
-            const file = await handle.getFile();
-            const buf = await file.arrayBuffer();
-            currentExcelWb = XLSX.read(buf, { type: 'array', cellText: true, raw: false });
-
-            const wrap = document.getElementById('excelSheetSelWrap');
-            const sel = document.getElementById('excelSheetSelect');
-
-            if (currentExcelWb.SheetNames.length > 1) {
-                wrap.classList.remove('hidden');
-                sel.innerHTML = currentExcelWb.SheetNames.map(n => `<option value="${n}">${n}</option>`).join('');
-                const chosen = preSelectedSheet && currentExcelWb.SheetNames.includes(preSelectedSheet)
-                    ? preSelectedSheet : currentExcelWb.SheetNames[0];
-                sel.value = chosen;
-                sel.onchange = () => confirmSheetChoice(handle, sel.value);
-                await confirmSheetChoice(handle, chosen);
-            } else {
-                wrap.classList.add('hidden');
-                await confirmSheetChoice(handle, currentExcelWb.SheetNames[0]);
-            }
-        }
-
-        async function confirmSheetChoice(handle, sheetName) {
-            const ws = currentExcelWb.Sheets[sheetName];
-            const headerRowIdx = detectHeaderRowIndex(ws);
-            const note = document.getElementById('excelHeaderRowNote');
-            note.innerHTML = `صف العناوين المكتشف تلقائياً: رقم ${headerRowIdx + 1}. لو غلط: ` +
-                `<input type="number" id="excelHeaderRowManual" min="1" value="${headerRowIdx + 1}" style="width:60px;padding:2px 4px;margin:0 4px" class="border border-slate-300 rounded">` +
-                `<button type="button" id="excelHeaderRowManualBtn" class="text-indigo-600 font-bold underline">تحديث</button>`;
-            document.getElementById('excelHeaderRowManualBtn').onclick = async () => {
-                const v = parseInt(document.getElementById('excelHeaderRowManual').value, 10);
-                if (v && v >= 1) await saveExcelSheetConfig(handle, sheetName, v - 1);
-            };
-            await saveExcelSheetConfig(handle, sheetName, headerRowIdx);
-        }
-
-        async function saveExcelSheetConfig(handle, sheetName, headerRowIdx) {
-            await saveSharedPaths({
-                excelFile: {
-                    name: handle.name,
-                    kind: 'file',
-                    updated_at: new Date().toISOString(),
-                    sheetName: sheetName,
-                    headerRowIdx: headerRowIdx
-                }
-            });
-            showAlert(`تم اعتماد الصفحة "${sheetName}" وصف العناوين رقم ${headerRowIdx + 1} — سيُستخدمان تلقائياً في شاشتي "المطابقة" و"إدارة الثوابت".`, true);
         }
 
         async function pickEntry(key, kind) {
@@ -244,12 +161,7 @@
                 [key]: { name: handle.name, kind: kind, updated_at: new Date().toISOString() }
             });
 
-            if (key === 'excelFile') {
-                // اكتشاف الصفحة وصف العناوين وحفظهما (يستبدل الحفظ العام أعلاه بنسخة أكمل تتضمنهما)
-                await analyzeAndSaveExcelSheet(handle);
-            } else {
-                showAlert(`تم اختيار "${handle.name}" وحفظ الوصول له بنجاح — سيُستخدم تلقائياً في شاشة المطابقة.`, true);
-            }
+            showAlert(`تم اختيار "${handle.name}" وحفظ الوصول له بنجاح — سيُستخدم تلقائياً في شاشة المطابقة.`, true);
         }
 
         function updateBadge(key, state, text) {

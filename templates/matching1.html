@@ -1018,7 +1018,7 @@
       info.textContent = 'جارٍ القراءة...';
       info.className = 'file-info';
       const reader = new FileReader();
-      reader.onload = async e => {
+      reader.onload = e => {
         try {
           const wb = XLSX.read(e.target.result, { type: 'array', cellText: true, raw: false });
           S.Excel.wb = wb;
@@ -1028,43 +1028,24 @@
           const sheetSelWrap = document.getElementById('sheetSelExcel');
           const writeNote = S.Excel.fileHandle ? ' — 💾 صلاحية الحفظ المباشر مفعّلة' : '';
 
-          // محاولة استرجاع الصفحة/صف العناوين المعتمدَين مسبقاً من شاشة "المسارات"
-          // (يتجنّب إجبار المستخدم على اختيار نفس الصفحة يدوياً كل مرة)
-          let sharedSheetCfg = null;
-          try {
-            const shared = await fetchSharedPaths();
-            if (shared && shared.excelFile && shared.excelFile.sheetName && wb.SheetNames.includes(shared.excelFile.sheetName)) {
-              sharedSheetCfg = shared.excelFile;
-            }
-          } catch (cfgErr) { /* تجاهل — سيُعتمد على الاكتشاف/الاختيار اليدوي كما كان */ }
-
           if (wb.SheetNames.length > 1) {
+            // الملف يحتوي على أكثر من صفحة — لا نحمّل أي أعمدة تلقائياً حتى
+            // يختار المستخدم الصفحة الصحيحة صراحة (تجنّباً لعرض أعمدة خاطئة
+            // من صفحة افتراضية غير مقصودة، مثل لوحة معلومات بدل جدول الطلاب)
             sheetSelWrap.style.display = 'block';
-            if (sharedSheetCfg) {
-              // فيه صفحة معتمدة مسبقاً لهذا الملف من شاشة "المسارات" — استخدمها مباشرة
-              sheetSelWrap.classList.remove('needs-attention');
-              sel.value = sharedSheetCfg.sheetName;
-              loadExcelSheet(typeof sharedSheetCfg.headerRowIdx === 'number' ? sharedSheetCfg.headerRowIdx : undefined);
-              info.textContent = `✓ ${file.name}${writeNote} — تم استخدام الصفحة المعتمدة "${sharedSheetCfg.sheetName}" (يمكن تغييرها من القائمة أدناه لو احتجت).`;
-              info.className = 'file-info ok';
-              document.getElementById('boxExcel').classList.add('loaded');
-            } else {
-              // لا يوجد إعداد معتمد بعد — نفس السلوك السابق: يجب اختيار الصفحة يدوياً
-              // (تجنّباً لعرض أعمدة خاطئة من صفحة افتراضية غير مقصودة)
-              sheetSelWrap.classList.add('needs-attention');
-              sel.insertAdjacentHTML('afterbegin', '<option value="" disabled selected>— اختر الصفحة —</option>');
-              S.Excel.rows = [];
-              S.Excel.cols = [];
-              document.getElementById('step2').classList.add('hidden');
-              info.textContent = `✓ ${file.name}${writeNote} — يحتوي على ${wb.SheetNames.length} صفحات، اختر الصفحة الصحيحة أدناه للمتابعة ⬇️`;
-              info.className = 'file-info ok';
-              document.getElementById('boxExcel').classList.add('loaded');
-              sheetSelWrap.scrollIntoView({ behavior: 'smooth', block: 'center' });
-            }
+            sheetSelWrap.classList.add('needs-attention');
+            sel.insertAdjacentHTML('afterbegin', '<option value="" disabled selected>— اختر الصفحة —</option>');
+            S.Excel.rows = [];
+            S.Excel.cols = [];
+            document.getElementById('step2').classList.add('hidden');
+            info.textContent = `✓ ${file.name}${writeNote} — يحتوي على ${wb.SheetNames.length} صفحات، اختر الصفحة الصحيحة أدناه للمتابعة ⬇️`;
+            info.className = 'file-info ok';
+            document.getElementById('boxExcel').classList.add('loaded');
+            sheetSelWrap.scrollIntoView({ behavior: 'smooth', block: 'center' });
           } else {
             sheetSelWrap.style.display = 'none';
             sheetSelWrap.classList.remove('needs-attention');
-            loadExcelSheet(sharedSheetCfg && typeof sharedSheetCfg.headerRowIdx === 'number' ? sharedSheetCfg.headerRowIdx : undefined);
+            loadExcelSheet();
             info.textContent = `✓ ${file.name}${writeNote}`;
             info.className = 'file-info ok';
             document.getElementById('boxExcel').classList.add('loaded');
@@ -1149,26 +1130,6 @@
     updateColumnSelects();
     onDocTypeChange();
     checkReady();
-
-    // مزامنة الصفحة/صف العناوين المستخدمَين حالياً مع paths.json (بدون انتظار)
-    // حتى تعتمدهما شاشة "إدارة الثوابت" عند تنفيذ "مزامنة شاملة"
-    saveExcelSheetConfigFromMatching(sheetName, headerRowIdx);
-  }
-
-  async function saveExcelSheetConfigFromMatching(sheetName, headerRowIdx) {
-    try {
-      await saveSharedPaths({
-        excelFile: {
-          name: S.Excel.name || (S.Excel.fileHandle ? S.Excel.fileHandle.name : ''),
-          kind: 'file',
-          updated_at: new Date().toISOString(),
-          sheetName: sheetName,
-          headerRowIdx: headerRowIdx
-        }
-      });
-    } catch (e) {
-      console.warn('تعذّرت مزامنة إعداد الصفحة مع paths.json:', e);
-    }
   }
 
   function updateColumnSelects() {
@@ -1204,12 +1165,10 @@
 
   /* ============================================================
      إنشاء عمود جديد وآمن لحالة نوع الوثيقة (عند عدم وجود عمود مطابق آمن)
-     يُدرج قبل آخر عمودين في الإكسل ("الحالة"، "نسبة التسليم" — وهما
-     العمودان الثابتان اللذان تضمنهما شاشة "إدارة الثوابت" عبر
-     "مزامنة شاملة")، بقيمة افتراضية "لا" لكل الصفوف. إذا كان اسم الرمز
-     نفسه مستخدَماً أصلاً لعمود آخر (تصادم أسماء)، يُختار اسم بديل فريد
-     تلقائياً (مثل ID_2, ID_3...) بدل الاصطدام بعمود موجود — هذا بالضبط
-     ما تسبب بالخطأ السابق.
+     يُدرج قبل آخر عمودين في الإكسل (نسبة الاكتمال، حالة الملف)، بقيمة
+     افتراضية "لا" لكل الصفوف. إذا كان اسم الرمز نفسه مستخدَماً أصلاً لعمود
+     آخر (تصادم أسماء)، يُختار اسم بديل فريد تلقائياً (مثل ID_2, ID_3...)
+     بدل الاصطدام بعمود موجود — هذا بالضبط ما تسبب بالخطأ السابق.
      ============================================================ */
   function getUniqueColumnName(code) {
     if (!S.Excel.cols.includes(code)) return code;
@@ -1271,7 +1230,7 @@
       const newCol = createDocStatusColumn(code);
       S.docStatusColumn = newCol;
       const note = newCol !== code ? ` (باسم "${esc(newCol)}" لتفادي تصادم مع عمود "${esc(code)}" موجود مسبقاً)` : '';
-      infoEl.innerHTML = `🆕 لا يوجد عمود آمن مطابق — تم إنشاء عمود جديد <strong>"${esc(newCol)}"</strong>${note} قبل عمودي "الحالة" و"نسبة التسليم"، وسيُحفظ عند تأكيد الترقيم.`;
+      infoEl.innerHTML = `🆕 لا يوجد عمود آمن مطابق — تم إنشاء عمود جديد <strong>"${esc(newCol)}"</strong>${note} قبل عمودي "نسبة الاكتمال" و"حالة الملف"، وسيُحفظ عند تأكيد الترقيم.`;
       infoEl.style.color = 'var(--found-b)';
     }
   }
