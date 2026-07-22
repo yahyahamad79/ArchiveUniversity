@@ -278,6 +278,13 @@
 
 </div>
 
+<!-- زر ثابت ودائم الظهور (بغض النظر عن التحديد) للرجوع لآخر تقرير ترحيل
+     جماعي بعد إغلاقه، بدل ما يضيع لو اتقفل ومحتاج تراجعه تاني -->
+<button id="lastMigrateReportBtn" class="btn btn-primary btn-sm"
+        style="position:fixed;bottom:18px;left:18px;z-index:500;display:none;box-shadow:0 4px 14px rgba(0,0,0,.2)">
+  📦 آخر تقرير ترحيل جماعي
+</button>
+
 <!-- ===== Image Viewer/Editor Modal ===== -->
 <div class="overlay" id="imgOverlay">
   <div class="modal viewer-modal">
@@ -406,6 +413,7 @@ let searchTerm = '';
 
 let docTypes = {};        // من /api/get-constants — {name_ar: {code, storage_path, ...}}
 let archiveRootHandle = null; // مجلد storage_secure الجذري (يُطلب مرة واحدة لكل جلسة)
+let lastBulkMigrateReport = null; // آخر تقرير ترحيل جماعي، لإتاحة الرجوع إليه من الزر الثابت أسفل الصفحة
 
 const $ = id => document.getElementById(id);
 
@@ -460,98 +468,63 @@ function normalizeArabicName(str){
   return s;
 }
 
-/* ---------------- IndexedDB — تخزين دائم لمجلد الأرشيف بين الجلسات ---------------- */
-
-const HANDLE_DB_NAME = 'archiveUniversityHandles';
-const HANDLE_STORE = 'handles';
-const ARCHIVE_ROOT_KEY = 'storageSecureRoot';
-
-function openHandleDB(){
+/* ---------------- تحميل handle-store.js عند الحاجة فقط (بدون تعليق تحميل الشاشة عليه) ---------------- */
+function loadScriptOnce(src){
   return new Promise((resolve, reject) => {
-    const req = indexedDB.open(HANDLE_DB_NAME, 1);
-    req.onupgradeneeded = () => {
-      if(!req.result.objectStoreNames.contains(HANDLE_STORE)){
-        req.result.createObjectStore(HANDLE_STORE);
-      }
-    };
-    req.onsuccess = () => resolve(req.result);
-    req.onerror = () => reject(req.error);
+    if(document.querySelector(`script[src="${src}"]`)){ resolve(); return; }
+    const s = document.createElement('script');
+    s.src = src;
+    s.onload = () => resolve();
+    s.onerror = () => reject(new Error(`تعذّر تحميل ${src}`));
+    document.head.appendChild(s);
   });
 }
-
-async function idbGetHandle(key){
-  try{
-    const db = await openHandleDB();
-    return await new Promise((resolve, reject) => {
-      const tx = db.transaction(HANDLE_STORE, 'readonly');
-      const req = tx.objectStore(HANDLE_STORE).get(key);
-      req.onsuccess = () => resolve(req.result || null);
-      req.onerror = () => reject(req.error);
-    });
-  }catch(e){ return null; }
+async function ensureHandleStoreLoaded(){
+  if(typeof getHandle === 'undefined'){
+    await loadScriptOnce('/static/handle-store.js');
+  }
 }
 
-async function idbSetHandle(key, handle){
+/* مجلد الأرشيف الجذري: المرجع الوحيد له هو شاشة "تهيئة مسارات النظام"
+   (مفتاح "archiveFolder" المشترك عبر handle-store.js) — هذه الشاشة لا
+   تفتح منتقي مجلد خاص بها إطلاقاً ولا تحتفظ بمخزن IndexedDB منفصل، حتى
+   لا يتفرّع مرجعان مختلفان لنفس المجلد عبر شاشات النظام */
+(async function showSavedArchiveRootLabel(){
   try{
-    const db = await openHandleDB();
-    await new Promise((resolve, reject) => {
-      const tx = db.transaction(HANDLE_STORE, 'readwrite');
-      tx.objectStore(HANDLE_STORE).put(handle, key);
-      tx.oncomplete = () => resolve();
-      tx.onerror = () => reject(tx.error);
-    });
-  }catch(e){ console.warn('تعذّر حفظ صلاحية مجلد الأرشيف:', e); }
-}
-
-/* عند فتح الصفحة: حاول استعادة مجلد الأرشيف بصمت (بدون أي نافذة) إن كانت الصلاحية لا تزال سارية */
-(async function restoreArchiveRootSilently(){
-  const saved = await idbGetHandle(ARCHIVE_ROOT_KEY);
-  if(!saved) return;
-  try{
-    const perm = await saved.queryPermission({mode:'readwrite'});
-    if(perm === 'granted'){
-      archiveRootHandle = saved;
-      $('archiveRootLabel').textContent = 'مجلد الأرشيف: ' + saved.name;
-    } else {
-      $('archiveRootLabel').textContent = 'مجلد الأرشيف محفوظ (' + saved.name + ') — يحتاج تأكيداً عند أول ترحيل';
-    }
-  }catch(e){ /* الصلاحية انتهت أو المجلد لم يعد متاحاً — سيُطلب اختياره من جديد عند الحاجة */ }
+    await ensureHandleStoreLoaded();
+    const handle = await getHandle('archiveFolder');
+    if(handle) $('archiveRootLabel').textContent = 'مجلد الأرشيف (من شاشة المسارات): ' + handle.name;
+  }catch(e){ /* تجاهل — سيُعاد المحاولة عند أول ترحيل فعلي */ }
 })();
 
 async function getArchiveRootHandle(){
+  await ensureHandleStoreLoaded();
+
   if(archiveRootHandle){
-    const perm = await archiveRootHandle.queryPermission({mode:'readwrite'});
+    const perm = await checkHandlePermission(archiveRootHandle, 'readwrite');
     if(perm === 'granted') return archiveRootHandle;
-    // الصلاحية تحتاج تأكيداً فقط (نفس المجلد المحفوظ) — لا حاجة لإعادة التصفح الكامل
-    const reconfirm = await archiveRootHandle.requestPermission({mode:'readwrite'});
-    if(reconfirm === 'granted'){
-      $('archiveRootLabel').textContent = 'مجلد الأرشيف: ' + archiveRootHandle.name;
-      return archiveRootHandle;
-    }
   }
 
-  const savedHandle = await idbGetHandle(ARCHIVE_ROOT_KEY);
-  if(savedHandle){
-    try{
-      const perm = await savedHandle.requestPermission({mode:'readwrite'});
-      if(perm === 'granted'){
-        archiveRootHandle = savedHandle;
-        $('archiveRootLabel').textContent = 'مجلد الأرشيف: ' + savedHandle.name;
-        return archiveRootHandle;
-      }
-    }catch(e){ /* المجلد لم يعد متاحاً — ننتقل لاختيار مجلد جديد */ }
+  const saved = await getHandle('archiveFolder');
+  if(!saved){
+    throw new Error('لم يتم تحديد "مجلد الأرشيف الفعلي" بعد — اذهب لشاشة "تهيئة مسارات النظام" واختره من هناك أولاً');
   }
 
-  toast('اختر مجلد الأرشيف الجذري (storage_secure) للمتابعة');
-  archiveRootHandle = await window.showDirectoryPicker();
-  const perm = await archiveRootHandle.requestPermission({mode:'readwrite'});
-  if(perm !== 'granted'){
-    archiveRootHandle = null;
-    throw new Error('لم يتم منح صلاحية الكتابة على مجلد الأرشيف');
+  const perm = await checkHandlePermission(saved, 'readwrite');
+  if(perm === 'granted'){
+    archiveRootHandle = saved;
+    $('archiveRootLabel').textContent = 'مجلد الأرشيف (من شاشة المسارات): ' + saved.name;
+    return archiveRootHandle;
   }
-  await idbSetHandle(ARCHIVE_ROOT_KEY, archiveRootHandle);
-  $('archiveRootLabel').textContent = 'مجلد الأرشيف: ' + archiveRootHandle.name;
-  return archiveRootHandle;
+
+  const reconfirm = await requestHandlePermission(saved, 'readwrite');
+  if(reconfirm === 'granted'){
+    archiveRootHandle = saved;
+    $('archiveRootLabel').textContent = 'مجلد الأرشيف (من شاشة المسارات): ' + saved.name;
+    return archiveRootHandle;
+  }
+
+  throw new Error('لم تُمنح صلاحية الكتابة على مجلد الأرشيف المحفوظ من شاشة "تهيئة مسارات النظام" — أعد تأكيدها من هناك');
 }
 
 function toast(msg, type=''){
@@ -967,6 +940,8 @@ $('bulkMigrateBtn').addEventListener('click', async ()=>{
 
   renderTable();
   updateBulkBar();
+  lastBulkMigrateReport = report;
+  showLastMigrateReportBtn();
   showReport(report);
 });
 
@@ -1412,6 +1387,16 @@ function showReport(report){
     || '<div class="report-row">لا توجد نتائج</div>';
   $('reportOverlay').classList.add('show');
 }
+
+/* الزر الثابت أسفل الصفحة للرجوع لآخر تقرير ترحيل جماعي بعد إغلاقه —
+   يبقى ظاهراً بغض النظر عن وجود تحديد حالي، ويفتح نفس التقرير من جديد */
+function showLastMigrateReportBtn(){
+  const btn = $('lastMigrateReportBtn');
+  if(lastBulkMigrateReport) btn.style.display = 'inline-flex';
+}
+$('lastMigrateReportBtn').addEventListener('click', () => {
+  if(lastBulkMigrateReport) showReport(lastBulkMigrateReport);
+});
 
 /* ---------------- Modal close helpers ---------------- */
 
