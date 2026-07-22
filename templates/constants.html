@@ -788,6 +788,9 @@
 
             const protectedCols = [cols[0], cols[1]].filter(c => c !== undefined);
 
+            let changed = false;
+            const addedCols = [];
+
             // خريطة: رمز نوع الوثيقة → اسم العمود المطابق له فعلياً في الإكسل (إن وُجد)
             const codeToColumn = {};
             Object.values(systemDocuments).forEach(doc => {
@@ -796,17 +799,41 @@
                 const match = cols.find(c => String(c).trim().toUpperCase() === code && !protectedCols.includes(c));
                 if (match) codeToColumn[code] = match;
             });
-            // نسبة التسليم تُحسب فقط بناءً على أنواع الوثائق الإلزامية التي لها
-            // عمود فعلي موجود بالفعل بالإكسل (الأنواع الإلزامية بلا عمود بعد تُستثنى)
+
+            // 1) لكل نوع وثيقة معرَّف بالفعل (بنفس أسماء/رموز المجلدات الفرعية)
+            // بدون عمود مطابق حالياً بالإكسل، يُنشأ عمود جديد باسم الرمز
+            // (بقيمة افتراضية "لا" لكل الطلاب) — يُدرج قبل عمودي "الحالة" و
+            // "نسبة التسليم" لو كانا موجودين مسبقاً، أو في آخر الجدول غير ذلك
+            const perTypeAddedCols = [];
+            Object.values(systemDocuments).forEach(doc => {
+                const code = (doc.code || '').toUpperCase();
+                if (!code || codeToColumn[code]) return;
+
+                let colName = code;
+                let n = 2;
+                while (cols.includes(colName)) { colName = `${code}_${n}`; n++; }
+
+                const statusIdx = cols.indexOf(STATUS_COL_NAME);
+                const deliveryIdx = cols.indexOf(DELIVERY_COL_NAME);
+                const reservedIdxs = [statusIdx, deliveryIdx].filter(i => i !== -1);
+                const insertAt = reservedIdxs.length ? Math.min(...reservedIdxs) : cols.length;
+
+                cols.splice(insertAt, 0, colName);
+                rows.forEach(r => { r[colName] = 'لا'; });
+                codeToColumn[code] = colName;
+                perTypeAddedCols.push(colName);
+                changed = true;
+            });
+            addedCols.push(...perTypeAddedCols);
+
+            // نسبة التسليم تُحسب بناءً على أنواع الوثائق الإلزامية التي أصبح
+            // لها الآن عمود فعلي بالإكسل (سواء كان موجوداً مسبقاً أو أُنشئ للتو)
             const mandatoryCols = Object.entries(codeToColumn)
                 .filter(([code]) => {
                     const doc = Object.values(systemDocuments).find(d => (d.code || '').toUpperCase() === code);
                     return doc && doc.required;
                 })
                 .map(([, col]) => col);
-
-            let changed = false;
-            const addedCols = [];
 
             if (!cols.includes(STATUS_COL_NAME)) {
                 cols.push(STATUS_COL_NAME);
@@ -829,7 +856,7 @@
             }
 
             if (!changed) {
-                return `أعمدة "الحالة" و"نسبة التسليم" موجودتان بالفعل في الإكسل — لم يتم لمسهما. (تفصيل للتأكد: الصفحة المستخدمة "${sheetName}"، صف العناوين رقم ${headerRowIdx + 1}، عدد الأعمدة المكتشفة ${cols.length}).`;
+                return `أعمدة أنواع الوثائق و"الحالة"/"نسبة التسليم" موجودة بالفعل في الإكسل — لم يتم لمس أي شيء. (تفصيل للتأكد: الصفحة المستخدمة "${sheetName}"، صف العناوين رقم ${headerRowIdx + 1}، عدد الأعمدة المكتشفة ${cols.length}).`;
             }
 
             // إعادة بناء الورقة، مع الحفاظ على صفوف البانر والنوع النصي للأعمدة المحمية
