@@ -580,16 +580,23 @@
 
             try {
                 await ensureSyncDependenciesLoaded();
+
+                if (statusEl) statusEl.textContent = 'جارٍ إنشاء/التأكد من مجلدات أنواع الوثائق...';
+                const createdFolders = await syncDocTypesToFolders();
+
                 if (statusEl) statusEl.textContent = 'جارٍ فحص مجلدات الأرشيف...';
                 const addedTypes = await syncFoldersToDocTypes();
 
                 if (statusEl) statusEl.textContent = 'جارٍ مزامنة أعمدة الإكسل...';
                 const excelMsg = await syncExcelStatusColumns();
 
+                const createdFoldersMsg = createdFolders.length
+                    ? `تم إنشاء ${createdFolders.length} مجلد فعلي جديد لأنواع وثائق كانت بدون مجلد (${createdFolders.join('، ')}). `
+                    : '';
                 const foldersMsg = addedTypes.length
                     ? `تمت إضافة ${addedTypes.length} نوع وثيقة جديد من مجلدات غير معرّفة (${addedTypes.join('، ')}) بقيم افتراضية — عدّلها يدوياً حسب الحاجة.`
                     : 'لا توجد مجلدات فرعية جديدة غير معرّفة كأنواع وثائق.';
-                const fullMsg = `✅ ${foldersMsg} ${excelMsg}`;
+                const fullMsg = `✅ ${createdFoldersMsg}${foldersMsg} ${excelMsg}`;
 
                 showAlert(fullMsg, true);
                 if (statusEl) { statusEl.textContent = fullMsg; statusEl.className = 'text-[10px] text-emerald-600 font-bold px-1'; }
@@ -605,7 +612,24 @@
             }
         }
 
-        // 1) فحص المجلدات الفرعية داخل مجلد الأرشيف الرئيسي وإضافة أي مجلد
+        // 1) لكل نوع وثيقة معرَّف بالفعل في doc_types.json، تتأكد من وجود
+        // مجلده الفعلي (باسم الرمز/code) داخل مجلد الأرشيف، وتنشئه لو ناقص
+        async function syncDocTypesToFolders() {
+            const created = [];
+            for (const doc of Object.values(systemDocuments)) {
+                const code = (doc.code || '').trim().toUpperCase();
+                if (!code) continue;
+                try {
+                    const { existedBefore } = await ensureStorageFolder(code);
+                    if (!existedBefore) created.push(code);
+                } catch (e) {
+                    console.warn(`تعذّر التأكد من/إنشاء مجلد الرمز "${code}":`, e);
+                }
+            }
+            return created;
+        }
+
+        // 2) فحص المجلدات الفرعية داخل مجلد الأرشيف الرئيسي وإضافة أي مجلد
         // غير معرّف كنوع وثيقة (بالرمز = اسم المجلد نفسه)، بقيم افتراضية عامة
         async function syncFoldersToDocTypes() {
             const root = await getArchiveRootHandle();
