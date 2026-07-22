@@ -411,15 +411,31 @@ const $ = id => document.getElementById(id);
 
 async function loadDocTypes(){
   try{
-    const res = await fetch('/api/get-constants');
+    // بدون أي تخزين مؤقت (no-store) — تُقرأ دائماً أحدث نسخة من doc_types.json
+    // مباشرة من الخادم، حتى لو تم تعديلها للتو من شاشة "أنواع الوثائق"
+    const res = await fetch('/api/get-constants', {cache: 'no-store'});
     const data = await res.json();
     if(data.success) docTypes = data.document_types || {};
     populateBulkDocTypeSelect();
+    // تحديث القوائم المنسدلة لكل الصفوف المعروضة حالياً بالجدول أيضاً
+    // (تبقي الاختيار الحالي لو لسه نوعه موجوداً، وإلا ترجعه لحالة "— اختر —")
+    document.querySelectorAll('select.doctype-select[data-action="doctype"]').forEach(sel => {
+      const currentVal = sel.value;
+      sel.innerHTML = docTypeOptionsHtml(currentVal);
+    });
   }catch(e){
     console.warn('تعذّر جلب أنواع الوثائق:', e);
   }
 }
 loadDocTypes();
+
+// إعادة الجلب تلقائياً كل ما رجع المستخدم لهذا التبويب (بعد تعديل الأنواع
+// من شاشة "أنواع الوثائق" في تبويب آخر مثلاً) — تزامن مباشر بدل انتظار
+// إعادة تحميل الصفحة يدوياً
+document.addEventListener('visibilitychange', () => {
+  if(document.visibilityState === 'visible') loadDocTypes();
+});
+window.addEventListener('focus', () => loadDocTypes());
 
 function subfolderNameFromPath(storagePath){
   if(!storagePath) return null;
@@ -584,6 +600,7 @@ async function pickNewFolder(){
 
 $('pickFolderBtn').addEventListener('click', async () => {
   try{
+    await loadDocTypes();
     if(dirHandle){
       // مجلد مُختار بالفعل — أعد قراءته فقط لتحديث القائمة (ملفات أُضيفت/حُذفت خارجياً)
       await loadEntries();
@@ -682,7 +699,8 @@ function getFilteredEntries(){
 
 function docTypeOptionsHtml(selectedKey){
   let html = '<option value="">— اختر —</option>';
-  for(const key of Object.keys(docTypes)){
+  const sortedKeys = Object.keys(docTypes).sort((a, b) => (Number(docTypes[a]?.order) || 0) - (Number(docTypes[b]?.order) || 0));
+  for(const key of sortedKeys){
     const info = docTypes[key] || {};
     const label = (info.name_ar || key).replace(/"/g,'&quot;');
     html += `<option value="${key.replace(/"/g,'&quot;')}" ${key===selectedKey?'selected':''}>${label}</option>`;
