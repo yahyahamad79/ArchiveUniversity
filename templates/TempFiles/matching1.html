@@ -6,6 +6,7 @@
 <title>مطابقة وترقيم الملفات</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script src="https://cdn.tailwindcss.com"></script>
+<script src="/static/handle-store.js"></script>
 <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@300;400;600;700&display=swap" rel="stylesheet">
 <style>
   :root {
@@ -173,6 +174,21 @@
   .sheet-sel {
     margin-top: 10px;
     display: none;
+  }
+  .sheet-sel.needs-attention {
+    background: #fff8e1;
+    border: 2px solid var(--warning, #d97706);
+    border-radius: 10px;
+    padding: 10px;
+    animation: sheetPulse 1.6s ease-in-out 2;
+  }
+  .sheet-sel.needs-attention label {
+    color: var(--warning, #d97706) !important;
+    font-weight: 700 !important;
+  }
+  @keyframes sheetPulse {
+    0%, 100% { box-shadow: 0 0 0 0 rgba(217,119,6,.35); }
+    50% { box-shadow: 0 0 0 6px rgba(217,119,6,0); }
   }
 
   select,
@@ -704,24 +720,31 @@
     <div class="three-col">
       <div class="file-box" id="boxExcel">
         <label>📄 ملف الإكسل (أسماء + أرقام)</label>
-        <label for="fileExcel" class="btn" style="display:block;width:100%;text-align:center;cursor:pointer">📄 اختيار ملف</label>
+        <button type="button" class="btn" id="pickExcelBtn" style="width:100%">📄 اختيار ملف</button>
         <input type="file" id="fileExcel" accept=".xlsx,.xls,.csv" style="display:none">
         <div class="file-info" id="infoExcel">لم يتم اختيار ملف</div>
+        <div style="font-size:11px;color:var(--muted);margin-top:4px" id="savedPathExcelFile"></div>
+        <button type="button" class="btn btn-ghost" id="reconnectExcelFile" style="display:none;width:100%;margin-top:6px;font-size:12px">🔓 تأكيد الوصول للملف المحفوظ</button>
         <div class="sheet-sel" id="sheetSelExcel">
           <label style="font-size:13px;color:var(--muted);margin:8px 0 4px;display:block">اختر الورقة (Sheet):</label>
           <select id="sheetExcel"></select>
         </div>
+        <div style="font-size:11px;color:var(--found-b);background:#f0fdf4;border:1px solid #bbf7d0;border-radius:6px;padding:6px 8px;margin-top:6px;display:none" id="headerRowNote"></div>
       </div>
       <div class="file-box" id="boxFolder">
         <label>📁 المجلد (الملفات: صور، وثائق، PDF...)</label>
         <button type="button" class="btn" id="pickFolderBtn" style="width:100%">📂 اختيار المجلد</button>
         <div class="file-info" id="infoFolder">لم يتم اختيار مجلد</div>
+        <div style="font-size:11px;color:var(--muted);margin-top:4px" id="savedPathWorkspaceFolder"></div>
+        <button type="button" class="btn btn-ghost" id="reconnectWorkspaceFolder" style="display:none;width:100%;margin-top:6px;font-size:12px">🔓 تأكيد الوصول للمجلد المحفوظ</button>
         <div class="file-list" id="folderFileList"></div>
       </div>
       <div class="file-box" id="boxDestination">
         <label>🚚 مسار الوجهة (نقل الملفات المرقمة إليه)</label>
         <button type="button" class="btn" id="pickDestinationBtn" style="width:100%">📂 اختيار مسار الوجهة</button>
         <div class="file-info" id="infoDestination">لم يتم اختيار مسار (اختياري الآن)</div>
+        <div style="font-size:11px;color:var(--muted);margin-top:4px" id="savedPathArchiveFolder"></div>
+        <button type="button" class="btn btn-ghost" id="reconnectArchiveFolder" style="display:none;width:100%;margin-top:6px;font-size:12px">🔓 تأكيد الوصول لمسار الوجهة المحفوظ</button>
       </div>
     </div>
   </div>
@@ -742,6 +765,13 @@
           <label>🔢 عمود الترقيم (لإعادة التسمية):</label>
           <select id="numberColumn"></select>
           <div style="font-size:11px;color:var(--muted);margin-top:4px">سيتم استخدام هذه الأرقام لإعادة تسمية الملفات بعد المطابقة</div>
+        </div>
+        <div class="field">
+          <label>🗂️ نوع الوثيقة (لتحديث حالتها في الإكسل):</label>
+          <select id="docTypeSelect">
+            <option value="">— بدون تحديث حالة وثيقة —</option>
+          </select>
+          <div style="font-size:11px;color:var(--muted);margin-top:4px" id="docTypeColumnInfo">اختر نوع الوثيقة ليتم تحديد عمود الحالة المطابق له تلقائياً في الإكسل</div>
         </div>
       </div>
 
@@ -794,13 +824,31 @@
   <!-- الخطوة 3: النتائج -->
   <div class="step hidden" id="step3">
     <div class="step-title"><span class="step-num">3</span> النتائج</div>
+    <div style="font-size:11px;color:var(--muted);margin-bottom:10px">📌 الجدول أدناه يعرض فقط ملفات المجلد الحالي (وليس كل قاعدة بيانات الإكسل) لتحسين الأداء مع الملفات الكبيرة.</div>
 
     <div class="summary" id="summary"></div>
+
+    <div class="missing-panel" id="missingPanel" style="display:none;margin-bottom:14px">
+      <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:10px 14px">
+        <span style="font-size:13px">⚠️ يوجد <strong id="missingTotalCount">0</strong> طالب بقاعدة الإكسل بدون ملف مطابق بالمجلد الحالي (غير معروضين بالجدول الرئيسي أدناه للحفاظ على الأداء).</span>
+        <button class="btn btn-ghost" id="toggleMissingListBtn" style="font-size:12px;white-space:nowrap">👁️ عرض القائمة الكاملة</button>
+      </div>
+      <div id="missingListWrap" style="display:none;margin-top:8px;max-height:280px;overflow:auto;border:1px solid var(--line);border-radius:8px">
+        <table style="width:100%;border-collapse:collapse">
+          <thead>
+            <tr style="position:sticky;top:0;background:var(--panel)">
+              <th style="text-align:right;padding:8px;font-size:12px;color:var(--muted)">الاسم بالإكسل</th>
+              <th style="text-align:right;padding:8px;font-size:12px;color:var(--muted)">الرقم</th>
+            </tr>
+          </thead>
+          <tbody id="missingTableBody"></tbody>
+        </table>
+      </div>
+    </div>
 
     <div class="filter-row">
       <span class="filter-chip active" data-f="all">الكل</span>
       <span class="filter-chip" data-f="found">✅ موجود</span>
-      <span class="filter-chip" data-f="missing">❌ مفقود</span>
       <span class="filter-chip" data-f="extra">➕ إضافي</span>
       <span class="filter-chip" data-f="renamed">🔄 مرقّم</span>
       <input type="text" class="search-box" id="searchBox" placeholder="🔎 بحث في الأسماء...">
@@ -859,9 +907,10 @@
 
     <div class="btn-row">
       <button class="btn" id="exportBtn">📥 تصدير النتائج إلى Excel</button>
-      <button class="btn btn-ghost" id="exportMissingBtn">📋 تصدير المفقودين فقط</button>
+      <button class="btn btn-ghost" id="exportMissingBtn">📋 تصدير الملفات غير المطابقة</button>
       <button class="btn btn-ghost" id="resetBtn">🔄 مقارنة جديدة</button>
     </div>
+    <div style="font-size:12px;color:var(--muted);margin-top:6px" id="saveDocStatusInfo"></div>
   </div>
 
   <!-- نافذة تأكيد الترقيم -->
@@ -890,10 +939,10 @@
      الحالة العامة
      ============================================================ */
   const S = {
-    Excel: { wb: null, rows: [], cols: [], name: "" },
+    Excel: { wb: null, rows: [], cols: [], name: "", fileHandle: null, headerRowIdx: 0 },
     Folder: { dirHandle: null, files: [], fileMap: {} },
     Destination: { dirHandle: null },
-    results: [], // [{excelName, number, folderName, ext, path, status: 'found'|'missing'|'extra'|'renamed', newName}]
+    results: [], // [{excelName, number, folderName, ext, path, status: 'found'|'missing'|'extra'|'renamed', newName, origIndex}]
     nameColumn: "",
     numberColumn: "",
     matchMode: "exact",
@@ -901,55 +950,185 @@
     removeExt: true,
     normalize: true,
     renamedCount: 0,
-    migratedCount: 0
+    migratedCount: 0,
+    docTypes: {},        // من doc_types.json: { "شهادة ميلاد": {code:"BC", name_ar:"...", ...}, ... }
+    docTypeCode: "",      // الرمز المختار حالياً (مثل BC)
+    docStatusColumn: "",  // اسم عمود الحالة الفعلي في الإكسل المطابق لهذا الرمز
+    docStatusSaved: true, // هل آخر تحديث لحالة الوثيقة تم حفظه فعلياً في الملف الأصلي؟
+    autoCreatedColumns: {}, // { code: colName } — لتفادي إنشاء عمود جديد مكرر لنفس الرمز
+    missingItems: []       // طلاب بالإكسل بدون ملف مطابق — لا تُعرض بالجدول الرئيسي، فقط عند الطلب
   };
 
   let folderFileList = [];
 
-  // التحقق من دعم المتصفح لميزة الكتابة الفعلية على المجلد
+  // التحقق من دعم المتصفح لميزة الكتابة الفعلية على المجلد/الملف
   const SUPPORTS_FS_ACCESS = typeof window.showDirectoryPicker === 'function';
+  const SUPPORTS_FILE_FS_ACCESS = typeof window.showOpenFilePicker === 'function';
   if (!SUPPORTS_FS_ACCESS) {
     document.getElementById('infoFolder').textContent =
       '⚠️ متصفحك لا يدعم إعادة التسمية الفعلية للملفات. الرجاء استخدام Google Chrome أو Microsoft Edge على سطح المكتب.';
   }
 
   /* ============================================================
-     قراءة ملف الإكسل
+     قراءة ملف الإكسل (مع الاحتفاظ بصلاحية الحفظ المباشر إن أمكن)
      ============================================================ */
-  function readExcelFile() {
+  async function pickExcelFile() {
+    if (SUPPORTS_FILE_FS_ACCESS) {
+      let handle;
+      try {
+        [handle] = await window.showOpenFilePicker({
+          types: [{ description: 'Excel', accept: { 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet': ['.xlsx'], 'application/vnd.ms-excel': ['.xls'] } }],
+          excludeAcceptAllOption: false,
+          multiple: false
+        });
+      } catch (err) {
+        if (err.name === 'AbortError') return; // ألغى المستخدم
+        alert('تعذّر فتح ملف الإكسل: ' + err.message);
+        return;
+      }
+      const perm = await handle.requestPermission({ mode: 'readwrite' });
+      if (perm !== 'granted') {
+        alert('لم يتم منح صلاحية الحفظ المباشر على ملف الإكسل — سيتم فتحه للقراءة فقط، ولن يعمل زر "حفظ حالة الوثيقة في الملف الأصلي".');
+        S.Excel.fileHandle = null;
+      } else {
+        S.Excel.fileHandle = handle;
+        await saveHandle('excelFile', handle);
+        await saveSharedPaths({ excelFile: { name: handle.name, kind: 'file', updated_at: new Date().toISOString() } });
+      }
+      const file = await handle.getFile();
+      await processExcelFile(file);
+    } else {
+      // متصفح لا يدعم File System Access API → رجوع لطريقة اختيار ملف تقليدية (بدون حفظ مباشر)
+      document.getElementById('fileExcel').click();
+    }
+  }
+
+  async function readExcelFile() {
+    // مسار احتياطي (input تقليدي) للمتصفحات التي لا تدعم showOpenFilePicker
     const input = document.getElementById('fileExcel');
     const file = input.files[0];
     if (!file) return;
-    const info = document.getElementById('infoExcel');
-    info.textContent = 'جارٍ القراءة...';
-    info.className = 'file-info';
-    const reader = new FileReader();
-    reader.onload = e => {
-      try {
-        const wb = XLSX.read(e.target.result, { type: 'array', cellText: true, raw: false });
-        S.Excel.wb = wb;
-        S.Excel.name = file.name;
-        const sel = document.getElementById('sheetExcel');
-        sel.innerHTML = wb.SheetNames.map(n => `<option>${n}</option>`).join('');
-        document.getElementById('sheetSelExcel').style.display = wb.SheetNames.length > 1 ? 'block' : 'none';
-        loadExcelSheet();
-        info.textContent = `✓ ${file.name}`;
-        info.className = 'file-info ok';
-        document.getElementById('boxExcel').classList.add('loaded');
-      } catch (err) {
-        info.textContent = 'خطأ في قراءة الملف: ' + err.message;
-      }
-    };
-    reader.readAsArrayBuffer(file);
+    S.Excel.fileHandle = null;
+    await processExcelFile(file);
   }
 
-  function loadExcelSheet() {
+  function processExcelFile(file) {
+    return new Promise((resolve) => {
+      const info = document.getElementById('infoExcel');
+      info.textContent = 'جارٍ القراءة...';
+      info.className = 'file-info';
+      const reader = new FileReader();
+      reader.onload = e => {
+        try {
+          const wb = XLSX.read(e.target.result, { type: 'array', cellText: true, raw: false });
+          S.Excel.wb = wb;
+          S.Excel.name = file.name;
+          const sel = document.getElementById('sheetExcel');
+          sel.innerHTML = wb.SheetNames.map(n => `<option>${n}</option>`).join('');
+          const sheetSelWrap = document.getElementById('sheetSelExcel');
+          const writeNote = S.Excel.fileHandle ? ' — 💾 صلاحية الحفظ المباشر مفعّلة' : '';
+
+          if (wb.SheetNames.length > 1) {
+            // الملف يحتوي على أكثر من صفحة — لا نحمّل أي أعمدة تلقائياً حتى
+            // يختار المستخدم الصفحة الصحيحة صراحة (تجنّباً لعرض أعمدة خاطئة
+            // من صفحة افتراضية غير مقصودة، مثل لوحة معلومات بدل جدول الطلاب)
+            sheetSelWrap.style.display = 'block';
+            sheetSelWrap.classList.add('needs-attention');
+            sel.insertAdjacentHTML('afterbegin', '<option value="" disabled selected>— اختر الصفحة —</option>');
+            S.Excel.rows = [];
+            S.Excel.cols = [];
+            document.getElementById('step2').classList.add('hidden');
+            info.textContent = `✓ ${file.name}${writeNote} — يحتوي على ${wb.SheetNames.length} صفحات، اختر الصفحة الصحيحة أدناه للمتابعة ⬇️`;
+            info.className = 'file-info ok';
+            document.getElementById('boxExcel').classList.add('loaded');
+            sheetSelWrap.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          } else {
+            sheetSelWrap.style.display = 'none';
+            sheetSelWrap.classList.remove('needs-attention');
+            loadExcelSheet();
+            info.textContent = `✓ ${file.name}${writeNote}`;
+            info.className = 'file-info ok';
+            document.getElementById('boxExcel').classList.add('loaded');
+          }
+        } catch (err) {
+          info.textContent = 'خطأ في قراءة الملف: ' + err.message;
+        }
+        resolve();
+      };
+      reader.readAsArrayBuffer(file);
+    });
+  }
+
+  /* ============================================================
+     الحقلان الأساسيان المحميان في ملف قاعدة البيانات (الإكسل)
+     العمود الأول (رقم الطالب) والعمود الثاني (اسم الطالب) — بحكم موقعهما
+     دائماً (أول عمودين بالترتيب)، بغض النظر عن أي اختيار بالقوائم المنسدلة.
+     يُمنع نهائياً: الكتابة فوقهما، اختيارهما كعمود حالة وثيقة، أو تغيير
+     نوع بياناتهما (يبقيان نصّاً دائماً، حتى لو كانت القيمة أرقاماً ظاهرياً).
+     ============================================================ */
+  function getProtectedColumns() {
+    return [S.Excel.cols[0], S.Excel.cols[1]].filter(c => c !== undefined);
+  }
+
+  function isProtectedColumn(colName) {
+    return getProtectedColumns().includes(colName);
+  }
+
+  // يكتشف صف العناوين الحقيقي بدل افتراض أن الصف الأول دائماً هو العناوين —
+  // بعض الملفات تبدأ بصف عنوان/شعار مدمج (خلية واحدة فقط تحمل نصاً مثل
+  // "لوحة معلومات الطلبة") قبل صف العناوين الفعلي، ما يجعل SheetJS يولّد
+  // مفاتيح وهمية (__EMPTY, __EMPTY_1...) لبقية الأعمدة. الحل: فحص أول 15 صفاً
+  // خاماً واختيار الصف الذي يحوي أكبر عدد من الخلايا غير الفارغة كصف عناوين.
+  function detectHeaderRowIndex(ws) {
+    const raw = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '', raw: false, blankrows: false });
+    let bestIdx = 0, bestCount = -1;
+    for (let i = 0; i < Math.min(raw.length, 15); i++) {
+      const nonEmpty = (raw[i] || []).filter(c => String(c).trim() !== '').length;
+      if (nonEmpty > bestCount) { bestCount = nonEmpty; bestIdx = i; }
+    }
+    return bestIdx;
+  }
+
+  function loadExcelSheet(headerRowOverride) {
     const sheetName = document.getElementById('sheetExcel').value || S.Excel.wb.SheetNames[0];
     const ws = S.Excel.wb.Sheets[sheetName];
-    const json = XLSX.utils.sheet_to_json(ws, { defval: '', raw: false, rawNumbers: false });
+
+    const headerRowIdx = (typeof headerRowOverride === 'number')
+      ? headerRowOverride
+      : detectHeaderRowIndex(ws);
+
+    const json = XLSX.utils.sheet_to_json(ws, { range: headerRowIdx, defval: '', raw: false, rawNumbers: false });
     S.Excel.rows = json;
     S.Excel.cols = json.length ? Object.keys(json[0]) : [];
+    S.Excel.headerRowIdx = headerRowIdx;
+    S.autoCreatedColumns = {};
+
+    // تنبيه المستخدم فقط لو تم تجاوز صف/أكثر (سلوك غير معتاد يستحق التوضيح)،
+    // مع إتاحة تصحيح الصف يدوياً لو أخطأ الاكتشاف التلقائي
+    const headerNote = document.getElementById('headerRowNote');
+    if (headerRowIdx > 0) {
+      headerNote.style.display = 'block';
+      headerNote.innerHTML = `ℹ️ تم تجاوز ${headerRowIdx} صف/صفوف غير صالحة كعناوين (مثل عنوان أو شعار)، واعتُبر الصف رقم ${headerRowIdx + 1} صف العناوين الفعلي. إذا كان هذا غير صحيح: <input type="number" id="headerRowManualInput" min="1" value="${headerRowIdx + 1}" style="width:60px;padding:2px 4px;margin:0 4px"><button type="button" class="btn btn-ghost" id="headerRowManualBtn" style="padding:3px 10px;font-size:11px">تحديث</button>`;
+      document.getElementById('headerRowManualBtn').onclick = () => {
+        const v = parseInt(document.getElementById('headerRowManualInput').value, 10);
+        if (v && v >= 1) loadExcelSheet(v - 1);
+      };
+    } else {
+      headerNote.style.display = 'none';
+      headerNote.innerHTML = '';
+    }
+
+    // فرض النوع النصي على العمودين المحميين (رقم الطالب + اسم الطالب) فور
+    // القراءة، لمنع أي تحويل ضمني لرقم (وفقدان أصفار بادئة مثلاً)
+    const protectedCols = getProtectedColumns();
+    for (const row of S.Excel.rows) {
+      for (const col of protectedCols) {
+        if (col in row) row[col] = String(row[col]);
+      }
+    }
+
     updateColumnSelects();
+    onDocTypeChange();
     checkReady();
   }
 
@@ -966,12 +1145,136 @@
     }
   }
 
+  /* ============================================================
+     نوع الوثيقة (من doc_types.json) وتحديد عمود الحالة تلقائياً
+     ============================================================ */
+  async function loadDocTypes() {
+    const sel = document.getElementById('docTypeSelect');
+    try {
+      const res = await fetch('/api/get-constants');
+      const data = await res.json();
+      if (!data.success) throw new Error(data.message || 'فشل تحميل الثوابت');
+      S.docTypes = data.document_types || {};
+      const entries = Object.values(S.docTypes).sort((a, b) => (a.order || 0) - (b.order || 0));
+      sel.innerHTML = '<option value="">— بدون تحديث حالة وثيقة —</option>' +
+        entries.map(d => `<option value="${esc(d.code)}">${esc(d.name_ar || d.code)} (${esc(d.code)})</option>`).join('');
+    } catch (err) {
+      document.getElementById('docTypeColumnInfo').textContent = '⚠️ تعذّر تحميل أنواع الوثائق من doc_types.json: ' + err.message;
+    }
+  }
+
+  /* ============================================================
+     إنشاء عمود جديد وآمن لحالة نوع الوثيقة (عند عدم وجود عمود مطابق آمن)
+     يُدرج قبل آخر عمودين في الإكسل (نسبة الاكتمال، حالة الملف)، بقيمة
+     افتراضية "لا" لكل الصفوف. إذا كان اسم الرمز نفسه مستخدَماً أصلاً لعمود
+     آخر (تصادم أسماء)، يُختار اسم بديل فريد تلقائياً (مثل ID_2, ID_3...)
+     بدل الاصطدام بعمود موجود — هذا بالضبط ما تسبب بالخطأ السابق.
+     ============================================================ */
+  function getUniqueColumnName(code) {
+    if (!S.Excel.cols.includes(code)) return code;
+    let n = 2;
+    while (S.Excel.cols.includes(`${code}_${n}`)) n++;
+    return `${code}_${n}`;
+  }
+
+  function createDocStatusColumn(code) {
+    // إعادة استخدام نفس العمود لو سبق إنشاؤه لهذا الرمز بالجلسة الحالية (يمنع تكرار الإنشاء)
+    if (S.autoCreatedColumns[code] && S.Excel.cols.includes(S.autoCreatedColumns[code])) {
+      return S.autoCreatedColumns[code];
+    }
+    const colName = getUniqueColumnName(code);
+    const cols = S.Excel.cols;
+    const insertAt = cols.length >= 2 ? cols.length - 2 : cols.length;
+    cols.splice(insertAt, 0, colName);
+    for (const row of S.Excel.rows) {
+      if (!(colName in row)) row[colName] = 'لا';
+    }
+    S.autoCreatedColumns[code] = colName;
+    return colName;
+  }
+
+  function onDocTypeChange() {
+    const code = document.getElementById('docTypeSelect').value;
+    S.docTypeCode = code;
+    S.docStatusColumn = "";
+    S.docStatusSaved = true;
+    const infoEl = document.getElementById('docTypeColumnInfo');
+
+    if (!code) {
+      infoEl.textContent = 'اختر نوع الوثيقة ليتم تحديد عمود الحالة المطابق له تلقائياً في الإكسل';
+      infoEl.style.color = '';
+      return;
+    }
+
+    // حاجز أمان: عمود حالة الوثيقة لا يمكن أبداً أن يكون نفس عمود الاسم أو
+    // عمود الرقم/الترقيم المختارين بالخطوة 2 — حتى لو تطابق اسمه حرفياً مع
+    // رمز الوثيقة (هذا بالضبط ما سبّب استبدال رقم الطالب سابقاً بالخطأ)،
+    // وكذلك لا يمكن أبداً أن يكون أول أو ثاني عمود بالإكسل (رقم الطالب/اسمه)
+    // بغض النظر عمّا هو مختار حالياً بالقوائم المنسدلة
+    const nameCol = document.getElementById('nameColumn').value;
+    const numCol = document.getElementById('numberColumn').value;
+
+    const match = S.Excel.cols.find(c => {
+      if (String(c).trim().toUpperCase() !== code.trim().toUpperCase()) return false;
+      if (c === nameCol || c === numCol) return false;
+      if (isProtectedColumn(c)) return false;
+      return true;
+    });
+
+    if (match) {
+      S.docStatusColumn = match;
+      infoEl.innerHTML = `✅ سيتم تحديث عمود <strong>"${esc(match)}"</strong> في الإكسل إلى "نعم" لكل طالب تمت مطابقته`;
+      infoEl.style.color = 'var(--found-b)';
+    } else {
+      // لا يوجد عمود مطابق آمن → إنشاء عمود جديد تلقائياً بدل التخمين
+      const newCol = createDocStatusColumn(code);
+      S.docStatusColumn = newCol;
+      const note = newCol !== code ? ` (باسم "${esc(newCol)}" لتفادي تصادم مع عمود "${esc(code)}" موجود مسبقاً)` : '';
+      infoEl.innerHTML = `🆕 لا يوجد عمود آمن مطابق — تم إنشاء عمود جديد <strong>"${esc(newCol)}"</strong>${note} قبل عمودي "نسبة الاكتمال" و"حالة الملف"، وسيُحفظ عند تأكيد الترقيم.`;
+      infoEl.style.color = 'var(--found-b)';
+    }
+  }
+
+  document.getElementById('docTypeSelect').addEventListener('change', onDocTypeChange);
+  // إعادة التحقق من حاجز الأمان لو تغيّر عمود الاسم/الرقم بعد اختيار نوع الوثيقة
+  document.getElementById('nameColumn').addEventListener('change', () => { if (S.docTypeCode) onDocTypeChange(); });
+  document.getElementById('numberColumn').addEventListener('change', () => { if (S.docTypeCode) onDocTypeChange(); });
+  document.getElementById('pickExcelBtn').addEventListener('click', pickExcelFile);
   document.getElementById('fileExcel').addEventListener('change', readExcelFile);
-  document.getElementById('sheetExcel').addEventListener('change', loadExcelSheet);
+  document.getElementById('sheetExcel').addEventListener('change', () => {
+    document.getElementById('sheetSelExcel').classList.remove('needs-attention');
+    loadExcelSheet();
+  });
+
+  loadDocTypes();
 
   /* ============================================================
      اختيار المجلد (صلاحية قراءة وكتابة حقيقية)
      ============================================================ */
+  async function scanWorkspaceDirHandle(dirHandle) {
+    const list = [];
+    for await (const entry of dirHandle.values()) {
+      if (entry.kind === 'file') {
+        list.push({ name: entry.name });
+      }
+    }
+    return list;
+  }
+
+  // إعادة مسح صامتة لمجلد العمل الحالي (تُستدعى قبل المطابقة/الترقيم/الترحيل
+  // لضمان العمل على أحدث نسخة من الملفات على القرص في كل مرة)
+  async function rescanWorkspaceFolderSilently() {
+    if (!S.Folder.dirHandle) return;
+    try {
+      folderFileList = await scanWorkspaceDirHandle(S.Folder.dirHandle);
+      const info = document.getElementById('infoFolder');
+      info.innerHTML = `✓ تم اختيار مجلد يحتوي على <span class="count">${folderFileList.length}</span> ملف`;
+      info.className = 'file-info ok';
+    } catch (err) {
+      console.warn('تعذّرت إعادة مسح المجلد:', err);
+    }
+  }
+
   async function pickFolder() {
     if (!SUPPORTS_FS_ACCESS) {
       alert('متصفحك لا يدعم هذه الميزة. الرجاء استخدام Google Chrome أو Microsoft Edge على سطح المكتب.');
@@ -996,14 +1299,12 @@
     const info = document.getElementById('infoFolder');
     info.textContent = 'جارٍ قراءة المجلد...';
 
-    folderFileList = [];
-    for await (const entry of dirHandle.values()) {
-      if (entry.kind === 'file') {
-        folderFileList.push({ name: entry.name });
-      }
-    }
-
+    folderFileList = await scanWorkspaceDirHandle(dirHandle);
     S.Folder.dirHandle = dirHandle;
+
+    await saveHandle('workspaceFolder', dirHandle);
+    await saveSharedPaths({ workspaceFolder: { name: dirHandle.name, kind: 'directory', updated_at: new Date().toISOString() } });
+    document.getElementById('reconnectWorkspaceFolder').style.display = 'none';
 
     info.innerHTML = `✓ تم اختيار مجلد يحتوي على <span class="count">${folderFileList.length}</span> ملف`;
     info.className = 'file-info ok';
@@ -1040,6 +1341,10 @@
 
     S.Destination.dirHandle = dirHandle;
 
+    await saveHandle('archiveFolder', dirHandle);
+    await saveSharedPaths({ archiveFolder: { name: dirHandle.name, kind: 'directory', updated_at: new Date().toISOString() } });
+    document.getElementById('reconnectArchiveFolder').style.display = 'none';
+
     const info = document.getElementById('infoDestination');
     info.innerHTML = `✓ تم اختيار مسار الوجهة: <strong>${esc(dirHandle.name)}</strong>`;
     info.className = 'file-info ok';
@@ -1047,6 +1352,100 @@
   }
 
   document.getElementById('pickDestinationBtn').addEventListener('click', pickDestinationFolder);
+
+  /* ============================================================
+     استرجاع المسارات المحفوظة سابقاً (من paths.html) تلقائياً
+     ============================================================ */
+  async function restoreSavedHandles() {
+    // 1) عرض الأسماء المحفوظة على السيرفر فوراً (بغض النظر عن دعم المتصفح)
+    const shared = await fetchSharedPaths();
+    const labelMap = { excelFile: 'savedPathExcelFile', workspaceFolder: 'savedPathWorkspaceFolder', archiveFolder: 'savedPathArchiveFolder' };
+    for (const key of Object.keys(labelMap)) {
+      const el = document.getElementById(labelMap[key]);
+      if (shared[key] && shared[key].name) {
+        el.textContent = `🗂️ محفوظ من شاشة المسارات: ${shared[key].name}`;
+      }
+    }
+
+    if (!SUPPORTS_FS_ACCESS) return;
+
+    // 2) ملف الإكسل
+    const excelHandle = await getHandle('excelFile');
+    if (excelHandle) {
+      const perm = await checkHandlePermission(excelHandle, 'readwrite');
+      if (perm === 'granted') {
+        S.Excel.fileHandle = excelHandle;
+        const file = await excelHandle.getFile();
+        await processExcelFile(file);
+      } else {
+        const btn = document.getElementById('reconnectExcelFile');
+        btn.style.display = 'block';
+        btn.onclick = async () => {
+          const p = await requestHandlePermission(excelHandle, 'readwrite');
+          if (p === 'granted') {
+            S.Excel.fileHandle = excelHandle;
+            const file = await excelHandle.getFile();
+            await processExcelFile(file);
+            btn.style.display = 'none';
+          } else {
+            alert('لم يتم منح الصلاحية.');
+          }
+        };
+      }
+    }
+
+    // 3) مجلد العمل (الملفات: صور، وثائق)
+    const workspaceHandle = await getHandle('workspaceFolder');
+    if (workspaceHandle) {
+      const perm = await checkHandlePermission(workspaceHandle, 'readwrite');
+      const useIt = async () => {
+        S.Folder.dirHandle = workspaceHandle;
+        folderFileList = await scanWorkspaceDirHandle(workspaceHandle);
+        const info = document.getElementById('infoFolder');
+        info.innerHTML = `✓ تم استرجاع مجلد "${esc(workspaceHandle.name)}" ويحتوي على <span class="count">${folderFileList.length}</span> ملف`;
+        info.className = 'file-info ok';
+        document.getElementById('boxFolder').classList.add('loaded');
+        checkReady();
+      };
+      if (perm === 'granted') {
+        await useIt();
+      } else {
+        const btn = document.getElementById('reconnectWorkspaceFolder');
+        btn.style.display = 'block';
+        btn.onclick = async () => {
+          const p = await requestHandlePermission(workspaceHandle, 'readwrite');
+          if (p === 'granted') { await useIt(); btn.style.display = 'none'; }
+          else alert('لم يتم منح الصلاحية.');
+        };
+      }
+    }
+
+    // 4) مسار الوجهة
+    const archiveHandle = await getHandle('archiveFolder');
+    if (archiveHandle) {
+      const perm = await checkHandlePermission(archiveHandle, 'readwrite');
+      const useIt = () => {
+        S.Destination.dirHandle = archiveHandle;
+        const info = document.getElementById('infoDestination');
+        info.innerHTML = `✓ تم استرجاع مسار الوجهة: <strong>${esc(archiveHandle.name)}</strong>`;
+        info.className = 'file-info ok';
+        document.getElementById('boxDestination').classList.add('loaded');
+      };
+      if (perm === 'granted') {
+        useIt();
+      } else {
+        const btn = document.getElementById('reconnectArchiveFolder');
+        btn.style.display = 'block';
+        btn.onclick = async () => {
+          const p = await requestHandlePermission(archiveHandle, 'readwrite');
+          if (p === 'granted') { useIt(); btn.style.display = 'none'; }
+          else alert('لم يتم منح الصلاحية.');
+        };
+      }
+    }
+  }
+
+  restoreSavedHandles();
 
   /* ============================================================
      التحقق من الجاهزية
@@ -1131,6 +1530,9 @@
   }
 
   async function runMatch() {
+    // مزامنة صامتة لمجلد العمل قبل المطابقة، لضمان العمل على أحدث نسخة من الملفات على القرص
+    await rescanWorkspaceFolderSilently();
+
     const nameCol = document.getElementById('nameColumn').value;
     const numCol = document.getElementById('numberColumn').value;
     if (!nameCol) { alert('اختر عمود الأسماء في ملف الإكسل'); return; }
@@ -1145,10 +1547,11 @@
     S.removeExt = document.getElementById('optRemoveExt').checked;
     S.normalize = document.getElementById('optNormalize').checked;
 
-    // تحضير بيانات الإكسل
-    const excelData = S.Excel.rows.map(row => ({
+    // تحضير بيانات الإكسل (مع الاحتفاظ بالفهرس الأصلي للصف لتحديث حالة الوثيقة لاحقاً)
+    const excelData = S.Excel.rows.map((row, idx) => ({
       name: String(row[nameCol] || '').trim(),
-      number: String(row[numCol] || '').trim()
+      number: String(row[numCol] || '').trim(),
+      origIndex: idx
     })).filter(d => d.name);
 
     if (!excelData.length) { alert('لا توجد أسماء في عمود الإكسل المحدد'); return; }
@@ -1202,6 +1605,7 @@
 
     // المطابقة
     const results = [];
+    const missingItems = [];
     const usedFiles = new Set();
     const total = excelData.length;
     let processed = 0;
@@ -1289,18 +1693,26 @@
         item.number + (match ? '.' + match.ext : '') :
         '';
 
-      results.push({
-        excelName: item.name,
-        number: item.number,
-        folderName: match ? match.fullName : '',
-        ext: match ? match.ext : '',
-        path: match ? match.path : '',
-        file: match ? match.file : null,
-        status: matchType,
-        matchedKey: matchedKey,
-        newName: newName,
-        renamed: false
-      });
+      // لا تُدرج الطلاب "المفقودين" (بدون ملف مطابق) بالجدول الرئيسي — قاعدة
+      // بيانات الإكسل قد تحوي آلاف السجلات، وعرضها كاملة يُبطئ المتصفح دون
+      // فائدة عملية. تُحفظ بقائمة خفيفة منفصلة (اسم + رقم فقط) تُعرض عند الطلب.
+      if (matchType === 'missing') {
+        missingItems.push({ name: item.name, number: item.number });
+      } else {
+        results.push({
+          excelName: item.name,
+          number: item.number,
+          folderName: match ? match.fullName : '',
+          ext: match ? match.ext : '',
+          path: match ? match.path : '',
+          file: match ? match.file : null,
+          status: matchType,
+          matchedKey: matchedKey,
+          newName: newName,
+          renamed: false,
+          origIndex: item.origIndex
+        });
+      }
 
       processed++;
       if (processed % 10 === 0) {
@@ -1349,8 +1761,10 @@
 
     setProgress(100, 'اكتملت المطابقة ✓');
     S.results = results;
+    S.missingItems = missingItems;
     S.renamedCount = 0;
     S.migratedCount = 0;
+    applyDocStatusToExcelRows();
     renderResults();
     updateRenameInfo();
     document.getElementById('migrateArea').style.display = 'none';
@@ -1363,13 +1777,153 @@
   }
 
   /* ============================================================
+     تحديث حالة نوع الوثيقة في صفوف الإكسل (في الذاكرة فقط)
+     لا يمس أي عمود أو صف آخر — يضع "نعم" فقط لصفوف الطلاب الذين تمت
+     مطابقة ملفاتهم بنجاح (status === 'found')، ولا يلمس صفوف "مفقود"
+     أو "إضافي" حتى لا تُفقد بيانات كانت موجودة مسبقاً بالخطأ.
+     الحفظ الفعلي على القرص يحدث تلقائياً عند تأكيد الترقيم (وليس هنا).
+     ============================================================ */
+  function applyDocStatusToExcelRows() {
+    if (!S.docTypeCode || !S.docStatusColumn) return;
+
+    // حاجز أمان أخير (دفاع إضافي): ارفض الكتابة إطلاقاً لو تصادف أن عمود
+    // الحالة يساوي عمود الاسم أو عمود الرقم الحاليين، أو أول/ثاني عمود
+    // بالإكسل (رقم الطالب/اسمه) — مهما كان السبب
+    const nameCol = document.getElementById('nameColumn').value;
+    const numCol = document.getElementById('numberColumn').value;
+    if (S.docStatusColumn === nameCol || S.docStatusColumn === numCol || isProtectedColumn(S.docStatusColumn)) {
+      console.error('تم رفض تحديث عمود حالة الوثيقة لأنه يتطابق مع عمود محمي (رقم/اسم الطالب) — حماية من الكتابة فوق بيانات الطالب.');
+      S.docStatusColumn = '';
+      return;
+    }
+
+    let updatedCount = 0;
+    for (const r of S.results) {
+      if (r.status === 'found' && typeof r.origIndex === 'number') {
+        S.Excel.rows[r.origIndex][S.docStatusColumn] = 'نعم';
+        updatedCount++;
+      }
+    }
+    S.docStatusSaved = false;
+  }
+
+  /* ============================================================
+     حفظ التعديلات مباشرة في ملف الإكسل الأصلي (بدون تصدير ملف جديد)
+     تُستدعى تلقائياً بعد نجاح الترقيم — لا يوجد زر منفصل لها ولا نافذة
+     تأكيد إضافية، لأن ضغط "✅ تأكيد الترقيم" نفسه هو التأكيد المطلوب.
+     يعيد كتابة كل الصفوف/الأعمدة كما هي في S.Excel.rows، مع تعديل
+     عمود حالة الوثيقة المختار فقط — بقية بيانات الطالب لا تتغير.
+     ============================================================ */
+  // يفرض النوع النصي الحقيقي (t='s') وتنسيق نص ('@') على أعمدة بعينها داخل
+  // ورقة إكسل مبنية حديثاً — يمنع Excel نفسه من إعادة تفسيرها كأرقام لاحقاً
+  // (وبالتالي فقدان الأصفار البادئة) حتى لو بدت القيمة رقماً بحتاً
+  function forceTextColumnsInSheet(sheet, colNames, rows) {
+    const idxByName = {};
+    S.Excel.cols.forEach((c, i) => { idxByName[c] = i; });
+    for (const colName of colNames) {
+      const colIdx = idxByName[colName];
+      if (colIdx === undefined) continue;
+      const colLetter = XLSX.utils.encode_col(colIdx);
+      for (let r = 0; r < rows.length; r++) {
+        const addr = colLetter + (r + 2); // +2: صف العناوين رقم 1
+        const cell = sheet[addr];
+        if (cell) {
+          cell.v = String(cell.v);
+          cell.t = 's';
+          cell.z = '@';
+        }
+      }
+    }
+  }
+
+  // لو تم تجاوز صف/صفوف بانر (مثل عنوان مدمج) قبل صف العناوين الحقيقي، يجب
+  // الحفاظ عليها كما هي بالملف المحفوظ — بدل فقدانها لأن json_to_sheet يبني
+  // دائماً من الصف 1. يدمج صفوف البانر الأصلية + بيانات الجدول الجديدة بإزاحة.
+  function mergeWithOriginalBannerRows(originalWs, dataSheet, headerRowIdx) {
+    if (!headerRowIdx) return dataSheet; // لا يوجد بانر، لا حاجة لأي دمج
+    const merged = {};
+    const origRange = originalWs['!ref'] ? XLSX.utils.decode_range(originalWs['!ref']) : null;
+    if (origRange) {
+      for (let R = origRange.s.r; R < headerRowIdx; R++) {
+        for (let C = origRange.s.c; C <= origRange.e.c; C++) {
+          const addr = XLSX.utils.encode_cell({ r: R, c: C });
+          if (originalWs[addr]) merged[addr] = originalWs[addr];
+        }
+      }
+    }
+    const dataRange = dataSheet['!ref'] ? XLSX.utils.decode_range(dataSheet['!ref']) : null;
+    let maxR = headerRowIdx - 1;
+    let maxC = origRange ? origRange.e.c : 0;
+    if (dataRange) {
+      for (let R = dataRange.s.r; R <= dataRange.e.r; R++) {
+        for (let C = dataRange.s.c; C <= dataRange.e.c; C++) {
+          const srcAddr = XLSX.utils.encode_cell({ r: R, c: C });
+          if (dataSheet[srcAddr]) {
+            const dstAddr = XLSX.utils.encode_cell({ r: R + headerRowIdx, c: C });
+            merged[dstAddr] = dataSheet[srcAddr];
+          }
+        }
+      }
+      maxR = Math.max(maxR, dataRange.e.r + headerRowIdx);
+      maxC = Math.max(maxC, dataRange.e.c);
+    }
+    merged['!ref'] = XLSX.utils.encode_range({ s: { r: 0, c: 0 }, e: { r: maxR, c: maxC } });
+    if (originalWs['!merges']) merged['!merges'] = originalWs['!merges'];
+    return merged;
+  }
+
+  async function autoSaveDocStatusToOriginalFile() {
+    const info = document.getElementById('saveDocStatusInfo');
+    if (!info) return;
+
+    // لا يوجد نوع وثيقة محدد أصلاً → لا شيء لحفظه، تجاهل بصمت
+    if (!S.docTypeCode || !S.docStatusColumn) { info.textContent = ''; return; }
+
+    if (!S.Excel.fileHandle) {
+      info.textContent = '⚠️ تم تحديث حالة الوثيقة في الذاكرة، لكن تعذّر حفظها في الملف الأصلي (لا توجد صلاحية حفظ مباشر — تأكد من اختيار ملف الإكسل عبر Chrome/Edge مع منح صلاحية الحفظ).';
+      info.style.color = 'var(--warning)';
+      return;
+    }
+
+    try {
+      const sheetName = document.getElementById('sheetExcel').value || S.Excel.wb.SheetNames[0];
+      const originalWs = S.Excel.wb.Sheets[sheetName];
+
+      // إعادة بناء الورقة من S.Excel.rows الحالية (تحتوي كل الأعمدة الأصلية + التحديث)
+      let newSheet = XLSX.utils.json_to_sheet(S.Excel.rows, { header: S.Excel.cols });
+
+      // حماية إلزامية: فرض النوع النصي على العمودين المحميين (رقم الطالب واسمه)
+      // في الملف المكتوب فعلياً على القرص، بغض النظر عن أي شيء آخر
+      forceTextColumnsInSheet(newSheet, getProtectedColumns(), S.Excel.rows);
+
+      // الحفاظ على أي صف/صفوف بانر أعلى صف العناوين الفعلي (لا تُفقد أبداً)
+      newSheet = mergeWithOriginalBannerRows(originalWs, newSheet, S.Excel.headerRowIdx || 0);
+
+      S.Excel.wb.Sheets[sheetName] = newSheet;
+
+      const outArrayBuffer = XLSX.write(S.Excel.wb, { bookType: 'xlsx', type: 'array' });
+
+      const writable = await S.Excel.fileHandle.createWritable();
+      await writable.write(outArrayBuffer);
+      await writable.close();
+
+      S.docStatusSaved = true;
+      info.textContent = `✅ تم تحديث عمود "${S.docStatusColumn}" وحفظه تلقائياً في الملف الأصلي "${S.Excel.name}".`;
+      info.style.color = 'var(--found-b)';
+    } catch (err) {
+      info.textContent = '⚠️ تم تحديث حالة الوثيقة في الذاكرة، لكن فشل الحفظ التلقائي في الملف الأصلي: ' + err.message;
+      info.style.color = 'var(--warning)';
+    }
+  }
+
+  /* ============================================================
      عرض النتائج
      ============================================================ */
   function renderResults() {
     const results = S.results;
 
     const found = results.filter(r => r.status === 'found').length;
-    const missing = results.filter(r => r.status === 'missing').length;
+    const missing = S.missingItems.length;
     const extra = results.filter(r => r.status === 'extra').length;
     const renamed = results.filter(r => r.status === 'renamed').length;
 
@@ -1380,10 +1934,43 @@
       <div class="stat s-renamed"><div class="num">${renamed}</div><div class="lbl">🔄 مرقّم</div></div>
     `;
 
+    const missingPanel = document.getElementById('missingPanel');
+    if (missing > 0) {
+      document.getElementById('missingTotalCount').textContent = missing;
+      missingPanel.style.display = 'block';
+      // إخفاء القائمة التفصيلية دائماً عند مطابقة جديدة، وإفراغ الجدول لتُبنى فقط عند الطلب
+      document.getElementById('missingListWrap').style.display = 'none';
+      document.getElementById('toggleMissingListBtn').textContent = '👁️ عرض القائمة الكاملة';
+      document.getElementById('missingTableBody').innerHTML = '';
+    } else {
+      missingPanel.style.display = 'none';
+    }
+
     drawTable();
     document.getElementById('step3').classList.remove('hidden');
     document.getElementById('step3').scrollIntoView({ behavior: 'smooth' });
   }
+
+  // عرض/إخفاء قائمة الطلاب المفقودين — الجدول يُبنى فقط أول مرة يُفتح فيها
+  // (Lazy render) حتى لا يُبطئ عرض النتائج الرئيسي مهما كان عدد المفقودين كبيراً
+  document.getElementById('toggleMissingListBtn').addEventListener('click', () => {
+    const wrap = document.getElementById('missingListWrap');
+    const btn = document.getElementById('toggleMissingListBtn');
+    const isHidden = wrap.style.display === 'none';
+    if (isHidden) {
+      const tbody = document.getElementById('missingTableBody');
+      if (!tbody.children.length) {
+        tbody.innerHTML = S.missingItems.map(m =>
+          `<tr><td style="padding:6px 8px;border-top:1px solid var(--line)">${esc(m.name)}</td><td style="padding:6px 8px;border-top:1px solid var(--line)">${esc(m.number || '—')}</td></tr>`
+        ).join('');
+      }
+      wrap.style.display = 'block';
+      btn.textContent = '🙈 إخفاء القائمة';
+    } else {
+      wrap.style.display = 'none';
+      btn.textContent = '👁️ عرض القائمة الكاملة';
+    }
+  });
 
   function drawTable() {
     const filter = document.querySelector('.filter-chip.active').dataset.f;
@@ -1469,7 +2056,10 @@
   /* ============================================================
      ترقيم الملفات
      ============================================================ */
-  document.getElementById('renameBtn').addEventListener('click', () => {
+  document.getElementById('renameBtn').addEventListener('click', async () => {
+    // مزامنة صامتة لمجلد العمل قبل الترقيم
+    await rescanWorkspaceFolderSilently();
+
     const toRename = S.results.filter(r =>
       r.status === 'found' && r.number && r.folderName && !r.renamed
     );
@@ -1517,6 +2107,8 @@
     const dirHandle = S.Folder.dirHandle;
     let renamedCount = 0;
     const errors = [];
+    let activationExpired = false;
+    let processedThisRun = 0;
 
     try {
       for (const r of toRename) {
@@ -1527,14 +2119,27 @@
           continue;
         }
 
+        // بمجرد أن تنتهي صلاحية "تفعيل المستخدم" (بعد نجاح دفعة من move())،
+        // كل محاولات move() اللاحقة بنفس هذه الجلسة ستفشل حتماً — نتوقف فوراً
+        // بدل تضييع وقت بمحاولات محكوم عليها بالفشل، ونترك الباقي لضغطة جديدة
+        if (activationExpired) break;
+
         try {
           const oldHandle = await dirHandle.getFileHandle(oldName);
 
           if (typeof oldHandle.move === 'function') {
-            // الطريقة المباشرة: إعادة تسمية حقيقية بدون نسخ
-            await oldHandle.move(newName);
+            try {
+              // الطريقة المباشرة الحقيقية دائماً — بدون أي نسخ
+              await oldHandle.move(newName);
+            } catch (moveErr) {
+              // فشل أثناء التنفيذ (غالباً انتهاء تفعيل المستخدم العابر بعد
+              // معالجة عدة ملفات) — نوقف الدفعة الحالية فوراً؛ ضغطة جديدة على
+              // الزر تمنح تفعيلاً جديداً فتنجح move() مجدداً للباقي تلقائياً
+              activationExpired = true;
+              break;
+            }
           } else {
-            // بديل: نسخ المحتوى لملف جديد بالاسم الجديد ثم حذف القديم
+            // فقط لو move() غير مدعومة إطلاقاً بهذا المتصفح (وليس فشلاً طارئاً)
             const fileData = await oldHandle.getFile();
             const buffer = await fileData.arrayBuffer();
             const newHandle = await dirHandle.getFileHandle(newName, { create: true });
@@ -1552,13 +2157,20 @@
           errors.push(`${oldName} ← ${err.message}`);
         }
 
-        await sleep(20);
+        processedThisRun++;
+        // نقطة تنفّس خفيفة للواجهة فقط كل عدة ملفات (بدل تأخير كل ملف) —
+        // للاستفادة من أطول وقت ممكن ضمن نافذة التفعيل القصيرة
+        if (processedThisRun % 8 === 0) await sleep(0);
       }
 
       S.renamedCount = renamedCount;
 
+      const remaining = toRename.filter(r => !r.renamed && r.newName && r.folderName !== r.newName).length;
       const renameInfo = document.getElementById('renameInfo');
-      if (errors.length) {
+      if (activationExpired && remaining > 0) {
+        renameInfo.innerHTML = `✅ تم ترقيم <strong>${renamedCount}</strong> ملف مباشرة. ⏸️ توقفت العملية مؤقتاً بسبب قيد أمان بمتصفح Chrome (صلاحية تفعيل قصيرة تنتهي بعد عدة ملفات) — بقي <strong>${remaining}</strong> ملف. اضغط "🔄 ترقيم الملفات" مرة أخرى لإكمالهم مباشرة (بدون نسخ) بضغطة جديدة.`;
+        renameInfo.style.color = 'var(--warning)';
+      } else if (errors.length) {
         renameInfo.innerHTML = `✅ تم ترقيم <strong>${renamedCount}</strong> ملف بنجاح. ⚠️ فشل ترقيم <strong>${errors.length}</strong> ملف: ${errors.slice(0, 5).map(esc).join(' | ')}`;
         renameInfo.style.color = 'var(--warning)';
       } else {
@@ -1591,6 +2203,16 @@
       updateMigrateInfo();
     } catch (e) {
       console.error('خطأ أثناء تحديث معلومات الترحيل:', e);
+    }
+
+    // حفظ تلقائي لحالة نوع الوثيقة في ملف الإكسل الأصلي فور نجاح الترقيم —
+    // بدون زر منفصل وبدون نافذة تأكيد إضافية
+    if (renamedCount > 0) {
+      try {
+        await autoSaveDocStatusToOriginalFile();
+      } catch (e) {
+        console.error('خطأ أثناء الحفظ التلقائي لحالة الوثيقة:', e);
+      }
     }
 
     // الانتقال تلقائياً إلى قسم الترحيل عند وجود ملفات مرقّمة بانتظار النقل
@@ -1655,6 +2277,9 @@
   document.getElementById('migrateBtn').addEventListener('click', async () => {
     const migrateInfo = document.getElementById('migrateInfo');
     const migrateBtn = document.getElementById('migrateBtn');
+
+    // مزامنة صامتة لمجلد العمل قبل الترحيل
+    await rescanWorkspaceFolderSilently();
 
     if (!S.Destination.dirHandle) {
       migrateInfo.innerHTML = '⚠️ يجب اختيار مسار الوجهة أولاً من الأعلى قبل الترحيل.';
@@ -1792,29 +2417,41 @@
   });
 
   document.getElementById('exportMissingBtn').addEventListener('click', () => {
-    const missing = S.results.filter(r => r.status === 'missing');
-    if (!missing.length) { alert('لا يوجد أسماء مفقودة للتصدير'); return; }
-    const data = missing.map(r => ({
-      'الاسم المفقود': r.excelName || '',
-      'الرقم': r.number || ''
+    // "غير مطابق" هنا يقصد بها ملفات المجلد (صور/وثائق/PDF) التي لم يُعثر لها
+    // على صف مطابق بالإكسل (status === 'extra') — وليس طلاب الإكسل بلا ملف
+    const unmatchedFiles = S.results.filter(r => r.status === 'extra');
+    if (!unmatchedFiles.length) { alert('لا توجد ملفات غير مطابقة للتصدير'); return; }
+    const data = unmatchedFiles.map(r => ({
+      'اسم الملف غير المطابق': r.folderName || '',
+      'الامتداد': r.ext || ''
     }));
     const ws = XLSX.utils.json_to_sheet(data);
-    ws['!cols'] = [{ wch: 30 }, { wch: 15 }];
+    ws['!cols'] = [{ wch: 35 }, { wch: 12 }];
     const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, 'الأسماء المفقودة');
-    XLSX.writeFile(wb, 'الأسماء_المفقودة.xlsx');
+    XLSX.utils.book_append_sheet(wb, ws, 'ملفات غير مطابقة');
+    XLSX.writeFile(wb, 'ملفات_غير_مطابقة.xlsx');
   });
 
   /* ============================================================
      إعادة تعيين
      ============================================================ */
   document.getElementById('resetBtn').addEventListener('click', () => {
-    S.Excel = { wb: null, rows: [], cols: [], name: "" };
+    S.Excel = { wb: null, rows: [], cols: [], name: "", fileHandle: null, headerRowIdx: 0 };
     S.Folder = { dirHandle: null, files: [], fileMap: {} };
     S.Destination = { dirHandle: null };
     S.results = [];
     S.renamedCount = 0;
     S.migratedCount = 0;
+    S.docTypeCode = "";
+    S.docStatusColumn = "";
+    S.docStatusSaved = true;
+    S.autoCreatedColumns = {};
+    S.missingItems = [];
+
+    document.getElementById('missingPanel').style.display = 'none';
+    document.getElementById('missingListWrap').style.display = 'none';
+    document.getElementById('missingTableBody').innerHTML = '';
+    document.getElementById('toggleMissingListBtn').textContent = '👁️ عرض القائمة الكاملة';
 
     document.getElementById('fileExcel').value = '';
     document.getElementById('infoExcel').textContent = 'لم يتم اختيار ملف';
@@ -1829,9 +2466,14 @@
     document.getElementById('folderFileList').innerHTML = '';
     document.getElementById('migrateArea').style.display = 'none';
     document.getElementById('sheetSelExcel').style.display = 'none';
+    document.getElementById('sheetSelExcel').classList.remove('needs-attention');
+    document.getElementById('headerRowNote').style.display = 'none';
+    document.getElementById('headerRowNote').innerHTML = '';
     document.getElementById('sheetExcel').innerHTML = '';
     document.getElementById('nameColumn').innerHTML = '';
     document.getElementById('numberColumn').innerHTML = '';
+    document.getElementById('docTypeSelect').value = '';
+    document.getElementById('saveDocStatusInfo').textContent = '';
     document.getElementById('step2').classList.add('hidden');
     document.getElementById('step3').classList.add('hidden');
     document.getElementById('summary').innerHTML = '';
@@ -1844,7 +2486,37 @@
     const allChip = document.querySelector('.filter-chip[data-f="all"]');
     if (allChip) allChip.classList.add('active');
     folderFileList = [];
+
+    // إعادة ضبط زر تنفيذ المطابقة وشريط التقدم — كانا يبقيان معطّلَين/ظاهرَين
+    // بحالة "اكتملت المطابقة" من الجلسة السابقة لو لم يُلمسا هنا صراحة
+    const runBtn = document.getElementById('runBtn');
+    runBtn.disabled = false;
+    runBtn.style.opacity = '1';
+    document.getElementById('progressWrap').style.display = 'none';
+    document.getElementById('progressFill').style.width = '0%';
+    document.getElementById('progressPct').textContent = '0%';
+    document.getElementById('progressLabel').textContent = 'جارٍ المطابقة...';
+
+    const renameBtn = document.getElementById('renameBtn');
+    renameBtn.disabled = false;
+    renameBtn.textContent = '🔄 ترقيم الملفات';
+    const migrateBtn = document.getElementById('migrateBtn');
+    migrateBtn.disabled = false;
+    migrateBtn.textContent = '🚚 الترحيل والنقل';
+
+    // إعادة ضبط عناصر الاسترجاع التلقائي (الأسماء المحفوظة + أزرار إعادة التأكيد)
+    document.getElementById('savedPathExcelFile').textContent = '';
+    document.getElementById('savedPathWorkspaceFolder').textContent = '';
+    document.getElementById('savedPathArchiveFolder').textContent = '';
+    document.getElementById('reconnectExcelFile').style.display = 'none';
+    document.getElementById('reconnectWorkspaceFolder').style.display = 'none';
+    document.getElementById('reconnectArchiveFolder').style.display = 'none';
+
     window.scrollTo({ top: 0, behavior: 'smooth' });
+
+    // "مقارنة جديدة" يجب أن تبدو تماماً كأول دخول للشاشة — لذلك نعيد تشغيل نفس
+    // منطق الاسترجاع التلقائي من paths.html (الإكسل + المجلد + مسار الوجهة)
+    restoreSavedHandles();
   });
 
   /* ============================================================

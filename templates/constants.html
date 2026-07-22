@@ -259,7 +259,7 @@
             // بدون علم المستخدم (وهو ما كان يسبب التباساً في نتائج الزر اليدوي)
             try {
                 await ensureHandleStoreLoaded();
-                const shared = await fetchSharedPaths();
+                const shared = await fetchSharedPathsFresh();
                 if (shared && shared.archiveFolderSyncPending) {
                     await syncEverything();
                     await saveSharedPaths({ archiveFolderSyncPending: false });
@@ -553,6 +553,20 @@
             });
         }
 
+        // قراءة مباشرة وحديثة دائماً لـ paths.json (بدون أي احتمال تخزين مؤقت
+        // من المتصفح للاستجابة القديمة)، بدل الاعتماد على fetchSharedPaths()
+        // العامة التي قد لا تفرض عدم التخزين المؤقت صراحة
+        async function fetchSharedPathsFresh() {
+            try {
+                const res = await fetch('/api/get-paths', { cache: 'no-store' });
+                const data = await res.json();
+                return (data && data.success) ? (data.paths || {}) : {};
+            } catch (e) {
+                console.warn('تعذّرت قراءة paths.json مباشرة:', e);
+                return {};
+            }
+        }
+
         async function ensureXlsxLoaded() {
             if (typeof XLSX === 'undefined') {
                 await loadScriptOnce('https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js');
@@ -623,10 +637,12 @@
         }
 
         // 1) لكل نوع وثيقة معرَّف بالفعل في doc_types.json، تتأكد من وجود
-        // مجلده الفعلي (باسم الرمز/code) داخل مجلد الأرشيف، وتنشئه لو ناقص
+        // مجلده الفعلي (باسم الرمز/code) داخل مجلد الأرشيف، وتنشئه لو ناقص —
+        // بترتيب حقل "الترتيب" (order) لكل وثيقة، وليس ترتيب المفاتيح العشوائي
         async function syncDocTypesToFolders() {
             const created = [];
-            for (const doc of Object.values(systemDocuments)) {
+            const sortedDocs = Object.values(systemDocuments).sort((a, b) => (Number(a.order) || 0) - (Number(b.order) || 0));
+            for (const doc of sortedDocs) {
                 const code = (doc.code || '').trim().toUpperCase();
                 if (!code) continue;
                 try {
@@ -763,7 +779,7 @@
                 }
             }
 
-            const shared = await fetchSharedPaths();
+            const shared = await fetchSharedPathsFresh();
             const cfg = shared.excelFile || {};
             const sheetNameStored = cfg.sheetName;
             const headerRowIdxStored = typeof cfg.headerRowIdx === 'number' ? cfg.headerRowIdx : null;
@@ -773,7 +789,8 @@
             const wb = XLSX.read(buf, { type: 'array', cellText: true, raw: false });
 
             if (wb.SheetNames.length > 1 && !(sheetNameStored && wb.SheetNames.includes(sheetNameStored))) {
-                return `⚠️ ملف الإكسل يحتوي على ${wb.SheetNames.length} صفحات ولم تُعتمد صفحة محددة بعد — افتح شاشة "المسارات" واختر ملف الإكسل هناك لتحديد الصفحة الصحيحة أولاً، ثم أعد المزامنة.`;
+                return `⚠️ ملف الإكسل يحتوي على ${wb.SheetNames.length} صفحات ولم تُعتمد صفحة محددة بعد — افتح شاشة "المسارات" واختر ملف الإكسل هناك لتحديد الصفحة الصحيحة أولاً، ثم أعد المزامنة. `
+                    + `(تشخيص: الصفحة المحفوظة حالياً = ${JSON.stringify(sheetNameStored)}، صفحات الملف الفعلية = ${JSON.stringify(wb.SheetNames)}).`;
             }
             const sheetName = sheetNameStored && wb.SheetNames.includes(sheetNameStored) ? sheetNameStored : wb.SheetNames[0];
 
@@ -791,9 +808,11 @@
             let changed = false;
             const addedCols = [];
 
+            const sortedDocsForExcel = Object.values(systemDocuments).sort((a, b) => (Number(a.order) || 0) - (Number(b.order) || 0));
+
             // خريطة: رمز نوع الوثيقة → اسم العمود المطابق له فعلياً في الإكسل (إن وُجد)
             const codeToColumn = {};
-            Object.values(systemDocuments).forEach(doc => {
+            sortedDocsForExcel.forEach(doc => {
                 const code = (doc.code || '').toUpperCase();
                 if (!code) return;
                 const match = cols.find(c => String(c).trim().toUpperCase() === code && !protectedCols.includes(c));
@@ -802,10 +821,11 @@
 
             // 1) لكل نوع وثيقة معرَّف بالفعل (بنفس أسماء/رموز المجلدات الفرعية)
             // بدون عمود مطابق حالياً بالإكسل، يُنشأ عمود جديد باسم الرمز
-            // (بقيمة افتراضية "لا" لكل الطلاب) — يُدرج قبل عمودي "الحالة" و
-            // "نسبة التسليم" لو كانا موجودين مسبقاً، أو في آخر الجدول غير ذلك
+            // (بقيمة افتراضية "لا" لكل الطلاب) — بترتيب حقل "الترتيب" لكل وثيقة،
+            // ويُدرج قبل عمودي "الحالة" و"نسبة التسليم" لو كانا موجودين مسبقاً،
+            // أو في آخر الجدول غير ذلك
             const perTypeAddedCols = [];
-            Object.values(systemDocuments).forEach(doc => {
+            sortedDocsForExcel.forEach(doc => {
                 const code = (doc.code || '').toUpperCase();
                 if (!code || codeToColumn[code]) return;
 
@@ -866,9 +886,15 @@
             wb.Sheets[sheetName] = newSheet;
 
             const outArrayBuffer = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
-            const writable = await excelHandle.createWritable();
-            await writable.write(outArrayBuffer);
-            await writable.close();
+            try {
+                const writable = await excelHandle.createWritable();
+                await writable.write(outArrayBuffer);
+                await writable.close();
+            } catch (writeErr) {
+                // أشهر سبب لفشل الكتابة هو أن الملف مفتوح حالياً في برنامج آخر
+                // (مثل Microsoft Excel) — رسالة واضحة للمستخدم بدل الخطأ التقني الغامض
+                return `⚠️ تعذّر حفظ التعديلات في ملف الإكسل — الملف على الأغلب مفتوح حالياً في برنامج آخر (مثل Microsoft Excel أو WPS). أغلق الملف تماماً من أي برنامج مفتوح فيه، ثم اضغط "مزامنة شاملة" مرة أخرى. (تفاصيل تقنية: ${writeErr.message})`;
+            }
 
             return `✅ تمت إضافة عمود/أعمدة (${addedCols.join('، ')}) لملف الإكسل "${file.name}" وحفظها مباشرة في الملف الأصلي (الصفحة "${sheetName}"، صف العناوين رقم ${headerRowIdx + 1}).`;
         }
