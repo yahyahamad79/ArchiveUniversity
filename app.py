@@ -11,13 +11,28 @@ JSON_PATH = os.path.join(DB_DIR, 'doc_types.json')
 PATHS_JSON_PATH = os.path.join(DB_DIR, 'paths.json')
 
 def load_doc_types():
+    return load_full_doc_types_file().get("document_types", {})
+
+# الملف الكامل يتضمن الآن "document_types" و"ignored_codes" (الرموز المحذوفة
+# صراحة من الشاشة — تُستبعد من "مزامنة شاملة" حتى لا تُعاد من مجلدها الفعلي
+# تلقائياً، مع بقاء المجلد نفسه دون أي حذف أو لمس)
+def load_full_doc_types_file():
     if not os.path.exists(JSON_PATH):
-        return {}
+        return {"document_types": {}, "ignored_codes": []}
     try:
         with open(JSON_PATH, 'r', encoding='utf-8') as f:
-            return json.load(f).get("document_types", {})
+            data = json.load(f)
+            data.setdefault("document_types", {})
+            data.setdefault("ignored_codes", [])
+            return data
     except Exception:
-        return {}
+        return {"document_types": {}, "ignored_codes": []}
+
+def save_full_doc_types_file(data):
+    if not os.path.exists(DB_DIR):
+        os.makedirs(DB_DIR)
+    with open(JSON_PATH, 'w', encoding='utf-8') as f:
+        json.dump(data, f, ensure_ascii=False, indent=4)
 
 def load_paths():
     if not os.path.exists(PATHS_JSON_PATH):
@@ -57,8 +72,12 @@ def documents_check_screen():
 @app.route('/api/get-constants', methods=['GET'])
 def get_constants():
     try:
-        doc_types = load_doc_types()
-        return jsonify({"success": True, "document_types": doc_types})
+        full = load_full_doc_types_file()
+        return jsonify({
+            "success": True,
+            "document_types": full.get("document_types", {}),
+            "ignored_codes": full.get("ignored_codes", [])
+        })
     except Exception as e:
         return jsonify({"success": False, "message": str(e)}), 500
 
@@ -92,7 +111,9 @@ def save_constant():
         return jsonify({"success": False, "message": "اسم الوثيقة بالعربية مطلوب"}), 400
 
     try:
-        doc_types = load_doc_types()
+        full = load_full_doc_types_file()
+        doc_types = full.get("document_types", {})
+        ignored_codes = full.get("ignored_codes", [])
 
         # تعديل مع تغيير الاسم العربي (المفتاح) → احذف المفتاح القديم أولاً
         if original_name and original_name != doc_key and original_name in doc_types:
@@ -100,10 +121,15 @@ def save_constant():
 
         doc_types[doc_key] = doc_data
 
-        if not os.path.exists(DB_DIR):
-            os.makedirs(DB_DIR)
-        with open(JSON_PATH, 'w', encoding='utf-8') as f:
-            json.dump({"document_types": doc_types}, f, ensure_ascii=False, indent=4)
+        # المستخدم أعاد إنشاء/تعديل هذا النوع صراحة الآن — أزل رمزه من قائمة
+        # "المتجاهَلة" إن كان مدرجاً فيها، حتى تتعامل معه "مزامنة شاملة" بشكل طبيعي مجدداً
+        code = (doc_data.get('code') or '').strip().upper()
+        if code and code in ignored_codes:
+            ignored_codes = [c for c in ignored_codes if c != code]
+
+        full["document_types"] = doc_types
+        full["ignored_codes"] = ignored_codes
+        save_full_doc_types_file(full)
 
         return jsonify({"success": True, "message": f'تم حفظ الوثيقة "{doc_key}" بنجاح!'})
     except Exception as e:
@@ -119,18 +145,26 @@ def delete_constant():
         return jsonify({"success": False, "message": "لم يُحدَّد مفتاح الوثيقة المطلوب حذفها"}), 400
 
     try:
-        doc_types = load_doc_types()
+        full = load_full_doc_types_file()
+        doc_types = full.get("document_types", {})
+        ignored_codes = full.get("ignored_codes", [])
+
         if doc_key not in doc_types:
             return jsonify({"success": False, "message": f'الوثيقة "{doc_key}" غير موجودة أصلاً'}), 404
 
+        deleted_code = (doc_types[doc_key].get('code') or '').strip().upper()
         del doc_types[doc_key]
 
-        if not os.path.exists(DB_DIR):
-            os.makedirs(DB_DIR)
-        with open(JSON_PATH, 'w', encoding='utf-8') as f:
-            json.dump({"document_types": doc_types}, f, ensure_ascii=False, indent=4)
+        # تسجيل الرمز كـ"متجاهَل" حتى لا تُعيد "مزامنة شاملة" إنشاءه تلقائياً من
+        # مجلده الفعلي — المجلد نفسه يبقى كما هو تماماً، بلا حذف أو لمس
+        if deleted_code and deleted_code not in ignored_codes:
+            ignored_codes.append(deleted_code)
 
-        return jsonify({"success": True, "message": f'تم حذف الوثيقة "{doc_key}" بنجاح!'})
+        full["document_types"] = doc_types
+        full["ignored_codes"] = ignored_codes
+        save_full_doc_types_file(full)
+
+        return jsonify({"success": True, "message": f'تم حذف الوثيقة "{doc_key}" بنجاح!', "deleted_code": deleted_code})
     except Exception as e:
         return jsonify({"success": False, "message": str(e)}), 500
 

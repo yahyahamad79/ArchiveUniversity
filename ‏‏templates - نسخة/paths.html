@@ -1,0 +1,284 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>إعداد المسارات المحلية - نظام الأرشفة</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@300;400;600;700&display=swap" rel="stylesheet">
+    <script src="/static/handle-store.js"></script>
+    <style>
+        body { font-family: 'Cairo', sans-serif; }
+    </style>
+</head>
+<body class="bg-slate-50 min-h-screen flex flex-col justify-between">
+
+    <header class="bg-slate-900 text-white px-8 py-5 shadow-md">
+        <div class="max-w-7xl mx-auto flex justify-between items-center">
+            <div class="flex items-center gap-3">
+                <span class="text-2xl">⚙️</span>
+                <div>
+                    <h1 class="text-lg font-bold">تهيئة مسارات النظام</h1>
+                    <p class="text-xs text-slate-400">ضبط واختيار مجلدات العمل وقاعدة البيانات بسهولة</p>
+                </div>
+            </div>
+            <a href="/" class="bg-slate-800 hover:bg-slate-750 text-slate-200 text-xs font-bold px-4 py-2 rounded-lg border border-slate-700 transition">العودة للرئيسية</a>
+        </div>
+    </header>
+
+    <main class="max-w-3xl mx-auto my-10 p-8 bg-white rounded-2xl shadow-sm border border-slate-100 flex-grow w-full">
+        <h2 class="text-xl font-bold text-slate-800 mb-2 pb-3 border-b border-slate-100">📂 اختيار وتأكيد مسارات العمل</h2>
+        <p class="text-xs text-slate-500 mb-6">
+            هذه الاختيارات تُحفظ وتُستخدم تلقائياً في شاشة "المطابقة" على نفس هذا المتصفح.
+            ملاحظة: المتصفحات لا تكشف المسار الكامل الحقيقي على القرص لأي موقع ويب لأسباب أمنية —
+            يظهر هنا اسم الملف/المجلد فقط، وهذا سلوك طبيعي وليس عطلاً.
+        </p>
+
+        <div id="browserWarning" class="hidden mb-6 p-4 rounded-xl text-xs font-semibold bg-amber-50 text-amber-800 border border-amber-100">
+            ⚠️ متصفحك الحالي لا يدعم ميزة الوصول الفعلي للملفات (File System Access API).
+            الرجاء استخدام Google Chrome أو Microsoft Edge على سطح المكتب حتى تعمل هذه الشاشة وشاشة المطابقة بشكل كامل.
+        </div>
+
+        <div class="space-y-6">
+            <div class="bg-slate-50 p-5 rounded-xl border border-slate-200" id="box_workspaceFolder">
+                <label class="block text-sm font-bold text-slate-700 mb-2">1. مجلد صندوق العمل المؤقت (الملفات: صور، وثائق...):</label>
+                <div class="flex gap-2 items-center">
+                    <div class="w-full text-xs bg-white border border-slate-300 rounded-lg px-3 py-2 text-slate-800" id="name_workspaceFolder">لم يتم الاختيار بعد</div>
+                    <button onclick="pickEntry('workspaceFolder', 'directory')" class="bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold px-4 py-2 rounded-lg whitespace-nowrap transition">
+                        📁 اختر المجلد
+                    </button>
+                </div>
+                <div class="mt-2 flex justify-between items-center">
+                    <span class="text-[11px] text-slate-500">نفس المجلد المستخدم كـ"المجلد" في شاشة المطابقة.</span>
+                    <span id="badge_workspaceFolder" class="text-[10px] font-bold text-rose-600 bg-rose-50 px-2 py-0.5 rounded">غير محدد</span>
+                </div>
+            </div>
+
+            <div class="bg-slate-50 p-5 rounded-xl border border-slate-200" id="box_archiveFolder">
+                <label class="block text-sm font-bold text-slate-700 mb-2">2. مجلد الأرشيف الفعلي المستهدف (مسار الوجهة):</label>
+                <div class="flex gap-2 items-center">
+                    <div class="w-full text-xs bg-white border border-slate-300 rounded-lg px-3 py-2 text-slate-800" id="name_archiveFolder">لم يتم الاختيار بعد</div>
+                    <button onclick="pickEntry('archiveFolder', 'directory')" class="bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold px-4 py-2 rounded-lg whitespace-nowrap transition">
+                        📁 اختر المجلد
+                    </button>
+                </div>
+                <div class="mt-2 flex justify-between items-center">
+                    <span class="text-[11px] text-slate-500">نفس مجلد "مسار الوجهة" في شاشة المطابقة (لترحيل الملفات المرقمة إليه).</span>
+                    <span id="badge_archiveFolder" class="text-[10px] font-bold text-rose-600 bg-rose-50 px-2 py-0.5 rounded">غير محدد</span>
+                </div>
+            </div>
+
+            <div class="bg-slate-50 p-5 rounded-xl border border-slate-200" id="box_excelFile">
+                <label class="block text-sm font-bold text-slate-700 mb-2">3. ملف قاعدة البيانات الرئيسي (Excel):</label>
+                <div class="flex gap-2 items-center">
+                    <div class="w-full text-xs bg-white border border-slate-300 rounded-lg px-3 py-2 text-slate-800" id="name_excelFile">لم يتم الاختيار بعد</div>
+                    <button onclick="pickEntry('excelFile', 'file')" class="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold px-4 py-2 rounded-lg whitespace-nowrap transition">
+                        📊 اختر الملف
+                    </button>
+                </div>
+                <div class="mt-2 flex justify-between items-center">
+                    <span class="text-[11px] text-slate-500">نفس ملف الإكسل المستخدم في شاشة المطابقة.</span>
+                    <span id="badge_excelFile" class="text-[10px] font-bold text-rose-600 bg-rose-50 px-2 py-0.5 rounded">غير محدد</span>
+                </div>
+
+                <div id="excelSheetSelWrap" class="hidden mt-3 p-3 bg-amber-50 border-2 border-amber-400 rounded-lg">
+                    <label class="block text-xs font-bold text-amber-700 mb-1">📄 اختر الصفحة (Sheet) الصحيحة من ملف الإكسل — هذا الاختيار سيُستخدم تلقائياً في شاشتي "المطابقة" و"إدارة الثوابت":</label>
+                    <select id="excelSheetSelect" class="w-full text-xs px-3 py-2 border border-slate-300 rounded-lg outline-none"></select>
+                    <div id="excelHeaderRowNote" class="text-[11px] text-slate-600 mt-2"></div>
+                </div>
+            </div>
+
+            <div id="path_alert" class="hidden p-4 rounded-xl text-xs font-semibold"></div>
+        </div>
+    </main>
+
+    <footer class="bg-slate-900 text-slate-500 text-center py-4 border-t border-slate-800 text-xs">
+        &copy; 2026 نظام الأرشفة الذكي - جامعة القدس المفتوحة. جميع الحقوق محفوظة.
+    </footer>
+
+    <script>
+        const SUPPORTS_FS_ACCESS = typeof window.showDirectoryPicker === 'function' && typeof window.showOpenFilePicker === 'function';
+        const KEYS = ['workspaceFolder', 'archiveFolder', 'excelFile'];
+
+        window.addEventListener('DOMContentLoaded', init);
+
+        async function init() {
+            if (!SUPPORTS_FS_ACCESS) {
+                document.getElementById('browserWarning').classList.remove('hidden');
+            }
+
+            // 1) عرض الأسماء المحفوظة سلفاً على السيرفر (paths.json) — تظهر فوراً بغض النظر عن المتصفح
+            const shared = await fetchSharedPaths();
+            for (const key of KEYS) {
+                if (shared[key] && shared[key].name) {
+                    document.getElementById('name_' + key).textContent = shared[key].name;
+                }
+            }
+
+            if (!SUPPORTS_FS_ACCESS) return;
+
+            // 2) التحقق من صلاحية كل handle محفوظ فعلياً بهذا المتصفح
+            for (const key of KEYS) {
+                const handle = await getHandle(key);
+                if (!handle) {
+                    updateBadge(key, false, "غير محدد");
+                    continue;
+                }
+                const perm = await checkHandlePermission(handle, 'readwrite');
+                document.getElementById('name_' + key).textContent = handle.name;
+                if (perm === 'granted') {
+                    updateBadge(key, true, "متصل ونشط 🟢");
+                    if (key === 'excelFile') {
+                        const storedSheet = shared.excelFile && shared.excelFile.sheetName;
+                        try {
+                            await analyzeAndSaveExcelSheet(handle, storedSheet);
+                        } catch (e) {
+                            console.warn('تعذّر تحليل صفحة ملف الإكسل المسترجَع:', e);
+                        }
+                    }
+                } else {
+                    updateBadge(key, 'warn', "يحتاج إعادة تأكيد");
+                }
+            }
+        }
+
+        /* ============================================================
+           اكتشاف صف العناوين الحقيقي (نفس منطق شاشة المطابقة بالضبط) —
+           بعض الملفات تبدأ بصف عنوان/شعار مدمج قبل صف العناوين الفعلي
+           ============================================================ */
+        function detectHeaderRowIndex(ws) {
+            const raw = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '', raw: false, blankrows: false });
+            let bestIdx = 0, bestCount = -1;
+            for (let i = 0; i < Math.min(raw.length, 15); i++) {
+                const nonEmpty = (raw[i] || []).filter(c => String(c).trim() !== '').length;
+                if (nonEmpty > bestCount) { bestCount = nonEmpty; bestIdx = i; }
+            }
+            return bestIdx;
+        }
+
+        let currentExcelWb = null;
+
+        // يقرأ ملف الإكسل، ويعرض قائمة اختيار الصفحة لو أكثر من صفحة، ثم يحفظ
+        // (اسم الصفحة + رقم صف العناوين) في paths.json ليُستخدما تلقائياً
+        // في شاشتي "المطابقة" و"إدارة الثوابت" بدل تخمينهما من الصفر
+        async function analyzeAndSaveExcelSheet(handle, preSelectedSheet) {
+            const file = await handle.getFile();
+            const buf = await file.arrayBuffer();
+            currentExcelWb = XLSX.read(buf, { type: 'array', cellText: true, raw: false });
+
+            const wrap = document.getElementById('excelSheetSelWrap');
+            const sel = document.getElementById('excelSheetSelect');
+
+            if (currentExcelWb.SheetNames.length > 1) {
+                wrap.classList.remove('hidden');
+                sel.innerHTML = currentExcelWb.SheetNames.map(n => `<option value="${n}">${n}</option>`).join('');
+                const chosen = preSelectedSheet && currentExcelWb.SheetNames.includes(preSelectedSheet)
+                    ? preSelectedSheet : currentExcelWb.SheetNames[0];
+                sel.value = chosen;
+                sel.onchange = () => confirmSheetChoice(handle, sel.value);
+                await confirmSheetChoice(handle, chosen);
+            } else {
+                wrap.classList.add('hidden');
+                await confirmSheetChoice(handle, currentExcelWb.SheetNames[0]);
+            }
+        }
+
+        async function confirmSheetChoice(handle, sheetName) {
+            const ws = currentExcelWb.Sheets[sheetName];
+            const headerRowIdx = detectHeaderRowIndex(ws);
+            const note = document.getElementById('excelHeaderRowNote');
+            note.innerHTML = `صف العناوين المكتشف تلقائياً: رقم ${headerRowIdx + 1}. لو غلط: ` +
+                `<input type="number" id="excelHeaderRowManual" min="1" value="${headerRowIdx + 1}" style="width:60px;padding:2px 4px;margin:0 4px" class="border border-slate-300 rounded">` +
+                `<button type="button" id="excelHeaderRowManualBtn" class="text-indigo-600 font-bold underline">تحديث</button>`;
+            document.getElementById('excelHeaderRowManualBtn').onclick = async () => {
+                const v = parseInt(document.getElementById('excelHeaderRowManual').value, 10);
+                if (v && v >= 1) await saveExcelSheetConfig(handle, sheetName, v - 1);
+            };
+            await saveExcelSheetConfig(handle, sheetName, headerRowIdx);
+        }
+
+        async function saveExcelSheetConfig(handle, sheetName, headerRowIdx) {
+            await saveSharedPaths({
+                excelFile: {
+                    name: handle.name,
+                    kind: 'file',
+                    updated_at: new Date().toISOString(),
+                    sheetName: sheetName,
+                    headerRowIdx: headerRowIdx
+                }
+            });
+            showAlert(`تم اعتماد الصفحة "${sheetName}" وصف العناوين رقم ${headerRowIdx + 1} — سيُستخدمان تلقائياً في شاشتي "المطابقة" و"إدارة الثوابت".`, true);
+        }
+
+        async function pickEntry(key, kind) {
+            if (!SUPPORTS_FS_ACCESS) return;
+            let handle;
+            try {
+                if (kind === 'directory') {
+                    handle = await window.showDirectoryPicker({ mode: 'readwrite' });
+                } else {
+                    const opts = key === 'excelFile'
+                        ? { types: [{ description: 'Excel', accept: { 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet': ['.xlsx'], 'application/vnd.ms-excel': ['.xls'] } }] }
+                        : {};
+                    [handle] = await window.showOpenFilePicker(opts);
+                }
+            } catch (err) {
+                if (err.name === 'AbortError') return;
+                showAlert('تعذّر الاختيار: ' + err.message, false);
+                return;
+            }
+
+            const perm = await handle.requestPermission({ mode: 'readwrite' });
+            if (perm !== 'granted') {
+                showAlert('لم يتم منح صلاحية الوصول الكاملة — حاول مرة أخرى واقبل الإذن.', false);
+                return;
+            }
+
+            await saveHandle(key, handle);
+            document.getElementById('name_' + key).textContent = handle.name;
+            updateBadge(key, true, "متصل ونشط 🟢");
+
+            // مزامنة الاسم مع السيرفر (paths.json) ليظهر فوراً بأي شاشة/متصفح آخر
+            await saveSharedPaths({
+                [key]: { name: handle.name, kind: kind, updated_at: new Date().toISOString() }
+            });
+
+            if (key === 'archiveFolder') {
+                // إشارة لشاشة "إدارة الثوابت" بأن مجلد الأرشيف تغيّر، لتنفّذ
+                // مزامنة شاملة تلقائية مرة واحدة فقط عند فتحها لاحقاً
+                await saveSharedPaths({ archiveFolderSyncPending: true });
+            }
+
+            if (key === 'excelFile') {
+                // اكتشاف الصفحة وصف العناوين وحفظهما (يستبدل الحفظ العام أعلاه بنسخة أكمل تتضمنهما)
+                await analyzeAndSaveExcelSheet(handle);
+            } else {
+                showAlert(`تم اختيار "${handle.name}" وحفظ الوصول له بنجاح — سيُستخدم تلقائياً في شاشة المطابقة.`, true);
+            }
+        }
+
+        function updateBadge(key, state, text) {
+            const el = document.getElementById('badge_' + key);
+            el.innerText = text;
+            if (state === true) {
+                el.className = "text-[10px] font-bold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded";
+            } else if (state === 'warn') {
+                el.className = "text-[10px] font-bold text-amber-600 bg-amber-50 px-2 py-0.5 rounded";
+            } else {
+                el.className = "text-[10px] font-bold text-rose-600 bg-rose-50 px-2 py-0.5 rounded";
+            }
+        }
+
+        function showAlert(text, isSuccess) {
+            const el = document.getElementById('path_alert');
+            el.innerText = text;
+            el.className = `p-4 rounded-xl text-xs font-semibold block ${
+                isSuccess
+                ? 'bg-emerald-50 text-emerald-800 border border-emerald-100'
+                : 'bg-rose-50 text-rose-800 border border-rose-100'
+            }`;
+        }
+    </script>
+</body>
+</html>
