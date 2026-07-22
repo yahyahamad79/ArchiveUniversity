@@ -244,12 +244,6 @@
                 [key]: { name: handle.name, kind: kind, updated_at: new Date().toISOString() }
             });
 
-            if (key === 'archiveFolder') {
-                // إشارة لشاشة "إدارة الثوابت" بأن مجلد الأرشيف تغيّر، لتنفّذ
-                // مزامنة شاملة تلقائية مرة واحدة فقط عند فتحها لاحقاً
-                await saveSharedPaths({ archiveFolderSyncPending: true });
-            }
-
             if (key === 'excelFile') {
                 // اكتشاف الصفحة وصف العناوين وحفظهما (يستبدل الحفظ العام أعلاه بنسخة أكمل تتضمنهما)
                 await analyzeAndSaveExcelSheet(handle);

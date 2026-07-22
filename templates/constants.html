@@ -250,13 +250,23 @@
             }
         }
 
-        window.addEventListener('DOMContentLoaded', () => {
+        window.addEventListener('DOMContentLoaded', async () => {
             loadConstantsFromServer();
 
-            // مزامنة شاملة تلقائية صامتة في الخلفية عند فتح الشاشة (تلتقط أي
-            // تغيير حصل في مجلد الأرشيف من شاشة "تهيئة مسارات النظام") —
-            // لا تنتظرها ولا توقف عرض جدول الوثائق، فقط تحدّث شريط الحالة
-            syncEverything();
+            // مزامنة شاملة تلقائية — لكن فقط لو مجلد الأرشيف تغيّر فعلاً من
+            // شاشة "تهيئة مسارات النظام" (إشارة archiveFolderSyncPending)،
+            // وليس في كل مرة تُفتح فيها الشاشة — لتفادي تشغيلها صامتة ومتكررة
+            // بدون علم المستخدم (وهو ما كان يسبب التباساً في نتائج الزر اليدوي)
+            try {
+                await ensureHandleStoreLoaded();
+                const shared = await fetchSharedPaths();
+                if (shared && shared.archiveFolderSyncPending) {
+                    await syncEverything();
+                    await saveSharedPaths({ archiveFolderSyncPending: false });
+                }
+            } catch (e) {
+                console.warn('تعذّر التحقق من إشارة تغيير مجلد الأرشيف:', e);
+            }
         });
 
         // 1. جلب بيانات doc_types.json من الخادم
@@ -819,7 +829,7 @@
             }
 
             if (!changed) {
-                return 'أعمدة "الحالة" و"نسبة التسليم" موجودتان بالفعل في الإكسل — لم يتم لمسهما.';
+                return `أعمدة "الحالة" و"نسبة التسليم" موجودتان بالفعل في الإكسل — لم يتم لمسهما. (تفصيل للتأكد: الصفحة المستخدمة "${sheetName}"، صف العناوين رقم ${headerRowIdx + 1}، عدد الأعمدة المكتشفة ${cols.length}).`;
             }
 
             // إعادة بناء الورقة، مع الحفاظ على صفوف البانر والنوع النصي للأعمدة المحمية
@@ -833,7 +843,7 @@
             await writable.write(outArrayBuffer);
             await writable.close();
 
-            return `✅ تمت إضافة عمود/أعمدة (${addedCols.join('، ')}) لملف الإكسل "${file.name}" وحفظها مباشرة في الملف الأصلي.`;
+            return `✅ تمت إضافة عمود/أعمدة (${addedCols.join('، ')}) لملف الإكسل "${file.name}" وحفظها مباشرة في الملف الأصلي (الصفحة "${sheetName}"، صف العناوين رقم ${headerRowIdx + 1}).`;
         }
 
         function showAlert(text, isSuccess) {
