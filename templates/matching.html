@@ -2331,6 +2331,12 @@
       return;
     }
 
+    if (!S.docTypeCode) {
+      migrateInfo.innerHTML = '⚠️ اختيار "نوع الوثيقة" إلزامي قبل الترحيل — الملفات تُنقل داخل مجلده الفرعي المخصص ضمن مسار الوجهة.';
+      migrateInfo.style.color = 'var(--warning)';
+      return;
+    }
+
     if (!S.Folder.dirHandle) {
       migrateInfo.innerHTML = '⚠️ لم يعد المجلد المصدر متاحاً.';
       migrateInfo.style.color = 'var(--warning)';
@@ -2350,7 +2356,21 @@
     migrateInfo.style.color = 'var(--muted)';
 
     const srcDir = S.Folder.dirHandle;
-    const destDir = S.Destination.dirHandle;
+
+    // مجلد الوجهة الفعلي للترحيل هو مجلد فرعي باسم رمز نوع الوثيقة المختار
+    // (نفس اسم/رمز المجلد الذي تديره شاشة "أنواع الوثائق")، داخل مسار
+    // الوجهة الجذري المحدَّد من شاشة "المسارات" — وليس الجذر مباشرة
+    let destDir;
+    try {
+      destDir = await S.Destination.dirHandle.getDirectoryHandle(S.docTypeCode, { create: true });
+    } catch (dirErr) {
+      migrateInfo.innerHTML = `⚠️ تعذّر الوصول لمجلد نوع الوثيقة "${esc(S.docTypeCode)}" داخل مسار الوجهة (${esc(dirErr.message)}) — لم يُنقل أي ملف.`;
+      migrateInfo.style.color = 'var(--warning)';
+      migrateBtn.disabled = false;
+      migrateBtn.textContent = '🚚 الترحيل والنقل';
+      return;
+    }
+
     let migratedCount = 0;
     let renamedDueToConflict = 0;
     const errors = [];
@@ -2391,7 +2411,7 @@
       S.migratedCount = (S.migratedCount || 0) + migratedCount;
       remainingPending = S.results.filter(r => r.status === 'renamed' && !r.migrated).length;
 
-      let msg = `✅ تم نقل <strong>${migratedCount}</strong> ملف بنجاح إلى مسار الوجهة.`;
+      let msg = `✅ تم نقل <strong>${migratedCount}</strong> ملف بنجاح إلى مجلد "<strong>${esc(S.docTypeCode)}</strong>" داخل مسار الوجهة.`;
       if (renamedDueToConflict) {
         msg += ` منها <strong>${renamedDueToConflict}</strong> ملف تم تعديل اسمه (بإضافة _1, _2...) بسبب وجود اسم مطابق مسبقاً في الوجهة، مع الإبقاء على الملف القديم دون استبدال.`;
       }
