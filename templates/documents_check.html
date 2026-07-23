@@ -1277,7 +1277,11 @@ async function openPdfEditor(entry){
 
 async function renderPdfPage(){
   const page = await pdfState.pdfDocJs.getPage(pdfState.currentPage);
-  const vp = page.getViewport({scale: 1.3, rotation: pdfState.rotationDelta});
+  // page.rotate = الدوران المدمج أصلاً داخل ملف الـPDF نفسه (نفس القيمة اللي
+  // يحترمها Adobe Reader تلقائياً) — لازم يُضاف لدوران المستخدم اليدوي، مش
+  // يُتجاهل، وإلا المعاينة تختلف عن الشكل الحقيقي للملف الأصلي
+  const effectiveRotation = (page.rotate + pdfState.rotationDelta + 360) % 360;
+  const vp = page.getViewport({scale: 1.3, rotation: effectiveRotation});
   const canvas = $('pdfCanvas');
   canvas.width = vp.width; canvas.height = vp.height;
   await page.render({canvasContext: canvas.getContext('2d'), viewport: vp}).promise;
