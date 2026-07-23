@@ -1306,29 +1306,7 @@ $('pdfSaveBtn').addEventListener('click', ()=>{
 $('pdfCancelSaveBtn').addEventListener('click', ()=>{ $('pdfSaveWarn').style.display = 'none'; });
 
 $('pdfConfirmSaveBtn').addEventListener('click', async ()=>{
-  if(!pdfState){
-    toast('⚠️ لا توجد وثيقة مفتوحة حالياً للحفظ — أعد فتح الملف وحاول مرة أخرى', 'err');
-    return;
-  }
-
-  const confirmBtn = $('pdfConfirmSaveBtn');
-  const cancelBtn = $('pdfCancelSaveBtn');
-  confirmBtn.disabled = true;
-  cancelBtn.disabled = true;
-  const originalLabel = confirmBtn.textContent;
-  confirmBtn.textContent = '⏳ جارٍ الحفظ...';
-
   try{
-    // تأكيد صلاحية الكتابة صراحة قبل أي محاولة حفظ — بدل ما نفترضها موجودة
-    // ونكتشف فشلها بشكل غامض لاحقاً
-    let perm = await pdfState.entry.handle.queryPermission({mode:'readwrite'});
-    if(perm !== 'granted'){
-      perm = await pdfState.entry.handle.requestPermission({mode:'readwrite'});
-    }
-    if(perm !== 'granted'){
-      throw new Error('لم تُمنح صلاحية الكتابة على هذا الملف — أعد اختيار المجلد من جديد وامنح صلاحية الوصول الكامل');
-    }
-
     const pdfDoc = await PDFDocument.load(pdfState.originalBuf);
     const pages = pdfDoc.getPages();
     pages.forEach(p => {
@@ -1350,14 +1328,7 @@ $('pdfConfirmSaveBtn').addEventListener('click', async ()=>{
     closeModal('pdfOverlay');
     renderTable();
   }catch(e){
-    // بعض أخطاء File System Access API بترجع بدون e.message مفهوم — نضيف
-    // اسم الخطأ (e.name) دايماً حتى تظهر رسالة مفيدة مهما كان سبب الفشل
-    const detail = e.message ? e.message : '';
-    toast(`⚠️ فشل حفظ التدوير (${e.name || 'خطأ'}): ${detail}`, 'err');
-  }finally{
-    confirmBtn.disabled = false;
-    cancelBtn.disabled = false;
-    confirmBtn.textContent = originalLabel;
+    toast('فشل حفظ التدوير: '+e.message, 'err');
   }
 });
 
