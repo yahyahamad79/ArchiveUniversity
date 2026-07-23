@@ -270,10 +270,24 @@
             }
         });
 
+        // عند الرجوع لهذه الشاشة عبر زر "رجوع" بالمتصفح، بعض المتصفحات تستعيد
+        // الصفحة من الذاكرة (bfcache) بحالتها القديمة تماماً بدون إعادة تحميل
+        // فعلية — يعني DOMContentLoaded ما بيتنفّذش تاني، والبيانات المعروضة
+        // تفضل قديمة رغم إنك عدّلتها فعلياً قبل كده. هذا المستمع يلتقط هذه
+        // الحالة تحديداً (event.persisted === true) ويعيد الجلب من جديد
+        window.addEventListener('pageshow', (event) => {
+            if (event.persisted) {
+                loadConstantsFromServer();
+            }
+        });
+
         // 1. جلب بيانات doc_types.json من الخادم
         async function loadConstantsFromServer() {
             try {
-                const response = await fetch('/api/get-constants');
+                // بدون أي تخزين مؤقت (no-store) — تُقرأ دائماً أحدث نسخة فعلية
+                // من doc_types.json من الخادم مباشرة، حتى لو المتصفح خزّن نسخة
+                // قديمة من استجابة سابقة لنفس الرابط
+                const response = await fetch('/api/get-constants', { cache: 'no-store' });
                 const result = await response.json();
                 if(result.success) {
                     systemDocuments = result.document_types;
