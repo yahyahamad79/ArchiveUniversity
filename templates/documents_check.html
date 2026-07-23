@@ -497,6 +497,32 @@ async function ensureHandleStoreLoaded(){
   }catch(e){ /* تجاهل — سيُعاد المحاولة عند أول ترحيل فعلي */ }
 })();
 
+/* تحميل مجلد العمل (workspaceFolder) وعرض ملفاته تلقائياً عند فتح الشاشة،
+   طالما تم تحديده مسبقاً وبصلاحية سارية من شاشة "تهيئة مسارات النظام" —
+   بدون أي ضغط يدوي على "اختيار المجلد". لو الصلاحية تحتاج إعادة تأكيد
+   (تتطلب إيماءة مستخدم فعلية من المتصفح)، تُترك الشاشة كما هي ليختار
+   المستخدم يدوياً أو يضغط "تحديث المجلد" لإعادة المحاولة */
+(async function autoLoadWorkspaceFolder(){
+  try{
+    await ensureHandleStoreLoaded();
+    const handle = await getHandle('workspaceFolder');
+    if(!handle) return;
+
+    const perm = await handle.queryPermission({mode:'readwrite'});
+    if(perm !== 'granted'){
+      $('folderLabel').innerHTML = 'مجلد العمل محفوظ (' + handle.name + ') — اضغط "اختيار المجلد" لإعادة تأكيد الصلاحية';
+      return;
+    }
+
+    dirHandle = handle;
+    $('folderLabel').innerHTML = 'المجلد (من شاشة المسارات): <span class="folder-name">'+dirHandle.name+'</span>';
+    $('pickFolderBtn').textContent = '🔄 تحديث المجلد';
+    $('changeFolderLink').style.display = 'inline';
+    await loadDocTypes();
+    await loadEntries();
+  }catch(e){ /* تجاهل — يبقى الاختيار اليدوي متاحاً كما هو */ }
+})();
+
 async function getArchiveRootHandle(){
   await ensureHandleStoreLoaded();
 
