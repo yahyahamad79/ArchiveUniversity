@@ -1618,43 +1618,8 @@
       await sleep(20);
     }
 
-  // كلمات وصفية شائعة بتتلحق باسم الملف بعد اسم الطالب الفعلي (مش جزء من
-  // الاسم) — بتتشال من آخر الاسم فقط، مش من أي مكان فيه، لتفادي حذف أي
-  // جزء حقيقي من الاسم بالغلط
-  const STATIC_SUFFIX_WORDS = new Set([
-    'كشف', 'علامات', 'شهاده', 'مصدقه', 'عربي', 'انجليزي', 'ميلاد', 'هويه',
-    'صحيه', 'بطاقه', 'صوره', 'وثيقه', 'ملف', 'نسخه', 'اصلي', 'مصدق', 'رسمي',
-    'ثانويه', 'عامه', 'دراسي', 'درجات', 'نتيجه', 'تقرير', 'طبي', 'احتساب'
-  ].map(normalizeArabic));
-
-  // كلمات وصفية إضافية مُشتقة تلقائياً من اسم نوع الوثيقة المختار حالياً
-  // (عربي وإنجليزي) — مثلاً لو اخترت "كشف علامات" تُضاف "كشف" و"علامات"
-  // تلقائياً حتى لو مش موجودة بالقائمة الثابتة أعلاه
-  function getDynamicSuffixWords() {
-    const words = new Set();
-    const doc = Object.values(S.docTypes || {}).find(d => d.code === S.docTypeCode);
-    if (doc) {
-      [doc.name_ar, doc.name_en].forEach(label => {
-        if (!label) return;
-        normalizeArabic(label).split(' ').filter(w => w).forEach(w => words.add(w));
-      });
-    }
-    return words;
-  }
-
-  // يقص أي كلمات وصفية (ثابتة أو ديناميكية) من *آخر* الاسم فقط، طالما مطابقة،
-  // مع الإبقاء على 3 كلمات على الأقل كحد أدنى أماناً (اسم+أب+جد على الأقل)
-  function stripTrailingDescriptorWords(normalizedName) {
-    const dynamicWords = getDynamicSuffixWords();
-    const words = normalizedName.split(' ').filter(w => w);
-    while (words.length > 3 && (STATIC_SUFFIX_WORDS.has(words[words.length - 1]) || dynamicWords.has(words[words.length - 1]))) {
-      words.pop();
-    }
-    return words.join(' ');
-  }
-
-  // بناء خريطة الملفات
-  const fileMap = new Map();
+    // بناء خريطة الملفات
+    const fileMap = new Map();
     const fileMapNormalized = new Map();
 
     for (const f of filteredFiles) {
@@ -1668,16 +1633,11 @@
         const parts = name.split('.');
         ext = parts.length > 1 ? parts.pop().toLowerCase() : '';
       }
-      // تحويل الشرطة السفلية لمسافة (اسم_الطالب_كشف_علامات ← اسم الطالب كشف علامات)
-      // ثم قص أي كلمات وصفية زايدة من آخر الاسم قبل أي مقارنة
-      name = name.replace(/_/g, ' ');
-      const coreName = stripTrailingDescriptorWords(normalizeArabic(name));
-
-      const key = S.normalize ? coreName : name.trim();
+      const key = S.normalize ? normalizeArabic(name) : name.trim();
       if (!fileMap.has(key)) {
         fileMap.set(key, { fullName: f.name, ext: ext, path: f.webkitRelativePath || f.name, file: f });
       }
-      const normKey = coreName;
+      const normKey = normalizeArabic(name);
       if (!fileMapNormalized.has(normKey)) {
         fileMapNormalized.set(normKey, { fullName: f.name, ext: ext, path: f.webkitRelativePath || f.name, file: f });
       }
