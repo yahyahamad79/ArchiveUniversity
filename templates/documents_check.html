@@ -503,9 +503,10 @@ async function ensureHandleStoreLoaded(){
    (تتطلب إيماءة مستخدم فعلية من المتصفح)، تُترك الشاشة كما هي ليختار
    المستخدم يدوياً أو يضغط "تحديث المجلد" لإعادة المحاولة */
 (async function autoLoadWorkspaceFolder(){
+  let handle;
   try{
     await ensureHandleStoreLoaded();
-    const handle = await getHandle('workspaceFolder');
+    handle = await getHandle('workspaceFolder');
     if(!handle) return;
 
     const perm = await handle.queryPermission({mode:'readwrite'});
@@ -513,14 +514,26 @@ async function ensureHandleStoreLoaded(){
       $('folderLabel').innerHTML = 'مجلد العمل محفوظ (' + handle.name + ') — اضغط "اختيار المجلد" لإعادة تأكيد الصلاحية';
       return;
     }
+  }catch(e){
+    console.warn('تعذّر التحقق من مجلد العمل المحفوظ:', e);
+    return; // فشل التحقق نفسه — يبقى الاختيار اليدوي متاحاً بدون إزعاج المستخدم
+  }
 
+  // من هنا فصاعداً: الصلاحية سارية فعلاً، فأي فشل في التحميل نفسه لازم يظهر
+  // بوضوح للمستخدم بدل ما يختفي بصمت ويسيب الجدول عالقاً في حالة "جارٍ التحميل"
+  try{
     dirHandle = handle;
     $('folderLabel').innerHTML = 'المجلد (من شاشة المسارات): <span class="folder-name">'+dirHandle.name+'</span>';
     $('pickFolderBtn').textContent = '🔄 تحديث المجلد';
     $('changeFolderLink').style.display = 'inline';
     await loadDocTypes();
     await loadEntries();
-  }catch(e){ /* تجاهل — يبقى الاختيار اليدوي متاحاً كما هو */ }
+  }catch(e){
+    toast('⚠️ تعذّر تحميل ملفات مجلد العمل تلقائياً: ' + (e.message || e.name || 'خطأ غير معروف'), 'err');
+    $('loadingState').style.display = 'none';
+    $('emptyState').style.display = 'block';
+    $('emptyState').innerHTML = '<div class="big">⚠️</div><h3>تعذّر تحميل الملفات</h3><div>اضغط "تحديث المجلد" لإعادة المحاولة</div>';
+  }
 })();
 
 async function getArchiveRootHandle(){
