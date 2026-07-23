@@ -769,9 +769,9 @@
         <div class="field">
           <label>🗂️ نوع الوثيقة (لتحديث حالتها في الإكسل):</label>
           <select id="docTypeSelect">
-            <option value="">— بدون تحديث حالة وثيقة —</option>
+            <option value="" disabled selected>— اختر نوع الوثيقة (إلزامي) —</option>
           </select>
-          <div style="font-size:11px;color:var(--muted);margin-top:4px" id="docTypeColumnInfo">اختر نوع الوثيقة ليتم تحديد عمود الحالة المطابق له تلقائياً في الإكسل</div>
+          <div style="font-size:11px;color:var(--muted);margin-top:4px" id="docTypeColumnInfo">⚠️ اختيار نوع الوثيقة إلزامي — لن يعمل زر "تنفيذ المطابقة" قبل تحديده</div>
         </div>
       </div>
 
@@ -858,6 +858,7 @@
       <table id="resultTable">
         <thead>
           <tr>
+            <th style="width:40px">#</th>
             <th style="width:80px">الحالة</th>
             <th style="min-width:120px">الاسم في الإكسل</th>
             <th style="min-width:100px">الرقم</th>
@@ -1195,7 +1196,7 @@
       if (!data.success) throw new Error(data.message || 'فشل تحميل الثوابت');
       S.docTypes = data.document_types || {};
       const entries = Object.values(S.docTypes).sort((a, b) => (a.order || 0) - (b.order || 0));
-      sel.innerHTML = '<option value="">— بدون تحديث حالة وثيقة —</option>' +
+      sel.innerHTML = '<option value="" disabled selected>— اختر نوع الوثيقة (إلزامي) —</option>' +
         entries.map(d => `<option value="${esc(d.code)}">${esc(d.name_ar || d.code)} (${esc(d.code)})</option>`).join('');
     } catch (err) {
       document.getElementById('docTypeColumnInfo').textContent = '⚠️ تعذّر تحميل أنواع الوثائق من doc_types.json: ' + err.message;
@@ -1242,8 +1243,8 @@
     const infoEl = document.getElementById('docTypeColumnInfo');
 
     if (!code) {
-      infoEl.textContent = 'اختر نوع الوثيقة ليتم تحديد عمود الحالة المطابق له تلقائياً في الإكسل';
-      infoEl.style.color = '';
+      infoEl.textContent = '⚠️ اختيار نوع الوثيقة إلزامي — لن يعمل زر "تنفيذ المطابقة" قبل تحديده';
+      infoEl.style.color = 'var(--warning)';
       return;
     }
 
@@ -1578,6 +1579,7 @@
     const numCol = document.getElementById('numberColumn').value;
     if (!nameCol) { alert('اختر عمود الأسماء في ملف الإكسل'); return; }
     if (!numCol) { alert('اختر عمود الترقيم في ملف الإكسل'); return; }
+    if (!document.getElementById('docTypeSelect').value) { alert('اختيار نوع الوثيقة إلزامي — لتحديث حالتها في ملف الإكسل'); return; }
 
     S.nameColumn = nameCol;
     S.numberColumn = numCol;
@@ -2031,7 +2033,7 @@
 
     const tbody = document.querySelector('#resultTable tbody');
     if (!filtered.length) {
-      tbody.innerHTML = '<tr><td colspan="6"><div class="empty">لا توجد نتائج مطابقة للمرشّح</div></td></tr>';
+      tbody.innerHTML = '<tr><td colspan="7"><div class="empty">لا توجد نتائج مطابقة للمرشّح</div></td></tr>';
       return;
     }
 
@@ -2042,13 +2044,14 @@
       'renamed': { class: 'r-renamed', tag: 'tag-renamed', label: '🔄 مرقّم' }
     };
 
-    tbody.innerHTML = filtered.map(r => {
+    tbody.innerHTML = filtered.map((r, idx) => {
       const st = statusMap[r.status] || statusMap.missing;
       const newNameDisplay = r.newName || '—';
       const extDisplay = r.ext || '—';
       const numDisplay = r.number || '—';
       const label = r.migrated ? `${st.label} 🚚` : st.label;
       return `<tr class="${st.class}">
+        <td>${idx + 1}</td>
         <td><span class="tag ${st.tag}">${label}</span></td>
         <td>${esc(r.excelName || '—')}</td>
         <td>${esc(numDisplay)}</td>
@@ -2328,6 +2331,12 @@
       return;
     }
 
+    if (!S.docTypeCode) {
+      migrateInfo.innerHTML = '⚠️ اختيار "نوع الوثيقة" إلزامي قبل الترحيل — الملفات تُنقل داخل مجلده الفرعي المخصص ضمن مسار الوجهة.';
+      migrateInfo.style.color = 'var(--warning)';
+      return;
+    }
+
     if (!S.Folder.dirHandle) {
       migrateInfo.innerHTML = '⚠️ لم يعد المجلد المصدر متاحاً.';
       migrateInfo.style.color = 'var(--warning)';
@@ -2347,7 +2356,21 @@
     migrateInfo.style.color = 'var(--muted)';
 
     const srcDir = S.Folder.dirHandle;
-    const destDir = S.Destination.dirHandle;
+
+    // مجلد الوجهة الفعلي للترحيل هو مجلد فرعي باسم رمز نوع الوثيقة المختار
+    // (نفس اسم/رمز المجلد الذي تديره شاشة "أنواع الوثائق")، داخل مسار
+    // الوجهة الجذري المحدَّد من شاشة "المسارات" — وليس الجذر مباشرة
+    let destDir;
+    try {
+      destDir = await S.Destination.dirHandle.getDirectoryHandle(S.docTypeCode, { create: true });
+    } catch (dirErr) {
+      migrateInfo.innerHTML = `⚠️ تعذّر الوصول لمجلد نوع الوثيقة "${esc(S.docTypeCode)}" داخل مسار الوجهة (${esc(dirErr.message)}) — لم يُنقل أي ملف.`;
+      migrateInfo.style.color = 'var(--warning)';
+      migrateBtn.disabled = false;
+      migrateBtn.textContent = '🚚 الترحيل والنقل';
+      return;
+    }
+
     let migratedCount = 0;
     let renamedDueToConflict = 0;
     const errors = [];
@@ -2388,7 +2411,7 @@
       S.migratedCount = (S.migratedCount || 0) + migratedCount;
       remainingPending = S.results.filter(r => r.status === 'renamed' && !r.migrated).length;
 
-      let msg = `✅ تم نقل <strong>${migratedCount}</strong> ملف بنجاح إلى مسار الوجهة.`;
+      let msg = `✅ تم نقل <strong>${migratedCount}</strong> ملف بنجاح إلى مجلد "<strong>${esc(S.docTypeCode)}</strong>" داخل مسار الوجهة.`;
       if (renamedDueToConflict) {
         msg += ` منها <strong>${renamedDueToConflict}</strong> ملف تم تعديل اسمه (بإضافة _1, _2...) بسبب وجود اسم مطابق مسبقاً في الوجهة، مع الإبقاء على الملف القديم دون استبدال.`;
       }

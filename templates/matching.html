@@ -1698,7 +1698,10 @@
       let matchType = 'missing';
       let matchedKey = '';
 
-      const normName = S.normalize ? normalizeArabic(item.name) : item.name.trim();
+      // نفس منطق تنظيف اسم الملف (تحويل الشرطة السفلية لمسافة + قص الكلمات
+      // الوصفية الزايدة) يُطبَّق كمان على اسم الإكسل نفسه، لأن بعض الصفوف
+      // قد تحتوي على الاسم الرباعي مع كلمات زايدة بعده (مثل "... كشف علامات عربي")
+      const normName = S.normalize ? stripTrailingDescriptorWords(normalizeArabic(item.name.replace(/_/g, ' '))) : item.name.trim();
 
       if (S.matchMode === 'exact') {
         const key = S.normalize ? normName : item.name.trim();
@@ -1756,7 +1759,7 @@
             }
           }
           if (!match) {
-            const baseKey = S.normalize ? normalizeArabic(item.name) : item.name.trim();
+            const baseKey = normName;
             for (const [k, v] of fileMap) {
               if (k === baseKey && !usedFiles.has(v.fullName)) {
                 match = v;
