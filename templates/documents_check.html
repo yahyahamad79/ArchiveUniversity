@@ -507,16 +507,21 @@ async function ensureHandleStoreLoaded(){
   try{
     await ensureHandleStoreLoaded();
     handle = await getHandle('workspaceFolder');
-    if(!handle) return;
+    if(!handle){
+      toast('⚠️ لم يتم العثور على "مجلد صندوق العمل المؤقت" من شاشة المسارات — تأكد من اختياره هناك، أو استخدم "اختيار المجلد" هنا يدوياً.', 'err');
+      return;
+    }
 
     const perm = await handle.queryPermission({mode:'readwrite'});
     if(perm !== 'granted'){
       $('folderLabel').innerHTML = 'مجلد العمل محفوظ (' + handle.name + ') — اضغط "اختيار المجلد" لإعادة تأكيد الصلاحية';
+      toast('⚠️ مجلد العمل "' + handle.name + '" محفوظ لكن يحتاج إعادة تأكيد الصلاحية — اضغط "اختيار المجلد".', 'err');
       return;
     }
   }catch(e){
     console.warn('تعذّر التحقق من مجلد العمل المحفوظ:', e);
-    return; // فشل التحقق نفسه — يبقى الاختيار اليدوي متاحاً بدون إزعاج المستخدم
+    toast('⚠️ تعذّر التحقق من مجلد العمل المحفوظ: ' + (e.message || e.name || 'خطأ غير معروف'), 'err');
+    return;
   }
 
   // من هنا فصاعداً: الصلاحية سارية فعلاً، فأي فشل في التحميل نفسه لازم يظهر
