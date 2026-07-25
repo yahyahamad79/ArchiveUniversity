@@ -58,9 +58,9 @@
       "max_size_mb": 5,
       "ocr_keywords": ["رقم الجلوس ، اسم الطالب ، المعدل ، التربية والتعليم،وزارة التربية والتعليم"]
     },
-    "حسن سير وسلوك": {
-      "name_ar": "حسن سير وسلوك",
-      "name_en": "Athics\\888",
+    "مصدقة بالعربي": {
+      "name_ar": "مصدقة بالعربي  ",
+      "name_en": "Graduation Arabic",
       "code": "ATH",
       "required": false,
       "order": 8,
@@ -69,9 +69,9 @@
       "max_size_mb": 5,
       "ocr_keywords": ["وزارة الداخلة ، حسن سير وسلوك"]
     },
-    "الاحتساب": {
-      "name_ar": "الاحتساب",
-      "name_en": "ششسسaaaaaa",
+    "مصدقة بالانجليزي": {
+      "name_ar": "مصدقة بالانجليزي",
+      "name_en": "Graduation Certificate",
       "code": "QOU",
       "required": true,
       "order": 9,
