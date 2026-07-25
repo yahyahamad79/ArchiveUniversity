@@ -118,8 +118,8 @@
         <input type="text" id="searchInput" placeholder="🔎 بحث بالاسم أو الرقم الجامعي...">
         <label class="switch-label"><input type="checkbox" id="incompleteOnlyToggle"> عرض غير المكتملين فقط</label>
         <select id="sortSelect">
+          <option value="percent_desc" selected>الترتيب: نسبة التسليم (الأعلى أولاً)</option>
           <option value="percent_asc">الترتيب: نسبة التسليم (الأقل أولاً)</option>
-          <option value="percent_desc">الترتيب: نسبة التسليم (الأعلى أولاً)</option>
           <option value="number_asc">الترتيب: الرقم الجامعي</option>
           <option value="name_asc">الترتيب: الاسم</option>
         </select>
@@ -179,7 +179,7 @@ let S = {
   folderVerify: {}, // code -> Set(numbers of files actually found)
   filterIncompleteOnly: false,
   searchTerm: '',
-  sortMode: 'percent_asc'
+  sortMode: 'percent_desc'
 };
 
 function toast(msg, type=''){
