@@ -1,1 +1,11 @@
-{"paths": {}}
+{
+    "paths": {
+        "excelFile": {
+            "name": "Studs.xlsx",
+            "kind": "file",
+            "updated_at": "2026-07-25T09:13:09.381Z",
+            "sheetName": "1052",
+            "headerRowIdx": 0
+        }
+    }
+}
