@@ -28,11 +28,11 @@
   }
   *{box-sizing:border-box}
   body{margin:0;background:var(--bg);color:var(--text);font-family:'Cairo',sans-serif;}
-  header{background:linear-gradient(135deg,var(--primary-dark),var(--primary));color:#fff;padding:20px 28px;box-shadow:var(--shadow);
-    display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px}
-  header h1{margin:0;font-size:19px}
-  header p{margin:4px 0 0;font-size:12px;opacity:.85}
-  .btn{border:none;border-radius:8px;padding:9px 14px;font-family:inherit;font-size:12.5px;font-weight:700;cursor:pointer;transition:.15s;white-space:nowrap}
+  header{background:linear-gradient(135deg,var(--primary-dark),var(--primary));color:#fff;padding:12px 20px;box-shadow:var(--shadow);
+    display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px}
+  header h1{margin:0;font-size:16px}
+  header p{margin:2px 0 0;font-size:11px;opacity:.85}
+  .btn{border:none;border-radius:7px;padding:7px 12px;font-family:inherit;font-size:12px;font-weight:700;cursor:pointer;transition:.15s;white-space:nowrap}
   .btn-primary{background:var(--primary);color:#fff}
   .btn-primary:hover{background:var(--primary-dark)}
   .btn-ghost{background:var(--primary-tint);color:var(--primary-dark)}
@@ -42,30 +42,33 @@
   .btn-amber{background:var(--warning-tint);color:var(--warning);border:1px solid #FDE68A}
   .btn-amber:hover{background:#FEF3C7}
   .btn:disabled{opacity:.5;cursor:not-allowed}
-  .wrap{max-width:1500px;margin:0 auto;padding:20px}
-  .card{background:var(--panel);border:1px solid var(--border);border-radius:var(--radius);box-shadow:var(--shadow);padding:16px 18px;margin-bottom:16px}
-  .toolbar{display:flex;flex-wrap:wrap;gap:10px;align-items:center;justify-content:space-between}
-  .toolbar-group{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
-  input[type="text"], select{font-family:inherit;font-size:12.5px;padding:8px 10px;border:1px solid var(--border);border-radius:8px;outline:none}
+  .wrap{max-width:1600px;margin:0 auto;padding:12px 14px}
+  .card{background:var(--panel);border:1px solid var(--border);border-radius:10px;box-shadow:var(--shadow);padding:10px 12px;margin-bottom:10px}
+  .toolbar{display:flex;flex-wrap:wrap;gap:8px;align-items:center;justify-content:space-between}
+  .toolbar-group{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+  input[type="text"], select{font-family:inherit;font-size:12px;padding:6px 9px;border:1px solid var(--border);border-radius:7px;outline:none}
   input[type="text"]:focus, select:focus{border-color:var(--primary)}
-  .switch-label{display:flex;align-items:center;gap:6px;font-size:12.5px;color:var(--text-dim);cursor:pointer;user-select:none}
-  .stats-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin-bottom:16px}
-  .stat-box{background:var(--panel);border:1px solid var(--border);border-radius:var(--radius);box-shadow:var(--shadow);padding:14px 16px;text-align:center}
-  .stat-box .num{font-size:24px;font-weight:800;color:var(--primary-dark)}
-  .stat-box .lbl{font-size:11.5px;color:var(--text-dim);margin-top:2px}
+  #searchInput{font-size:14px;padding:10px 14px;min-width:320px;border-radius:9px;font-weight:600}
+  .switch-label{display:flex;align-items:center;gap:5px;font-size:12px;color:var(--text-dim);cursor:pointer;user-select:none}
+  .stats-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:8px;margin-bottom:10px}
+  .stat-box{background:var(--panel);border:1px solid var(--border);border-radius:10px;box-shadow:var(--shadow);padding:9px 12px;text-align:center}
+  .stat-box .num{font-size:20px;font-weight:800;color:var(--primary-dark)}
+  .stat-box .lbl{font-size:10.5px;color:var(--text-dim);margin-top:1px}
   .stat-box.success .num{color:var(--success)}
   .stat-box.danger .num{color:var(--danger)}
-  table{border-collapse:collapse;width:100%;font-size:12.5px}
-  thead th{position:sticky;top:0;background:var(--primary-tint);z-index:2;padding:8px 6px;border:1px solid var(--border);white-space:nowrap;font-size:11.5px}
+  table{border-collapse:collapse;width:100%;font-size:12px}
+  thead th{position:sticky;top:0;background:var(--primary-tint);z-index:2;padding:5px 5px;border:1px solid var(--border);white-space:nowrap;font-size:11px}
   thead th.required-col{background:#FFF1F0}
   thead th.optional-col{background:var(--primary-tint)}
-  thead th .col-head{display:flex;flex-direction:column;align-items:center;gap:3px}
-  thead th .view-folder-btn{background:#fff;border:1px solid var(--border);border-radius:6px;font-size:10px;padding:2px 6px;cursor:pointer;color:var(--primary-dark)}
+  thead th .col-head{display:flex;flex-direction:column;align-items:center;gap:2px}
+  thead th .view-folder-btn{background:#fff;border:1px solid var(--border);border-radius:5px;font-size:9.5px;padding:1px 5px;cursor:pointer;color:var(--primary-dark)}
   thead th .view-folder-btn:hover{background:var(--primary-tint)}
-  thead th.sticky-col{position:sticky;right:0;z-index:3;background:var(--primary-tint)}
-  tbody td{padding:7px 6px;border:1px solid var(--border);text-align:center;white-space:nowrap}
-  tbody td.sticky-col{position:sticky;right:0;background:#fff;text-align:right;font-weight:700;z-index:1}
-  tbody tr:nth-child(even) td.sticky-col{background:#FAFBFF}
+  thead th.sticky-num{position:sticky;right:0;z-index:4;background:var(--primary-tint)}
+  thead th.sticky-col{position:sticky;right:34px;z-index:3;background:var(--primary-tint)}
+  tbody td{padding:4px 5px;border:1px solid var(--border);text-align:center;white-space:nowrap}
+  tbody td.sticky-num{position:sticky;right:0;background:#fff;font-weight:700;z-index:2;color:var(--text-dim)}
+  tbody td.sticky-col{position:sticky;right:34px;background:#fff;text-align:right;font-weight:700;z-index:1}
+  tbody tr:nth-child(even) td.sticky-col,tbody tr:nth-child(even) td.sticky-num{background:#FAFBFF}
   .cell-yes{color:var(--success);font-weight:800}
   .cell-no{color:var(--danger);font-weight:800}
   .cell-mismatch{position:relative}
@@ -250,6 +253,16 @@ function sortedDocTypes(){
   return Object.values(systemDocuments).sort((a,b)=>(Number(a.order)||0)-(Number(b.order)||0));
 }
 
+// نفس أنواع الوثائق، لكن مرتبة بحيث تكون كل الأعمدة الإلزامية بجانب بعضها
+// أولاً، ثم الاختيارية بعدها — للعرض في المصفوفة تحديداً
+function docTypesForMatrix(){
+  return sortedDocTypes().slice().sort((a,b)=>{
+    const reqA = a.required ? 0 : 1, reqB = b.required ? 0 : 1;
+    if(reqA !== reqB) return reqA - reqB;
+    return (Number(a.order)||0)-(Number(b.order)||0);
+  });
+}
+
 /* ============================================================
    نفس منطق اكتشاف صف العناوين والحفاظ على الأعمدة المحمية،
    بنفس الأسلوب المتّبع في شاشات "المطابقة" و"إدارة الثوابت"
@@ -368,7 +381,7 @@ function renderMatrix(){
     return;
   }
 
-  const docs = sortedDocTypes();
+  const docs = docTypesForMatrix();
   const term = S.searchTerm.trim().toLowerCase();
 
   let list = S.students.filter(s=>{
@@ -398,7 +411,7 @@ function renderMatrix(){
   $('statsRow').style.display = 'grid';
 
   // رأس الجدول
-  const headCells = ['<th class="sticky-col">الطالب</th>'];
+  const headCells = ['<th class="sticky-num">#</th>', '<th class="sticky-col">الطالب</th>'];
   docs.forEach(doc=>{
     const code = (doc.code||'').toUpperCase();
     const cls = doc.required ? 'required-col' : 'optional-col';
@@ -412,7 +425,7 @@ function renderMatrix(){
   $('matrixHeadRow').innerHTML = headCells.join('');
 
   // صفوف الطلاب
-  $('matrixBody').innerHTML = list.map(s=>{
+  $('matrixBody').innerHTML = list.map((s,idx)=>{
     const cells = docs.map(doc=>{
       const code=(doc.code||'').toUpperCase();
       const val = s.docs[code];
@@ -429,10 +442,11 @@ function renderMatrix(){
 
     const barCls = s.percent>=100?'':(s.percent>=50?'mid':'low');
     return `<tr>
+      <td class="sticky-num">${idx+1}</td>
       <td class="sticky-col">${esc(s.name)}<div style="font-size:10.5px;color:var(--text-dim);font-weight:400">${esc(s.number)}</div></td>
       ${cells}
       <td><div class="pct-bar-wrap"><div class="pct-bar ${barCls}" style="width:${s.percent}%"></div></div>${s.percent}%</td>
-      <td>${esc(s.statusText||'—')}</td>
+      <td>${esc(s.statusText||'قيد المراجعة')}</td>
     </tr>`;
   }).join('');
 
@@ -451,19 +465,33 @@ async function viewFolderContents(code){
   try{
     const root = await getArchiveRootHandle();
     const sub = await root.getDirectoryHandle(code, {create:false});
-    const files = [];
+    const fileHandles = [];
     for await (const [name, handle] of sub.entries()){
-      if(handle.kind==='file') files.push(name);
+      if(handle.kind==='file') fileHandles.push(handle);
     }
-    files.sort((a,b)=>a.localeCompare(b,'ar'));
-    if(!files.length){
+    fileHandles.sort((a,b)=>a.name.localeCompare(b.name,'ar'));
+    if(!fileHandles.length){
       $('folderModalBody').innerHTML = '<div style="text-align:center;padding:20px;color:var(--text-dim)">المجلد فارغ — لا توجد ملفات بداخله حالياً</div>';
     }else{
-      $('folderModalBody').innerHTML = `<div style="font-size:11.5px;color:var(--text-dim);margin-bottom:8px">عدد الملفات: ${files.length}</div>` +
-        files.map(f=>`<div class="file-row"><span>📄 ${esc(f)}</span></div>`).join('');
+      $('folderModalBody').innerHTML = `<div style="font-size:11.5px;color:var(--text-dim);margin-bottom:8px">عدد الملفات: ${fileHandles.length} — اضغط "فتح" لمعاينة أي ملف فعلياً في تبويب جديد</div>` +
+        fileHandles.map((h,i)=>`<div class="file-row"><span>📄 ${esc(h.name)}</span><button type="button" class="view-folder-btn" onclick="openFolderFile(${i})">↗ فتح</button></div>`).join('');
+      window._folderFileHandles = fileHandles; // للاستخدام من زر "فتح" لكل ملف
     }
   }catch(e){
     $('folderModalBody').innerHTML = `<div style="text-align:center;padding:20px;color:var(--danger)">⚠️ ${esc(e.message)}<br><span style="font-size:11px;color:var(--text-dim)">(هذا طبيعي لو المجلد لسه ما اتنشأش أصلاً لهذا النوع)</span></div>`;
+  }
+}
+
+async function openFolderFile(index){
+  try{
+    const handle = window._folderFileHandles[index];
+    const file = await handle.getFile();
+    const url = URL.createObjectURL(file);
+    window.open(url, '_blank');
+    // لا نُلغي الرابط فوراً حتى يُتاح للتبويب الجديد وقت كافٍ لتحميل الملف بالكامل
+    setTimeout(()=>URL.revokeObjectURL(url), 60000);
+  }catch(e){
+    toast('⚠️ تعذّر فتح الملف: ' + e.message, 'err');
   }
 }
 
@@ -557,7 +585,7 @@ function exportReport(){
       const val = s.docs[code];
       row.push(val===null ? '—' : val);
     });
-    row.push(s.percent+'%', s.statusText||'');
+    row.push(s.percent+'%', s.statusText||'قيد المراجعة');
     return row;
   });
 
