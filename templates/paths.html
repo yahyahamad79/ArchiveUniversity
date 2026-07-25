@@ -109,6 +109,17 @@
                 </div>
             </div>
 
+            <div class="bg-amber-50 p-5 rounded-xl border-2 border-amber-300" id="box_backup">
+                <label class="block text-sm font-bold text-amber-800 mb-2">5. نسخة احتياطية من بيانات النظام (أنواع الوثائق + المسارات):</label>
+                <p class="text-[11px] text-amber-700 mb-3">
+                    ⚠️ مساحة تخزين الخادم الحالية مؤقتة — أي تعديل على "أنواع الوثائق" أو المسارات قد يُفقد عند أي نشر جديد للمشروع.
+                    نزّل نسخة احتياطية بعد أي تعديل مهم، وارفعها يدوياً على GitHub (استبدل بيها <code>database/doc_types.json</code> و<code>database/paths.json</code>) قبل عمل أي push جديد، حتى لا تضيع تعديلاتك.
+                </p>
+                <a href="/api/download-backup" class="inline-block bg-amber-600 hover:bg-amber-700 text-white text-xs font-bold px-4 py-2 rounded-lg transition">
+                    ⬇️ تنزيل نسخة احتياطية (ZIP)
+                </a>
+            </div>
+
             <div id="path_alert" class="hidden p-4 rounded-xl text-xs font-semibold"></div>
         </div>
     </main>

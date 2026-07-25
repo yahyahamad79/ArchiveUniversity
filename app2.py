@@ -1,10 +1,7 @@
 import os
 import json
 import tempfile
-import io
-import zipfile
-from datetime import datetime
-from flask import Flask, render_template, request, jsonify, send_file
+from flask import Flask, render_template, request, jsonify
 from document_extractor import extract_document_info, SUPPORTED_EXTENSIONS
 
 app = Flask(__name__)
@@ -203,33 +200,6 @@ def save_paths():
             json.dump({"paths": current}, f, ensure_ascii=False, indent=4)
 
         return jsonify({"success": True, "message": "تم حفظ المسار بنجاح!", "paths": current})
-    except Exception as e:
-        return jsonify({"success": False, "message": str(e)}), 500
-
-# ==========================================
-# API تنزيل نسخة احتياطية (doc_types.json + paths.json) كملف ZIP واحد —
-# بديل مجاني لقرص Render الدائم المدفوع: المستخدم ينزّل الملفين يدوياً
-# ويرفعهما على GitHub بنفسه قبل أي نشر جديد، حتى لا تُفقد التعديلات على
-# قرص Render المؤقت (ephemeral) عند إعادة النشر أو إعادة التشغيل
-# ==========================================
-@app.route('/api/download-backup', methods=['GET'])
-def download_backup():
-    try:
-        buf = io.BytesIO()
-        with zipfile.ZipFile(buf, 'w', zipfile.ZIP_DEFLATED) as zf:
-            if os.path.exists(JSON_PATH):
-                zf.write(JSON_PATH, arcname='doc_types.json')
-            if os.path.exists(PATHS_JSON_PATH):
-                zf.write(PATHS_JSON_PATH, arcname='paths.json')
-        buf.seek(0)
-
-        timestamp = datetime.now().strftime('%Y-%m-%d_%H-%M')
-        return send_file(
-            buf,
-            mimetype='application/zip',
-            as_attachment=True,
-            download_name=f'archive_backup_{timestamp}.zip'
-        )
     except Exception as e:
         return jsonify({"success": False, "message": str(e)}), 500
 
