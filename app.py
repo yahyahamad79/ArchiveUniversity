@@ -69,6 +69,10 @@ def matching_screen():
 def documents_check_screen():
     return render_template('documents_check.html')
 
+@app.route('/completion-tracking')
+def completion_tracking_screen():
+    return render_template('completion_tracking.html')
+
 # ==========================================
 # APIs العمليات والخدمات الخلفية (الثوابت فقط)
 # ==========================================
