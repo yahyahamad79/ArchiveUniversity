@@ -847,12 +847,6 @@ async function runAutoExtract(entry, rowEl, btnEl){
     const form = new FormData();
     form.append('file', file, entry.fullName);
 
-    // مفتاح Gemini الشخصي المحفوظ محلياً في هذا المتصفح (شاشة "تهيئة مسارات
-    // النظام") — لو موجود يُرسَل مع الطلب ليُستخدم بدل مفتاح السيرفر العام،
-    // حتى يبقى استهلاك كل مستخدم لخدمة Gemini منفصلاً عن غيره
-    const personalKey = localStorage.getItem('gemini_api_key');
-    if(personalKey) form.append('gemini_api_key', personalKey);
-
     const res = await fetch('/api/extract-document-info', {method:'POST', body: form});
     const data = await res.json();
 

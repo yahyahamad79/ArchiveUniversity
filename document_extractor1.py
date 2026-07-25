@@ -179,16 +179,13 @@ EXTRACTION_PROMPT = """أنت خبير OCR متخصص في قراءة المست
 نوع الوثيقة: [كما هو مكتوب على الوثيقة، أو غير محدد]"""
 
 
-def call_gemini_vision(image_path: str, api_key: str = None) -> str:
+def call_gemini_vision(image_path: str) -> str:
     from google import genai
     from google.genai import types
 
-    # المفتاح الشخصي (لو بعته المستخدم من متصفحه) له الأولوية دائماً على
-    # مفتاح السيرفر العام في متغيّر البيئة — بهذا يستخدم كل مستخدم حصته
-    # الخاصة من Gemini بدل مشاركة حصة واحدة مع الجميع
-    api_key = api_key or os.environ.get("GEMINI_API_KEY")
+    api_key = os.environ.get("GEMINI_API_KEY")
     if not api_key:
-        raise RuntimeError("لا يوجد مفتاح Gemini API — أضف مفتاحك الشخصي من شاشة \"تهيئة مسارات النظام\"، أو اضبط متغيّر البيئة GEMINI_API_KEY على السيرفر")
+        raise RuntimeError("متغيّر البيئة GEMINI_API_KEY غير مضبوط على السيرفر")
 
     ext = Path(image_path).suffix.lower()
     media_map = {".jpg": "image/jpeg", ".jpeg": "image/jpeg", ".png": "image/png", ".webp": "image/webp"}
@@ -256,7 +253,7 @@ def detect_doc_type(raw_doc_type: str, doc_types: dict) -> str:
 # =========================================================
 # الدالة الرئيسية
 # =========================================================
-def extract_document_info(file_path: str, doc_types: dict = None, api_key: str = None) -> dict:
+def extract_document_info(file_path: str, doc_types: dict = None) -> dict:
     result = {
         "name": None,
         "parts": 0,
@@ -268,7 +265,7 @@ def extract_document_info(file_path: str, doc_types: dict = None, api_key: str =
     }
     try:
         image_path = prepare_image(file_path)
-        raw_output = call_gemini_vision(image_path, api_key=api_key)
+        raw_output = call_gemini_vision(image_path)
         result["raw_lines"] = [raw_output]
 
         raw_name, raw_doc_type = parse_vision_output(raw_output)

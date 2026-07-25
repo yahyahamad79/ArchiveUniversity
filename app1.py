@@ -223,13 +223,8 @@ def extract_document_info_route():
         os.close(fd)
         file.save(tmp_path)
 
-        # مفتاح Gemini شخصي اختياري يبعته المستخدم من متصفحه (محفوظ محلياً
-        # عنده فقط في شاشة "تهيئة مسارات النظام") — لا يُحفظ هنا في أي ملف
-        # على الخادم، يُستخدم فقط لتنفيذ هذا الطلب ثم يُنسى فوراً
-        personal_api_key = (request.form.get('gemini_api_key') or '').strip() or None
-
         doc_types = load_doc_types()
-        result = extract_document_info(tmp_path, doc_types, api_key=personal_api_key)
+        result = extract_document_info(tmp_path, doc_types)
         return jsonify({"success": True, **result})
     except Exception as e:
         return jsonify({"success": False, "message": str(e)}), 500

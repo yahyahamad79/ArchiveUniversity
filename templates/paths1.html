@@ -89,26 +89,6 @@
                 </div>
             </div>
 
-            <div class="bg-slate-50 p-5 rounded-xl border border-slate-200" id="box_geminiKey">
-                <label class="block text-sm font-bold text-slate-700 mb-2">4. مفتاح Gemini API الشخصي (لميزة "استخراج تلقائي" في شاشة فحص الوثائق):</label>
-                <div class="flex gap-2 items-center">
-                    <input type="password" id="input_geminiKey" placeholder="الصق مفتاحك هنا (من aistudio.google.com)"
-                           class="w-full text-xs bg-white border border-slate-300 rounded-lg px-3 py-2 text-slate-800 outline-none focus:ring-2 focus:ring-indigo-400">
-                    <button onclick="saveGeminiKey()" class="bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold px-4 py-2 rounded-lg whitespace-nowrap transition">
-                        💾 حفظ
-                    </button>
-                    <button onclick="clearGeminiKey()" class="bg-slate-200 hover:bg-slate-300 text-slate-700 text-xs font-bold px-3 py-2 rounded-lg whitespace-nowrap transition">
-                        🗑
-                    </button>
-                </div>
-                <div class="mt-2 flex justify-between items-center">
-                    <span class="text-[11px] text-slate-500">
-                        يُخزَّن على جهازك/متصفحك أنت فقط (لا يُرفع لأي ملف على الخادم) — كل مستخدم يستخدم مفتاحه الخاص بدل مفتاح مشترك.
-                    </span>
-                    <span id="badge_geminiKey" class="text-[10px] font-bold text-rose-600 bg-rose-50 px-2 py-0.5 rounded">غير محدد</span>
-                </div>
-            </div>
-
             <div id="path_alert" class="hidden p-4 rounded-xl text-xs font-semibold"></div>
         </div>
     </main>
@@ -127,10 +107,6 @@
             if (!SUPPORTS_FS_ACCESS) {
                 document.getElementById('browserWarning').classList.remove('hidden');
             }
-
-            // مفتاح Gemini الشخصي — محلي بالكامل في هذا المتصفح، لا علاقة له بـ
-            // paths.json على الخادم ولا بأي handle من File System Access API
-            refreshGeminiKeyBadge();
 
             // 1) عرض الأسماء المحفوظة سلفاً على السيرفر (paths.json) — تظهر فوراً بغض النظر عن المتصفح
             const shared = await fetchSharedPaths();
@@ -233,42 +209,6 @@
                 }
             });
             showAlert(`تم اعتماد الصفحة "${sheetName}" وصف العناوين رقم ${headerRowIdx + 1} — سيُستخدمان تلقائياً في شاشتي "المطابقة" و"إدارة الثوابت".`, true);
-        }
-
-        const GEMINI_KEY_STORAGE_KEY = 'gemini_api_key';
-
-        function refreshGeminiKeyBadge() {
-            const saved = localStorage.getItem(GEMINI_KEY_STORAGE_KEY);
-            const badge = document.getElementById('badge_geminiKey');
-            const input = document.getElementById('input_geminiKey');
-            if (saved) {
-                badge.innerText = 'محفوظ محلياً 🟢';
-                badge.className = 'text-[10px] font-bold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded';
-                input.placeholder = '•••••••••••••••••••••• (محفوظ بالفعل — الصق مفتاحاً جديداً لاستبداله)';
-            } else {
-                badge.innerText = 'غير محدد';
-                badge.className = 'text-[10px] font-bold text-rose-600 bg-rose-50 px-2 py-0.5 rounded';
-                input.placeholder = 'الصق مفتاحك هنا (من aistudio.google.com)';
-            }
-            input.value = '';
-        }
-
-        function saveGeminiKey() {
-            const input = document.getElementById('input_geminiKey');
-            const value = input.value.trim();
-            if (!value) {
-                showAlert('الصق المفتاح أولاً في الحقل قبل الضغط على "حفظ".', false);
-                return;
-            }
-            localStorage.setItem(GEMINI_KEY_STORAGE_KEY, value);
-            refreshGeminiKeyBadge();
-            showAlert('تم حفظ مفتاح Gemini محلياً في هذا المتصفح — سيُستخدم تلقائياً في شاشة "فحص الوثائق".', true);
-        }
-
-        function clearGeminiKey() {
-            localStorage.removeItem(GEMINI_KEY_STORAGE_KEY);
-            refreshGeminiKeyBadge();
-            showAlert('تم حذف المفتاح المحفوظ من هذا المتصفح.', true);
         }
 
         async function pickEntry(key, kind) {
