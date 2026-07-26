@@ -23,7 +23,7 @@
             "code": "BC",
             "required": true,
             "order": 2,
-            "storage_path": "E:\\MyProjects\\ArchiveUniversity\\database\\storage_secure\\BC",
+            "storage_path": "BC",
             "allowed_extensions": [
                 "pdf",
                 "jpg",
@@ -58,10 +58,10 @@
         "مصدقة بالعربي": {
             "name_ar": "مصدقة بالعربي",
             "name_en": "Graduation Arabic",
-            "code": "ATH",
+            "code": "CER-A",
             "required": false,
             "order": 7,
-            "storage_path": "E:\\MyProjects\\ArchiveUniversity\\database\\storage_secure\\ATHICS",
+            "storage_path": "CER-A",
             "allowed_extensions": [
                 "pdf",
                 "jpg",
@@ -77,10 +77,10 @@
         "مصدقة بالانجليزي": {
             "name_ar": "مصدقة بالانجليزي",
             "name_en": "Graduation Certificate",
-            "code": "QOU",
+            "code": "CER-E",
             "required": true,
             "order": 8,
-            "storage_path": "E:\\MyProjects\\ArchiveUniversity\\database\\storage_secure\\QOU",
+            "storage_path": "CER-E",
             "allowed_extensions": [
                 "pdf"
             ],
@@ -112,10 +112,10 @@
         "كشف علامات عربي": {
             "name_ar": "كشف علامات عربي",
             "name_en": "Transcript Arabic",
-            "code": "TR",
+            "code": "TR-A",
             "required": true,
             "order": 5,
-            "storage_path": "E:\\MyProjects\\ArchiveUniversity\\database\\storage_secure\\TR",
+            "storage_path": "TR-A",
             "allowed_extensions": [
                 "pdf",
                 "jpg",
@@ -132,10 +132,10 @@
         "كشف علامات انجليزي": {
             "name_ar": "كشف علامات انجليزي",
             "name_en": "Transcript English",
-            "code": "HC",
+            "code": "TR-E",
             "required": false,
             "order": 6,
-            "storage_path": "E:\\MyProjects\\ArchiveUniversity\\database\\storage_secure\\HC",
+            "storage_path": "TR-E",
             "allowed_extensions": [
                 "pdf",
                 "jpg",

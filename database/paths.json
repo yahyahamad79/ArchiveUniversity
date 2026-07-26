@@ -1,11 +1,33 @@
 {
-    "paths": {
-        "excelFile": {
-            "name": "Studs.xlsx",
-            "kind": "file",
-            "updated_at": "2026-07-25T09:13:09.381Z",
-            "sheetName": "1052",
-            "headerRowIdx": 0
+    "workspaces": {
+        "default": {
+            "excelFile": {
+                "name": "Studs.xlsx",
+                "kind": "file",
+                "updated_at": "2026-07-25T09:13:09.381Z",
+                "sheetName": "1052",
+                "headerRowIdx": 0
+            }
+        },
+        "yahya hamad": {
+            "excelFile": {
+                "name": "Studs.xlsx",
+                "kind": "file",
+                "updated_at": "2026-07-26T10:16:42.559Z",
+                "sheetName": "1052",
+                "headerRowIdx": 0
+            },
+            "workspaceFolder": {
+                "name": "Archive",
+                "kind": "directory",
+                "updated_at": "2026-07-26T10:13:41.894Z"
+            },
+            "archiveFolder": {
+                "name": "Archive",
+                "kind": "directory",
+                "updated_at": "2026-07-26T10:13:57.038Z"
+            },
+            "archiveFolderSyncPending": false
         }
     }
 }
