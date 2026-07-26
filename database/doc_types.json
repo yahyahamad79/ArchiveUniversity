@@ -13,8 +13,9 @@
                 "png"
             ],
             "max_size_mb": 2,
-            "ocr_keywords": [],
-            "description_ar": "صورة شخصية حديثة بخلفية بيضاء"
+            "ocr_keywords": [
+                "صورة وجه انسان"
+            ]
         },
         "شهادة ميلاد": {
             "name_ar": "شهادة ميلاد",
@@ -55,11 +56,11 @@
             ]
         },
         "مصدقة بالعربي": {
-            "name_ar": "مصدقة بالعربي  ",
+            "name_ar": "مصدقة بالعربي",
             "name_en": "Graduation Arabic",
             "code": "ATH",
             "required": false,
-            "order": 8,
+            "order": 7,
             "storage_path": "E:\\MyProjects\\ArchiveUniversity\\database\\storage_secure\\ATHICS",
             "allowed_extensions": [
                 "pdf",
@@ -70,7 +71,7 @@
             ],
             "max_size_mb": 5,
             "ocr_keywords": [
-                "وزارة الداخلة ، حسن سير وسلوك"
+                "مصدقة، إستناداً إلى أنظمة الجامعة"
             ]
         },
         "مصدقة بالانجليزي": {
@@ -78,13 +79,15 @@
             "name_en": "Graduation Certificate",
             "code": "QOU",
             "required": true,
-            "order": 9,
+            "order": 8,
             "storage_path": "E:\\MyProjects\\ArchiveUniversity\\database\\storage_secure\\QOU",
             "allowed_extensions": [
                 "pdf"
             ],
             "max_size_mb": 5,
-            "ocr_keywords": []
+            "ocr_keywords": [
+                "Certification"
+            ]
         },
         "صورة هوية": {
             "name_ar": "صورة هوية",
@@ -120,10 +123,10 @@
             ],
             "max_size_mb": 10,
             "ocr_keywords": [
-                "كشف درجات",
-                "كشف علامات",
+                "كشف علامات، كشف درجات",
+                "السجل الأكاديمي",
                 "الدرجات",
-                "المقررات،العلامات"
+                "المقررات"
             ]
         },
         "كشف علامات انجليزي": {
@@ -131,7 +134,7 @@
             "name_en": "Transcript English",
             "code": "HC",
             "required": false,
-            "order": 7,
+            "order": 6,
             "storage_path": "E:\\MyProjects\\ArchiveUniversity\\database\\storage_secure\\HC",
             "allowed_extensions": [
                 "pdf",
@@ -139,7 +142,11 @@
                 "jpeg"
             ],
             "max_size_mb": 3,
-            "ocr_keywords": []
+            "ocr_keywords": [
+                "Graduation Certification",
+                "Graduation",
+                "Certification"
+            ]
         }
     },
     "ignored_codes": []
