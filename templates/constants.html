@@ -650,19 +650,13 @@
                 if (statusEl) statusEl.textContent = 'جارٍ إنشاء/التأكد من مجلدات أنواع الوثائق...';
                 const createdFolders = await syncDocTypesToFolders();
 
-                if (statusEl) statusEl.textContent = 'جارٍ فحص مجلدات الأرشيف...';
-                const addedTypes = await syncFoldersToDocTypes();
-
                 if (statusEl) statusEl.textContent = 'جارٍ مزامنة أعمدة الإكسل...';
                 const excelMsg = await syncExcelStatusColumns();
 
                 const createdFoldersMsg = createdFolders.length
-                    ? `تم إنشاء ${createdFolders.length} مجلد فعلي جديد لأنواع وثائق كانت بدون مجلد (${createdFolders.join('، ')}). `
-                    : '';
-                const foldersMsg = addedTypes.length
-                    ? `تمت إضافة ${addedTypes.length} نوع وثيقة جديد من مجلدات غير معرّفة (${addedTypes.join('، ')}) بقيم افتراضية — عدّلها يدوياً حسب الحاجة.`
-                    : 'لا توجد مجلدات فرعية جديدة غير معرّفة كأنواع وثائق.';
-                const fullMsg = `✅ ${createdFoldersMsg}${foldersMsg} ${excelMsg}`;
+                    ? `تم إنشاء ${createdFolders.length} مجلد فعلي جديد لأنواع وثائق كانت بدون مجلد (${createdFolders.join('، ')}).`
+                    : 'كل أنواع الوثائق المعرَّفة لها مجلدها الفعلي بالفعل.';
+                const fullMsg = `✅ ${createdFoldersMsg} ${excelMsg}`;
 
                 showAlert(fullMsg, true);
                 if (statusEl) { statusEl.textContent = fullMsg; statusEl.className = 'text-[10px] text-emerald-600 font-bold px-1'; }
@@ -678,9 +672,11 @@
             }
         }
 
-        // 1) لكل نوع وثيقة معرَّف بالفعل في doc_types.json، تتأكد من وجود
-        // مجلده الفعلي (باسم الرمز/code) داخل مجلد الأرشيف، وتنشئه لو ناقص —
-        // بترتيب حقل "الترتيب" (order) لكل وثيقة، وليس ترتيب المفاتيح العشوائي
+        // لكل نوع وثيقة معرَّف بالفعل في doc_types.json (الثوابت الموجودة في
+        // الصفحة)، تتأكد من وجود مجلده الفعلي (باسم الرمز/code) داخل مجلد
+        // الأرشيف، وتنشئه لو ناقص — بترتيب حقل "الترتيب" (order) لكل وثيقة.
+        // اتجاه واحد فقط: من الثوابت إلى المجلدات — لا يتم فحص المجلد الجذر
+        // ولا إضافة أي مجلد غير معرَّف مسبقاً كنوع وثيقة جديد إطلاقاً
         async function syncDocTypesToFolders() {
             const created = [];
             const sortedDocs = Object.values(systemDocuments).sort((a, b) => (Number(a.order) || 0) - (Number(b.order) || 0));
@@ -695,54 +691,6 @@
                 }
             }
             return created;
-        }
-
-        // 2) فحص المجلدات الفرعية داخل مجلد الأرشيف الرئيسي وإضافة أي مجلد
-        // غير معرّف كنوع وثيقة (بالرمز = اسم المجلد نفسه)، بقيم افتراضية عامة
-        async function syncFoldersToDocTypes() {
-            const root = await getArchiveRootHandle();
-            const existingCodes = new Set(Object.values(systemDocuments).map(d => (d.code || '').toUpperCase()));
-            const added = [];
-
-            let maxOrder = 0;
-            Object.values(systemDocuments).forEach(d => { if (Number(d.order) > maxOrder) maxOrder = Number(d.order); });
-
-            for await (const [name, handle] of root.entries()) {
-                if (handle.kind !== 'directory') continue;
-                const code = name.trim().toUpperCase();
-                if (!code || existingCodes.has(code)) continue;
-                if (ignoredCodes.includes(code)) continue; // نوع وثيقة حُذف صراحة سابقاً — لا يُعاد إنشاؤه تلقائياً، ومجلده يبقى كما هو
-
-                maxOrder += 1;
-                const newDoc = {
-                    name_ar: code,
-                    name_en: code,
-                    code: code,
-                    required: false,
-                    order: maxOrder,
-                    storage_path: code,
-                    allowed_extensions: ['pdf', 'jpg', 'jpeg', 'png'],
-                    max_size_mb: 5,
-                    ocr_keywords: []
-                };
-
-                try {
-                    const response = await fetch('/api/save-constant', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ original_name: '', doc_key: code, doc_data: newDoc })
-                    });
-                    const result = await response.json();
-                    if (result.success) {
-                        systemDocuments[code] = newDoc;
-                        existingCodes.add(code);
-                        added.push(code);
-                    }
-                } catch (e) {
-                    console.warn(`تعذّرت إضافة نوع الوثيقة للمجلد "${name}":`, e);
-                }
-            }
-            return added;
         }
 
         // detectHeaderRowIndex / mergeWithOriginalBannerRows / forceTextColumnsInSheet
