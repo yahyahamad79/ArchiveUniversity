@@ -93,7 +93,9 @@ def count_name_units(name: str) -> int:
     for i, unit in enumerate(sorted(COMPOUND_UNITS, key=len, reverse=True)):
         temp = temp.replace(unit, f'__U{i}__')
     temp = re.sub(r'عبد\s+\S+', '__UA__', temp)
-    temp = re.sub(r'أبو\s+\S+', '__UB__', temp)
+    # "أبو"/"ابو" (بالهمزة أو بدونها — الإملاء الشائع في الأسماء الفلسطينية
+    # كثيراً ما يكتبها بألف عادية بلا همزة) لازم يُعاملا كوحدة واحدة بالتساوي
+    temp = re.sub(r'[أا]بو\s+\S+', '__UB__', temp)
     return len(temp.split())
 
 
