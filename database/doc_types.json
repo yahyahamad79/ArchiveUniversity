@@ -1,21 +1,21 @@
 {
     "document_types": {
         "صور شخصية": {
-            "name_ar": "صور شخصية",
-            "name_en": "Personal Photos",
-            "code": "PH",
-            "required": true,
-            "order": 4,
-            "storage_path": "E:\\MyProjects\\ArchiveUniversity\\database\\storage_secure\\PH",
             "allowed_extensions": [
                 "jpg",
                 "jpeg",
                 "png"
             ],
+            "code": "PH",
             "max_size_mb": 2,
+            "name_ar": "صور شخصية",
+            "name_en": "Personal Photos",
             "ocr_keywords": [
                 "صورة وجه انسان"
-            ]
+            ],
+            "order": 4,
+            "required": true,
+            "storage_path": "PH"
         },
         "شهادة ميلاد": {
             "name_ar": "شهادة ميلاد",
@@ -38,22 +38,22 @@
             ]
         },
         "شهادة ثانوية عامة": {
-            "name_ar": "شهادة ثانوية عامة",
-            "name_en": "High School Certificate",
-            "code": "HS",
-            "required": true,
-            "order": 1,
-            "storage_path": "E:\\MyProjects\\ArchiveUniversity\\database\\storage_secure\\HS",
             "allowed_extensions": [
                 "pdf",
                 "jpg",
                 "jpeg",
                 "png"
             ],
+            "code": "HS",
             "max_size_mb": 5,
+            "name_ar": "شهادة ثانوية عامة",
+            "name_en": "High School Certificate",
             "ocr_keywords": [
                 "رقم الجلوس ، اسم الطالب ، المعدل ، التربية والتعليم،وزارة التربية والتعليم"
-            ]
+            ],
+            "order": 1,
+            "required": true,
+            "storage_path": "HS"
         },
         "مصدقة بالعربي": {
             "name_ar": "مصدقة بالعربي",
@@ -78,7 +78,7 @@
             "name_ar": "مصدقة بالانجليزي",
             "name_en": "Graduation Certificate",
             "code": "CER-E",
-            "required": true,
+            "required": false,
             "order": 8,
             "storage_path": "CER-E",
             "allowed_extensions": [
@@ -90,30 +90,30 @@
             ]
         },
         "صورة هوية": {
-            "name_ar": "صورة هوية",
-            "name_en": "ID Card",
-            "code": "ID",
-            "required": true,
-            "order": 3,
-            "storage_path": "E:\\MyProjects\\ArchiveUniversity\\database\\storage_secure\\ID",
             "allowed_extensions": [
                 "pdf",
                 "jpg",
                 "jpeg"
             ],
+            "code": "ID",
             "max_size_mb": 3,
+            "name_ar": "صورة هوية",
+            "name_en": "ID Card",
             "ocr_keywords": [
                 "الهوية الوطنية",
                 "البطاقة الشخصية",
                 "رقم الهوية",
                 "جواز سفر"
-            ]
+            ],
+            "order": 3,
+            "required": true,
+            "storage_path": "ID"
         },
         "كشف علامات عربي": {
             "name_ar": "كشف علامات عربي",
             "name_en": "Transcript Arabic",
             "code": "TR-A",
-            "required": true,
+            "required": false,
             "order": 5,
             "storage_path": "TR-A",
             "allowed_extensions": [
