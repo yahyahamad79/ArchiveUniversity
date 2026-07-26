@@ -591,7 +591,8 @@
         // العامة التي قد لا تفرض عدم التخزين المؤقت صراحة
         async function fetchSharedPathsFresh() {
             try {
-                const res = await fetch('/api/get-paths', { cache: 'no-store' });
+                const username = ensureWorkspaceUsername();
+                const res = await fetch('/api/get-paths?user=' + encodeURIComponent(username), { cache: 'no-store' });
                 const data = await res.json();
                 return (data && data.success) ? (data.paths || {}) : {};
             } catch (e) {

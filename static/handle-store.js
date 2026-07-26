@@ -92,11 +92,55 @@ async function requestHandlePermission(handle, mode = 'readwrite') {
 }
 
 /* ============================================================
-   مزامنة الأسماء/الحالة عبر السيرفر (database/paths.json)
+   هوية مساحة العمل (اسم المستخدم) — ليست تسجيل دخول ولا حماية أمنية
+   على الإطلاق (لا كلمة سر ولا صلاحيات)؛ مجرد اسم تعريفي يتخزّن محلياً
+   في متصفح كل شخص، ويُستخدم كمفتاح لتقسيم paths.json بحيث يحتفظ كل
+   مستخدم بمساراته الخاصة (المجلد/ملف الإكسل) منفصلة عن باقي المستخدمين
+   دون أن يعرف أحدهم مسارات الآخر أو يمسحها بالخطأ.
+   ============================================================ */
+const WORKSPACE_USERNAME_KEY = 'workspace_username';
+
+function getWorkspaceUsername() {
+  return localStorage.getItem(WORKSPACE_USERNAME_KEY) || null;
+}
+
+function setWorkspaceUsername(name) {
+  const trimmed = (name || '').trim();
+  if (trimmed) localStorage.setItem(WORKSPACE_USERNAME_KEY, trimmed);
+  return trimmed || null;
+}
+
+function clearWorkspaceUsername() {
+  localStorage.removeItem(WORKSPACE_USERNAME_KEY);
+}
+
+// يعيد الاسم المحفوظ إن وُجد، وإلا يطلبه من المستخدم فوراً (نافذة تأكيد
+// متصفح بسيطة) ولا يكمل حتى يُدخل شيئاً — لو ضغط "إلغاء" يُعطى اسم مؤقت
+// عشوائي حتى لا تتعطل الشاشة بالكامل بانتظار قرار لن يُتخذ
+function ensureWorkspaceUsername() {
+  let name = getWorkspaceUsername();
+  while (!name) {
+    const input = window.prompt(
+      'اكتب اسمك عشان تحتفظ بمساراتك (المجلد وملف الإكسل) منفصلة عن باقي المستخدمين.\n' +
+      'ملاحظة: هذا مجرد اسم تعريفي محفوظ في متصفحك فقط — ليس تسجيل دخول ولا يتطلب كلمة سر.'
+    );
+    if (input === null) {
+      name = setWorkspaceUsername('مستخدم_' + Date.now());
+    } else {
+      name = setWorkspaceUsername(input);
+    }
+  }
+  return name;
+}
+
+/* ============================================================
+   مزامنة الأسماء/الحالة عبر السيرفر (database/paths.json) — مقسّمة الآن
+   بمساحة عمل باسم كل مستخدم (workspace_username) بدل ملف مشترك واحد
    ============================================================ */
 async function fetchSharedPaths() {
   try {
-    const res = await fetch('/api/get-paths');
+    const username = ensureWorkspaceUsername();
+    const res = await fetch('/api/get-paths?user=' + encodeURIComponent(username));
     const data = await res.json();
     return data.success ? (data.paths || {}) : {};
   } catch (err) {
@@ -108,10 +152,11 @@ async function fetchSharedPaths() {
 // partialEntry: { [key]: { name, kind: 'file'|'directory', updated_at } }
 async function saveSharedPaths(partialEntry) {
   try {
+    const username = ensureWorkspaceUsername();
     const res = await fetch('/api/save-paths', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ paths: partialEntry })
+      body: JSON.stringify({ user: username, paths: partialEntry })
     });
     return await res.json();
   } catch (err) {
@@ -119,3 +164,4 @@ async function saveSharedPaths(partialEntry) {
     return { success: false };
   }
 }
+

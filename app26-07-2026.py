@@ -37,26 +37,14 @@ def save_full_doc_types_file(data):
     with open(JSON_PATH, 'w', encoding='utf-8') as f:
         json.dump(data, f, ensure_ascii=False, indent=4)
 
-def load_paths_file():
+def load_paths():
     if not os.path.exists(PATHS_JSON_PATH):
-        return {"workspaces": {}}
+        return {}
     try:
         with open(PATHS_JSON_PATH, 'r', encoding='utf-8') as f:
-            data = json.load(f)
-        if "workspaces" not in data:
-            # ترقية تلقائية لمرة واحدة من الصيغة القديمة (مشتركة بلا مستخدمين)
-            # — البيانات القديمة تُنسخ لمساحة عمل باسم "default" حتى لا تُفقد
-            legacy = data.get("paths", {})
-            data = {"workspaces": {"default": legacy}} if legacy else {"workspaces": {}}
-        return data
+            return json.load(f).get("paths", {})
     except Exception:
-        return {"workspaces": {}}
-
-def save_paths_file(data):
-    if not os.path.exists(DB_DIR):
-        os.makedirs(DB_DIR)
-    with open(PATHS_JSON_PATH, 'w', encoding='utf-8') as f:
-        json.dump(data, f, ensure_ascii=False, indent=4)
+        return {}
 
 # ==========================================
 # شاشات عرض واجهات المستخدم (توجيه الشاشات الفرعية)
@@ -196,31 +184,27 @@ def delete_constant():
 @app.route('/api/get-paths', methods=['GET'])
 def get_paths():
     try:
-        username = (request.args.get('user') or '').strip() or 'default'
-        data = load_paths_file()
-        workspace = data.get('workspaces', {}).get(username, {})
-        return jsonify({"success": True, "paths": workspace})
+        paths = load_paths()
+        return jsonify({"success": True, "paths": paths})
     except Exception as e:
         return jsonify({"success": False, "message": str(e)}), 500
 
 @app.route('/api/save-paths', methods=['POST'])
 def save_paths():
-    body = request.json or {}
-    username = (body.get('user') or '').strip() or 'default'
-    incoming = body.get('paths', {})
+    data = request.json or {}
+    incoming = data.get('paths', {})
 
     try:
-        data = load_paths_file()
-        data.setdefault('workspaces', {})
+        if not os.path.exists(DB_DIR):
+            os.makedirs(DB_DIR)
 
-        # دمج مع البيانات الموجودة *لنفس مساحة العمل* بدل الاستبدال الكامل،
-        # حتى لو حدّثت شاشة واحدة فقط من المسارات الثلاثة لا تُفقد بيانات
-        # الشاشات الأخرى — وبدون أي تأثير على مساحات عمل المستخدمين الآخرين
-        current = data['workspaces'].get(username, {})
+        # دمج مع البيانات الموجودة بدل الاستبدال الكامل، حتى لو حدّثت شاشة
+        # واحد فقط من المسارات الثلاثة لا تُفقد بيانات الشاشات الأخرى
+        current = load_paths()
         current.update(incoming)
-        data['workspaces'][username] = current
 
-        save_paths_file(data)
+        with open(PATHS_JSON_PATH, 'w', encoding='utf-8') as f:
+            json.dump({"paths": current}, f, ensure_ascii=False, indent=4)
 
         return jsonify({"success": True, "message": "تم حفظ المسار بنجاح!", "paths": current})
     except Exception as e:

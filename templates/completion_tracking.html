@@ -290,7 +290,8 @@ async function loadExcelAndBuildMatrix(){
       throw new Error('لم تُمنح صلاحية الوصول لملف الإكسل — أعد تأكيدها من شاشة "المسارات"');
     }
 
-    const sharedRes = await fetch('/api/get-paths', {cache:'no-store'});
+    const username = ensureWorkspaceUsername();
+    const sharedRes = await fetch('/api/get-paths?user=' + encodeURIComponent(username), {cache:'no-store'});
     const sharedData = await sharedRes.json();
     const cfg = (sharedData.success ? sharedData.paths : {}).excelFile || {};
 
