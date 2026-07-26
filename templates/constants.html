@@ -647,16 +647,22 @@
             try {
                 await ensureSyncDependenciesLoaded();
 
+                if (statusEl) statusEl.textContent = 'جارٍ توحيد مسارات التخزين القديمة...';
+                const normalizedPaths = await normalizeStoragePaths();
+
                 if (statusEl) statusEl.textContent = 'جارٍ إنشاء/التأكد من مجلدات أنواع الوثائق...';
                 const createdFolders = await syncDocTypesToFolders();
 
                 if (statusEl) statusEl.textContent = 'جارٍ مزامنة أعمدة الإكسل...';
                 const excelMsg = await syncExcelStatusColumns();
 
+                const normalizedMsg = normalizedPaths.length
+                    ? `تم توحيد مسار التخزين لـ${normalizedPaths.length} نوع وثيقة قديم (${normalizedPaths.join('، ')}). `
+                    : '';
                 const createdFoldersMsg = createdFolders.length
                     ? `تم إنشاء ${createdFolders.length} مجلد فعلي جديد لأنواع وثائق كانت بدون مجلد (${createdFolders.join('، ')}).`
                     : 'كل أنواع الوثائق المعرَّفة لها مجلدها الفعلي بالفعل.';
-                const fullMsg = `✅ ${createdFoldersMsg} ${excelMsg}`;
+                const fullMsg = `✅ ${normalizedMsg}${createdFoldersMsg} ${excelMsg}`;
 
                 showAlert(fullMsg, true);
                 if (statusEl) { statusEl.textContent = fullMsg; statusEl.className = 'text-[10px] text-emerald-600 font-bold px-1'; }
@@ -670,6 +676,34 @@
             } finally {
                 if (btn) { btn.disabled = false; btn.textContent = '🔄 مزامنة شاملة'; }
             }
+        }
+
+        // يوحّد قيمة "مسار التخزين" (storage_path) الموروثة من أنواع وثائق
+        // قديمة (كانت مساراً كاملاً على القرص) لتصبح الرمز (code) نفسه فقط،
+        // بنفس الاصطلاح المعتمد حالياً — تعديل على بيانات النوع ذاته فقط،
+        // بدون أي علاقة بفحص المجلدات أو إنشاء أنواع جديدة
+        async function normalizeStoragePaths() {
+            const normalized = [];
+            for (const [key, doc] of Object.entries(systemDocuments)) {
+                const code = (doc.code || '').trim().toUpperCase();
+                if (!code || doc.storage_path === code) continue;
+                const updatedDoc = { ...doc, storage_path: code };
+                try {
+                    const response = await fetch('/api/save-constant', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ original_name: key, doc_key: key, doc_data: updatedDoc })
+                    });
+                    const result = await response.json();
+                    if (result.success) {
+                        systemDocuments[key] = updatedDoc;
+                        normalized.push(code);
+                    }
+                } catch (e) {
+                    console.warn(`تعذّر تطبيع مسار التخزين للرمز "${code}":`, e);
+                }
+            }
+            return normalized;
         }
 
         // لكل نوع وثيقة معرَّف بالفعل في doc_types.json (الثوابت الموجودة في
