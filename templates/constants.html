@@ -173,6 +173,12 @@
 
     <script>
         let systemDocuments = {};
+
+        // تعقيم أي نص قبل إدراجه في innerHTML — يمنع تنفيذ HTML/JS لو احتوى
+        // اسم وثيقة أو أي حقل آخر على علامات مثل < أو > أو " بالخطأ أو قصداً
+        function esc(s) {
+            return String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+        }
         let ignoredCodes = []; // رموز أنواع وثائق حُذفت صراحة من الشاشة — تُستبعد من "مزامنة شاملة"
         let archiveRootHandle = null;
 
@@ -240,8 +246,8 @@
                 const {rootName, existedBefore} = await ensureStorageFolder(code);
                 document.getElementById('doc_storage').value = code;
                 statusEl.innerHTML = existedBefore
-                    ? `✅ المجلد "${code}" موجود فعلاً داخل الأرشيف (${rootName}) — مرتبط وجاهز.`
-                    : `✅ تم إنشاء المجلد "${code}" داخل الأرشيف (${rootName}) وربطه بنجاح.`;
+                    ? `✅ المجلد "${esc(code)}" موجود فعلاً داخل الأرشيف (${esc(rootName)}) — مرتبط وجاهز.`
+                    : `✅ تم إنشاء المجلد "${esc(code)}" داخل الأرشيف (${esc(rootName)}) وربطه بنجاح.`;
                 statusEl.className = 'text-[9px] text-emerald-600 font-bold block mt-1';
             }catch(e){
                 if(e.name !== 'AbortError'){
@@ -360,31 +366,42 @@
                 const keywordsTitle = keywordsCount ? doc.ocr_keywords.join('، ') : 'لا يوجد';
 
                 tr.innerHTML = `
-                    <td class="px-3 py-2.5 text-[11px] text-slate-500 align-top">${orderWarn}${doc.order ?? ''}</td>
+                    <td class="px-3 py-2.5 text-[11px] text-slate-500 align-top">${orderWarn}${esc(doc.order ?? '')}</td>
                     <td class="px-3 py-2.5 align-top">
-                        <div class="font-bold text-xs text-slate-800">${doc.name_ar}</div>
-                        <div class="text-[10px] text-slate-400 font-mono">${doc.name_en || ''}</div>
+                        <div class="font-bold text-xs text-slate-800">${esc(doc.name_ar)}</div>
+                        <div class="text-[10px] text-slate-400 font-mono">${esc(doc.name_en || '')}</div>
                     </td>
                     <td class="px-3 py-2.5 align-top">
-                        <span class="bg-amber-100 text-amber-800 text-[10px] font-mono font-bold px-2 py-0.5 rounded border border-amber-200 uppercase${codeWarn}" title="${dupCode.has(key) ? 'رمز مكرر مع نوع آخر!' : ''}">${doc.code}</span>
+                        <span class="bg-amber-100 text-amber-800 text-[10px] font-mono font-bold px-2 py-0.5 rounded border border-amber-200 uppercase${codeWarn}" title="${dupCode.has(key) ? 'رمز مكرر مع نوع آخر!' : ''}">${esc(doc.code)}</span>
                     </td>
                     <td class="px-3 py-2.5 align-top">${requiredBadge}</td>
-                    <td class="px-3 py-2.5 align-top text-[10px] text-slate-600 font-mono">${(doc.allowed_extensions || []).join(', ')}</td>
-                    <td class="px-3 py-2.5 align-top text-[10px] text-slate-600 font-mono whitespace-nowrap">${doc.max_size_mb} MB</td>
-                    <td class="px-3 py-2.5 align-top text-[10px] text-slate-600 font-mono truncate max-w-[160px]" title="${(doc.storage_path || '').replace(/"/g,'&quot;')}">${storageWarn}${doc.storage_path || ''}</td>
+                    <td class="px-3 py-2.5 align-top text-[10px] text-slate-600 font-mono">${esc((doc.allowed_extensions || []).join(', '))}</td>
+                    <td class="px-3 py-2.5 align-top text-[10px] text-slate-600 font-mono whitespace-nowrap">${esc(doc.max_size_mb)} MB</td>
+                    <td class="px-3 py-2.5 align-top text-[10px] text-slate-600 font-mono truncate max-w-[160px]" title="${esc(doc.storage_path || '')}">${storageWarn}${esc(doc.storage_path || '')}</td>
                     <td class="px-3 py-2.5 align-top">
-                        <span class="bg-indigo-50 text-indigo-700 border border-indigo-150 text-[9px] font-bold px-2 py-0.5 rounded-full cursor-help" title="${keywordsTitle.replace(/"/g,'&quot;')}">${keywordsCount} كلمة</span>
+                        <span class="bg-indigo-50 text-indigo-700 border border-indigo-150 text-[9px] font-bold px-2 py-0.5 rounded-full cursor-help" title="${esc(keywordsTitle)}">${keywordsCount} كلمة</span>
                     </td>
                     <td class="px-3 py-2.5 align-top">
                         <div class="flex gap-1.5">
-                            <button onclick="prepareEdit('${key.replace(/'/g,"\\'")}')" class="bg-blue-50 hover:bg-blue-100 text-blue-700 text-[10px] font-bold px-2.5 py-1 rounded-lg border border-blue-200 transition-all whitespace-nowrap">✏️ تعديل</button>
-                            <button onclick="deleteDocument('${key.replace(/'/g,"\\'")}')" class="bg-rose-50 hover:bg-rose-100 text-rose-700 text-[10px] font-bold px-2.5 py-1 rounded-lg border border-rose-200 transition-all whitespace-nowrap">🗑️ حذف</button>
+                            <button data-action="edit" data-key="${esc(key)}" class="bg-blue-50 hover:bg-blue-100 text-blue-700 text-[10px] font-bold px-2.5 py-1 rounded-lg border border-blue-200 transition-all whitespace-nowrap">✏️ تعديل</button>
+                            <button data-action="delete" data-key="${esc(key)}" class="bg-rose-50 hover:bg-rose-100 text-rose-700 text-[10px] font-bold px-2.5 py-1 rounded-lg border border-rose-200 transition-all whitespace-nowrap">🗑️ حذف</button>
                         </div>
                     </td>
                 `;
                 tbody.appendChild(tr);
             });
         }
+
+        // تفويض أحداث النقر لأزرار "تعديل"/"حذف" مرة واحدة بدل onclick مضمّن
+        // بكل صف — يتفادى أي التباس بين سياق HTML وسياق JS عند التعامل مع
+        // نصوص قد تحتوي على علامات اقتباس أو رموز خاصة
+        document.getElementById('documents_list').addEventListener('click', (e) => {
+            const btn = e.target.closest('button[data-action]');
+            if (!btn) return;
+            const key = btn.dataset.key;
+            if (btn.dataset.action === 'edit') prepareEdit(key);
+            else if (btn.dataset.action === 'delete') deleteDocument(key);
+        });
 
         document.getElementById('table_search').addEventListener('input', (e) => {
             currentSearchTerm = e.target.value;
@@ -394,7 +411,7 @@
         // 3. التحضير لعملية التعديل وتعبئة حقول الـ Form
         function prepareEdit(key) {
             const doc = systemDocuments[key];
-            document.getElementById('form_title').innerHTML = `✏️ تعديل الوثيقة: ${key}`;
+            document.getElementById('form_title').innerHTML = `✏️ تعديل الوثيقة: ${esc(key)}`;
             document.getElementById('original_name').value = key;
 
             document.getElementById('doc_name_ar').value = doc.name_ar;
@@ -406,7 +423,7 @@
             document.getElementById('doc_required').value = doc.required.toString();
             document.getElementById('doc_exts').value = doc.allowed_extensions.join(', ');
             document.getElementById('storage_status').innerHTML =
-                `المسار الحالي المخزَّن: <span class="font-mono">${doc.storage_path}</span> — اضغط "تحقق/أنشئ" لتحديثه وربطه بمجلد الأرشيف الفعلي.`;
+                `المسار الحالي المخزَّن: <span class="font-mono">${esc(doc.storage_path)}</span> — اضغط "تحقق/أنشئ" لتحديثه وربطه بمجلد الأرشيف الفعلي.`;
             document.getElementById('storage_status').className = 'text-[9px] text-slate-400 block mt-1';
             document.getElementById('doc_keywords').value = doc.ocr_keywords ? doc.ocr_keywords.join(', ') : '';
         }
@@ -589,6 +606,14 @@
             }
         }
 
+        async function ensureExcelUtilsLoaded() {
+            // يعتمد على XLSX، فلازم يُحمَّل بعده دائماً
+            await ensureXlsxLoaded();
+            if (typeof detectHeaderRowIndex === 'undefined') {
+                await loadScriptOnce('/static/excel-utils.js');
+            }
+        }
+
         async function ensureHandleStoreLoaded() {
             if (typeof getHandle === 'undefined') {
                 await loadScriptOnce('/static/handle-store.js');
@@ -596,7 +621,7 @@
         }
 
         async function ensureSyncDependenciesLoaded() {
-            await ensureXlsxLoaded();
+            await ensureExcelUtilsLoaded();
             await ensureHandleStoreLoaded();
         }
 
@@ -719,66 +744,9 @@
             return added;
         }
 
-        // نفس منطق اكتشاف صف العناوين المستخدم في شاشتي "المسارات" و"المطابقة"
-        function detectHeaderRowIndexConstants(ws) {
-            const raw = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '', raw: false, blankrows: false });
-            let bestIdx = 0, bestCount = -1;
-            for (let i = 0; i < Math.min(raw.length, 15); i++) {
-                const nonEmpty = (raw[i] || []).filter(c => String(c).trim() !== '').length;
-                if (nonEmpty > bestCount) { bestCount = nonEmpty; bestIdx = i; }
-            }
-            return bestIdx;
-        }
-
-        // نفس منطق الحفاظ على صفوف البانر أعلى صف العناوين الفعلي (من شاشة المطابقة)
-        function mergeWithOriginalBannerRowsConstants(originalWs, dataSheet, headerRowIdx) {
-            if (!headerRowIdx) return dataSheet;
-            const merged = {};
-            const origRange = originalWs['!ref'] ? XLSX.utils.decode_range(originalWs['!ref']) : null;
-            if (origRange) {
-                for (let R = origRange.s.r; R < headerRowIdx; R++) {
-                    for (let C = origRange.s.c; C <= origRange.e.c; C++) {
-                        const addr = XLSX.utils.encode_cell({ r: R, c: C });
-                        if (originalWs[addr]) merged[addr] = originalWs[addr];
-                    }
-                }
-            }
-            const dataRange = dataSheet['!ref'] ? XLSX.utils.decode_range(dataSheet['!ref']) : null;
-            let maxR = headerRowIdx - 1;
-            let maxC = origRange ? origRange.e.c : 0;
-            if (dataRange) {
-                for (let R = dataRange.s.r; R <= dataRange.e.r; R++) {
-                    for (let C = dataRange.s.c; C <= dataRange.e.c; C++) {
-                        const srcAddr = XLSX.utils.encode_cell({ r: R, c: C });
-                        if (dataSheet[srcAddr]) {
-                            const dstAddr = XLSX.utils.encode_cell({ r: R + headerRowIdx, c: C });
-                            merged[dstAddr] = dataSheet[srcAddr];
-                        }
-                    }
-                }
-                maxR = Math.max(maxR, dataRange.e.r + headerRowIdx);
-                maxC = Math.max(maxC, dataRange.e.c);
-            }
-            merged['!ref'] = XLSX.utils.encode_range({ s: { r: 0, c: 0 }, e: { r: maxR, c: maxC } });
-            if (originalWs['!merges']) merged['!merges'] = originalWs['!merges'];
-            return merged;
-        }
-
-        // فرض النوع النصي على الأعمدة المحمية (رقم/اسم الطالب) في الملف المكتوب فعلياً
-        function forceTextColumnsInSheetConstants(sheet, colNames, cols, rows) {
-            const idxByName = {};
-            cols.forEach((c, i) => { idxByName[c] = i; });
-            for (const colName of colNames) {
-                const colIdx = idxByName[colName];
-                if (colIdx === undefined) continue;
-                const colLetter = XLSX.utils.encode_col(colIdx);
-                for (let r = 0; r < rows.length; r++) {
-                    const addr = colLetter + (r + 2); // +2: صف العناوين رقم 1
-                    const cell = sheet[addr];
-                    if (cell) { cell.v = String(cell.v); cell.t = 's'; cell.z = '@'; }
-                }
-            }
-        }
+        // detectHeaderRowIndex / mergeWithOriginalBannerRows / forceTextColumnsInSheet
+        // الآن معرَّفة مركزياً في /static/excel-utils.js (محمَّل عبر
+        // ensureExcelUtilsLoaded أعلاه) بدل تكرارها هنا بأسماء مختلفة
 
         // 2) التأكد من وجود عمودي "الحالة" و"نسبة التسليم" في ملف الإكسل المعتمد
         // من شاشة "المسارات"، وإنشاؤهما كآخر عمودين لو ناقصين فقط
@@ -812,7 +780,7 @@
             const sheetName = sheetNameStored && wb.SheetNames.includes(sheetNameStored) ? sheetNameStored : wb.SheetNames[0];
 
             const ws = wb.Sheets[sheetName];
-            const headerRowIdx = headerRowIdxStored !== null ? headerRowIdxStored : detectHeaderRowIndexConstants(ws);
+            const headerRowIdx = headerRowIdxStored !== null ? headerRowIdxStored : detectHeaderRowIndex(ws);
 
             const rows = XLSX.utils.sheet_to_json(ws, { range: headerRowIdx, defval: '', raw: false, rawNumbers: false });
             let cols = rows.length ? Object.keys(rows[0]) : [];
@@ -913,8 +881,8 @@
 
             // إعادة بناء الورقة، مع الحفاظ على صفوف البانر والنوع النصي للأعمدة المحمية
             let newSheet = XLSX.utils.json_to_sheet(rows, { header: cols });
-            forceTextColumnsInSheetConstants(newSheet, protectedCols, cols, rows);
-            newSheet = mergeWithOriginalBannerRowsConstants(ws, newSheet, headerRowIdx);
+            forceTextColumnsInSheet(newSheet, protectedCols, cols, rows);
+            newSheet = mergeWithOriginalBannerRows(ws, newSheet, headerRowIdx);
             wb.Sheets[sheetName] = newSheet;
 
             const outArrayBuffer = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });

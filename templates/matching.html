@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>مطابقة وترقيم الملفات</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="/static/excel-utils.js"></script>
 <script src="https://cdn.tailwindcss.com"></script>
 <script src="/static/handle-store.js"></script>
 <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@300;400;600;700&display=swap" rel="stylesheet">
@@ -1094,20 +1095,8 @@
     return getProtectedColumns().includes(colName);
   }
 
-  // يكتشف صف العناوين الحقيقي بدل افتراض أن الصف الأول دائماً هو العناوين —
-  // بعض الملفات تبدأ بصف عنوان/شعار مدمج (خلية واحدة فقط تحمل نصاً مثل
-  // "لوحة معلومات الطلبة") قبل صف العناوين الفعلي، ما يجعل SheetJS يولّد
-  // مفاتيح وهمية (__EMPTY, __EMPTY_1...) لبقية الأعمدة. الحل: فحص أول 15 صفاً
-  // خاماً واختيار الصف الذي يحوي أكبر عدد من الخلايا غير الفارغة كصف عناوين.
-  function detectHeaderRowIndex(ws) {
-    const raw = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '', raw: false, blankrows: false });
-    let bestIdx = 0, bestCount = -1;
-    for (let i = 0; i < Math.min(raw.length, 15); i++) {
-      const nonEmpty = (raw[i] || []).filter(c => String(c).trim() !== '').length;
-      if (nonEmpty > bestCount) { bestCount = nonEmpty; bestIdx = i; }
-    }
-    return bestIdx;
-  }
+  // detectHeaderRowIndex(ws) الآن مُعرَّفة مركزياً في /static/excel-utils.js
+  // بدل تكرارها هنا — نفس المنطق بالحرف، ملف واحد بدل أربعة
 
   function loadExcelSheet(headerRowOverride) {
     const sheetName = document.getElementById('sheetExcel').value || S.Excel.wb.SheetNames[0];
@@ -1903,60 +1892,11 @@
   // يفرض النوع النصي الحقيقي (t='s') وتنسيق نص ('@') على أعمدة بعينها داخل
   // ورقة إكسل مبنية حديثاً — يمنع Excel نفسه من إعادة تفسيرها كأرقام لاحقاً
   // (وبالتالي فقدان الأصفار البادئة) حتى لو بدت القيمة رقماً بحتاً
-  function forceTextColumnsInSheet(sheet, colNames, rows) {
-    const idxByName = {};
-    S.Excel.cols.forEach((c, i) => { idxByName[c] = i; });
-    for (const colName of colNames) {
-      const colIdx = idxByName[colName];
-      if (colIdx === undefined) continue;
-      const colLetter = XLSX.utils.encode_col(colIdx);
-      for (let r = 0; r < rows.length; r++) {
-        const addr = colLetter + (r + 2); // +2: صف العناوين رقم 1
-        const cell = sheet[addr];
-        if (cell) {
-          cell.v = String(cell.v);
-          cell.t = 's';
-          cell.z = '@';
-        }
-      }
-    }
-  }
+  // forceTextColumnsInSheet(sheet, colNames, cols, rows) الآن مُعرَّفة مركزياً
+  // في /static/excel-utils.js (بنفس المنطق بالحرف)
 
-  // لو تم تجاوز صف/صفوف بانر (مثل عنوان مدمج) قبل صف العناوين الحقيقي، يجب
-  // الحفاظ عليها كما هي بالملف المحفوظ — بدل فقدانها لأن json_to_sheet يبني
-  // دائماً من الصف 1. يدمج صفوف البانر الأصلية + بيانات الجدول الجديدة بإزاحة.
-  function mergeWithOriginalBannerRows(originalWs, dataSheet, headerRowIdx) {
-    if (!headerRowIdx) return dataSheet; // لا يوجد بانر، لا حاجة لأي دمج
-    const merged = {};
-    const origRange = originalWs['!ref'] ? XLSX.utils.decode_range(originalWs['!ref']) : null;
-    if (origRange) {
-      for (let R = origRange.s.r; R < headerRowIdx; R++) {
-        for (let C = origRange.s.c; C <= origRange.e.c; C++) {
-          const addr = XLSX.utils.encode_cell({ r: R, c: C });
-          if (originalWs[addr]) merged[addr] = originalWs[addr];
-        }
-      }
-    }
-    const dataRange = dataSheet['!ref'] ? XLSX.utils.decode_range(dataSheet['!ref']) : null;
-    let maxR = headerRowIdx - 1;
-    let maxC = origRange ? origRange.e.c : 0;
-    if (dataRange) {
-      for (let R = dataRange.s.r; R <= dataRange.e.r; R++) {
-        for (let C = dataRange.s.c; C <= dataRange.e.c; C++) {
-          const srcAddr = XLSX.utils.encode_cell({ r: R, c: C });
-          if (dataSheet[srcAddr]) {
-            const dstAddr = XLSX.utils.encode_cell({ r: R + headerRowIdx, c: C });
-            merged[dstAddr] = dataSheet[srcAddr];
-          }
-        }
-      }
-      maxR = Math.max(maxR, dataRange.e.r + headerRowIdx);
-      maxC = Math.max(maxC, dataRange.e.c);
-    }
-    merged['!ref'] = XLSX.utils.encode_range({ s: { r: 0, c: 0 }, e: { r: maxR, c: maxC } });
-    if (originalWs['!merges']) merged['!merges'] = originalWs['!merges'];
-    return merged;
-  }
+  // mergeWithOriginalBannerRows(originalWs, dataSheet, headerRowIdx) الآن
+  // مُعرَّفة مركزياً في /static/excel-utils.js (بنفس المنطق بالحرف)
 
   async function autoSaveDocStatusToOriginalFile() {
     const info = document.getElementById('saveDocStatusInfo');
@@ -1980,7 +1920,7 @@
 
       // حماية إلزامية: فرض النوع النصي على العمودين المحميين (رقم الطالب واسمه)
       // في الملف المكتوب فعلياً على القرص، بغض النظر عن أي شيء آخر
-      forceTextColumnsInSheet(newSheet, getProtectedColumns(), S.Excel.rows);
+      forceTextColumnsInSheet(newSheet, getProtectedColumns(), S.Excel.cols, S.Excel.rows);
 
       // الحفاظ على أي صف/صفوف بانر أعلى صف العناوين الفعلي (لا تُفقد أبداً)
       newSheet = mergeWithOriginalBannerRows(originalWs, newSheet, S.Excel.headerRowIdx || 0);

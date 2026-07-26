@@ -407,6 +407,13 @@ const ALL_EXT = [...IMG_EXT, ...PDF_EXT];
 const INVALID_CHARS = /[\/\\:\*\?"<>\|]/;
 
 let dirHandle = null;
+
+// تعقيم أي نص قبل إدراجه في innerHTML — أسماء الملفات الفعلية على القرص
+// أو بيانات أنواع الوثائق ممكن تحتوي على علامات < أو > أو " بالخطأ أو
+// قصداً، ولازم تتحول لنص عادي مش HTML قابل للتنفيذ
+function esc(s) {
+    return String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+}
 let entries = [];        // {handle, fullName, baseName, ext, size, lastModified, thumbUrl}
 let selected = new Set(); // fullName set
 let searchTerm = '';
@@ -514,7 +521,7 @@ async function ensureHandleStoreLoaded(){
 
     const perm = await handle.queryPermission({mode:'readwrite'});
     if(perm !== 'granted'){
-      $('folderLabel').innerHTML = 'مجلد العمل محفوظ (' + handle.name + ') — اضغط "اختيار المجلد" لإعادة تأكيد الصلاحية';
+      $('folderLabel').innerHTML = 'مجلد العمل محفوظ (' + esc(handle.name) + ') — اضغط "اختيار المجلد" لإعادة تأكيد الصلاحية';
       toast('⚠️ مجلد العمل "' + handle.name + '" محفوظ لكن يحتاج إعادة تأكيد الصلاحية — اضغط "اختيار المجلد".', 'err');
       return;
     }
@@ -528,7 +535,7 @@ async function ensureHandleStoreLoaded(){
   // بوضوح للمستخدم بدل ما يختفي بصمت ويسيب الجدول عالقاً في حالة "جارٍ التحميل"
   try{
     dirHandle = handle;
-    $('folderLabel').innerHTML = 'المجلد (من شاشة المسارات): <span class="folder-name">'+dirHandle.name+'</span>';
+    $('folderLabel').innerHTML = 'المجلد (من شاشة المسارات): <span class="folder-name">'+esc(dirHandle.name)+'</span>';
     $('pickFolderBtn').textContent = '🔄 تحديث المجلد';
     $('changeFolderLink').style.display = 'inline';
     await loadDocTypes();
@@ -609,7 +616,7 @@ async function pickNewFolder(){
     dirHandle = null;
     return;
   }
-  $('folderLabel').innerHTML = 'المجلد: <span class="folder-name">'+dirHandle.name+'</span>';
+  $('folderLabel').innerHTML = 'المجلد: <span class="folder-name">'+esc(dirHandle.name)+'</span>';
   $('pickFolderBtn').textContent = '🔄 تحديث المجلد';
   $('changeFolderLink').style.display = 'inline';
   await loadEntries();
@@ -719,8 +726,8 @@ function docTypeOptionsHtml(selectedKey){
   const sortedKeys = Object.keys(docTypes).sort((a, b) => (Number(docTypes[a]?.order) || 0) - (Number(docTypes[b]?.order) || 0));
   for(const key of sortedKeys){
     const info = docTypes[key] || {};
-    const label = (info.name_ar || key).replace(/"/g,'&quot;');
-    html += `<option value="${key.replace(/"/g,'&quot;')}" ${key===selectedKey?'selected':''}>${label}</option>`;
+    const label = esc(info.name_ar || key);
+    html += `<option value="${esc(key)}" ${key===selectedKey?'selected':''}>${label}</option>`;
   }
   return html;
 }
@@ -760,13 +767,13 @@ function renderTable(){
     tr.innerHTML = `
       <td><input type="checkbox" class="checkbox row-chk" ${selected.has(entry.fullName)?'checked':''}></td>
       <td>${idx+1}</td>
-      <td data-thumb="${entry.fullName.replace(/"/g,'&quot;')}">
+      <td data-thumb="${esc(entry.fullName)}">
         ${entry.thumbUrl ? `<img class="thumb" src="${entry.thumbUrl}">` : `<div class="thumb-placeholder">…</div>`}
       </td>
       <td>
         <div class="name-cell">
-          <input type="text" class="name-input" value="${entry.baseName.replace(/"/g,'&quot;')}">
-          <span class="ext-tag">.${entry.ext}</span>
+          <input type="text" class="name-input" value="${esc(entry.baseName)}">
+          <span class="ext-tag">.${esc(entry.ext)}</span>
         </div>
       </td>
       <td><span class="type-pill ${isImg?'type-img':'type-pdf'}">${isImg?'صورة':'PDF'}</span></td>
@@ -776,7 +783,7 @@ function renderTable(){
         <div class="doctype-cell">
           <select class="doctype-select" data-action="doctype"></select>
           <div class="doctype-meta">
-            ${info ? `<span class="code-badge">${info.code || ''}</span><span class="path-badge" title="${(info.storage_path||'').replace(/"/g,'&quot;')}">${subfolderNameFromPath(info.storage_path) || ''}</span>` : ''}
+            ${info ? `<span class="code-badge">${esc(info.code || '')}</span><span class="path-badge" title="${esc(info.storage_path||'')}">${esc(subfolderNameFromPath(info.storage_path) || '')}</span>` : ''}
           </div>
         </div>
       </td>
@@ -1466,7 +1473,7 @@ function showReport(report){
   const okCount = report.filter(r=>r.icon==='✅').length;
   const skipCount = report.length - okCount;
   $('reportSummary').textContent = `تم تعديل ${okCount} ملف بنجاح، وتخطي ${skipCount} ملف.`;
-  $('reportList').innerHTML = report.map(r=>`<div class="report-row"><span class="icon">${r.icon}</span><span>${r.text}</span></div>`).join('')
+  $('reportList').innerHTML = report.map(r=>`<div class="report-row"><span class="icon">${r.icon}</span><span>${esc(r.text)}</span></div>`).join('')
     || '<div class="report-row">لا توجد نتائج</div>';
   $('reportOverlay').classList.add('show');
 }

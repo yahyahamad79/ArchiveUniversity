@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>متابعة اكتمال الوثائق - نظام الأرشفة</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="/static/excel-utils.js"></script>
 <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@300;400;600;700&display=swap" rel="stylesheet">
 <style>
   :root{
@@ -263,19 +264,8 @@ function docTypesForMatrix(){
   });
 }
 
-/* ============================================================
-   نفس منطق اكتشاف صف العناوين والحفاظ على الأعمدة المحمية،
-   بنفس الأسلوب المتّبع في شاشات "المطابقة" و"إدارة الثوابت"
-   ============================================================ */
-function detectHeaderRowIndex(ws){
-  const raw = XLSX.utils.sheet_to_json(ws, {header:1, defval:'', raw:false, blankrows:false});
-  let bestIdx=0, bestCount=-1;
-  for(let i=0;i<Math.min(raw.length,15);i++){
-    const nonEmpty = (raw[i]||[]).filter(c=>String(c).trim()!=='').length;
-    if(nonEmpty>bestCount){ bestCount=nonEmpty; bestIdx=i; }
-  }
-  return bestIdx;
-}
+/* detectHeaderRowIndex(ws) الآن مُعرَّفة مركزياً في /static/excel-utils.js
+   بدل تكرارها هنا */
 
 /* ============================================================
    تحميل بيانات الإكسل المعتمد وبناء مصفوفة الطلاب
