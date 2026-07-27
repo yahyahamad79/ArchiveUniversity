@@ -71,7 +71,8 @@
             ],
             "max_size_mb": 5,
             "ocr_keywords": [
-                "مصدقة، إستناداً إلى أنظمة الجامعة"
+                "مصدقة",
+                "إستناداً إلى أنظمة الجامعة"
             ]
         },
         "مصدقة بالانجليزي": {
@@ -86,28 +87,30 @@
             ],
             "max_size_mb": 5,
             "ocr_keywords": [
-                "Certification"
+                "Certification",
+                "Graduation"
             ]
         },
         "صورة هوية": {
+            "name_ar": "صورة هوية",
+            "name_en": "ID Card",
+            "code": "ID",
+            "required": true,
+            "order": 3,
+            "storage_path": "ID",
             "allowed_extensions": [
                 "pdf",
                 "jpg",
                 "jpeg"
             ],
-            "code": "ID",
             "max_size_mb": 3,
-            "name_ar": "صورة هوية",
-            "name_en": "ID Card",
             "ocr_keywords": [
+                "بطاقة هوية",
                 "الهوية الوطنية",
                 "البطاقة الشخصية",
                 "رقم الهوية",
                 "جواز سفر"
-            ],
-            "order": 3,
-            "required": true,
-            "storage_path": "ID"
+            ]
         },
         "كشف علامات عربي": {
             "name_ar": "كشف علامات عربي",
@@ -123,7 +126,8 @@
             ],
             "max_size_mb": 10,
             "ocr_keywords": [
-                "كشف علامات، كشف درجات",
+                "كشف علامات",
+                "كشف درجات",
                 "السجل الأكاديمي",
                 "الدرجات",
                 "المقررات"
