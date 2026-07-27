@@ -85,10 +85,6 @@ def documents_check_screen():
 def completion_tracking_screen():
     return render_template('completion_tracking.html')
 
-@app.route('/full-automation')
-def full_automation_screen():
-    return render_template('full_automation.html')
-
 # ==========================================
 # APIs العمليات والخدمات الخلفية (الثوابت فقط)
 # ==========================================
