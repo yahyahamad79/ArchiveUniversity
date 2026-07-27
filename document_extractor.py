@@ -227,30 +227,83 @@ def parse_vision_output(raw_output: str):
 # =========================================================
 # تحديد نوع الوثيقة — مطابقة اسم الوثيقة الذي حدده Claude ضد doc_types.json
 # =========================================================
+def _normalize_ar_word(w: str) -> str:
+    w = re.sub(r'[\u064B-\u0652\u0670\u0640]', '', w)
+    w = re.sub(r'[إأآاٱ]', 'ا', w)
+    w = re.sub(r'[ؤئء]', '', w)
+    w = w.replace('ة', 'ه').replace('ى', 'ي')
+    if w.startswith('ال') and len(w) > 3:
+        w = w[2:]
+    return w
+
+
+def _doc_type_words(text: str) -> set:
+    words = set()
+    for part in re.split(r'[,،]', text):
+        for w in re.split(r'\s+', part.strip()):
+            w = w.strip()
+            if w and not w.isdigit():
+                words.add(_normalize_ar_word(w))
+    return words
+
+
+def _overlap_score(a_words: set, b_words: set) -> float:
+    if not a_words or not b_words:
+        return 0.0
+    common = a_words & b_words
+    return len(common) / min(len(a_words), len(b_words))
+
+
 def detect_doc_type(raw_doc_type: str, doc_types: dict) -> str:
     """
-    يعمل مع أي بنية تقريباً لِـ doc_types (dict) — يقارن ما ذكره النموذج
-    مع القيم النصية الموجودة في doc_types.json، وإن لم يجد تطابقاً يعيد
-    ما ذكره النموذج نفسه كما هو (أفضل من "غير محدد" لأنه معلومة حقيقية من الوثيقة).
+    يقارن نص نوع الوثيقة الذي وصفه النموذج (كما هو مكتوب حرفياً على الوثيقة)
+    مع كل نوع معرَّف في doc_types.json عبر تطابق بالكلمات — بعد توحيد الألف
+    والتاء المربوطة وحذف "الـ" التعريف — بدل الاحتواء النصي الحرفي الهش،
+    حتى تُقبل الصياغات المختلفة لنفس الوثيقة (مثل "شهادة ثانوية عامة" مقابل
+    "شهادة الدراسة الثانوية العامة لعام 2020"). يفحص أيضاً كل عنصر داخل
+    ocr_keywords فعلياً (كانت تُتجاهَل بالكامل سابقاً لأنها قائمة وليست نصاً).
     """
     if not raw_doc_type:
         return "غير محدد"
     if not doc_types:
         return raw_doc_type
 
+    raw_words = _doc_type_words(raw_doc_type)
+    if not raw_words:
+        return raw_doc_type
+
+    best_score = 0.0
+    best_name = None
+
     for code, info in doc_types.items():
+        if not isinstance(info, dict):
+            continue
+
         candidates = []
-        if isinstance(info, dict):
-            for v in info.values():
-                if isinstance(v, str) and v.strip():
-                    candidates.append(v.strip())
-        elif isinstance(info, str):
-            candidates.append(info.strip())
-        candidates.append(str(code))
+        for key in ("name_ar", "name_en", "code"):
+            v = info.get(key)
+            if isinstance(v, str) and v.strip():
+                candidates.append(v.strip())
+
+        kws = info.get("ocr_keywords")
+        if isinstance(kws, list):
+            for kw in kws:
+                if isinstance(kw, str) and kw.strip():
+                    # عنصر واحد ممكن يحتوي أكثر من عبارة مفصولة بفاصلة (بيانات
+                    # قديمة قبل إصلاح شاشة الثوابت) — تُفكّ هنا احتياطاً أيضاً
+                    for part in re.split(r'[,،]', kw):
+                        part = part.strip()
+                        if part:
+                            candidates.append(part)
 
         for cand in candidates:
-            if len(cand) >= 3 and (cand in raw_doc_type or raw_doc_type in cand):
-                return info.get("name_ar", cand) if isinstance(info, dict) else cand
+            score = _overlap_score(raw_words, _doc_type_words(cand))
+            if score > best_score:
+                best_score = score
+                best_name = info.get("name_ar", str(code))
+
+    if best_score >= 0.5:
+        return best_name
 
     return raw_doc_type
 

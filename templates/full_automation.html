@@ -346,16 +346,28 @@ async function processSingleFile(entry){
     }
   }
 
+  // ضغط مؤقت معروف على خدمة Gemini نفسها (لا علاقة له بملفك) — يستاهل
+  // انتظاراً أطول قبل إعادة المحاولة، بعكس أخطاء الاتصال العابرة العادية
+  function isTransientOverload(result){
+    const msg = JSON.stringify(result?.error || result?.message || '');
+    return /UNAVAILABLE|503|overloaded|high demand/i.test(msg);
+  }
+
   let extractResult;
-  try{
-    extractResult = await callExtraction();
-  }catch(firstErr){
-    // محاولة ثانية بعد مهلة قصيرة قبل اعتباره فشلاً نهائياً
-    await new Promise(r => setTimeout(r, 1500));
-    try{
+  let attempt = 0;
+  const maxAttempts = 3;
+  while (true) {
+    attempt++;
+    try {
       extractResult = await callExtraction();
-    }catch(secondErr){
-      return { status: 'review', reason: `فشل الاتصال بخدمة الاستخراج بعد محاولتين: ${secondErr.message}`, entry, file };
+      if (extractResult.success || attempt >= maxAttempts || !isTransientOverload(extractResult)) break;
+      // ضغط مؤقت على Gemini — انتظار أطول تدريجياً قبل المحاولة التالية
+      await new Promise(r => setTimeout(r, attempt * 3000));
+    } catch (err) {
+      if (attempt >= maxAttempts) {
+        return { status: 'review', reason: `فشل الاتصال بخدمة الاستخراج بعد ${attempt} محاولات: ${err.message}`, entry, file };
+      }
+      await new Promise(r => setTimeout(r, 1500));
     }
   }
 
