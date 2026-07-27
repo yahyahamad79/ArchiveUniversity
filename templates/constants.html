@@ -444,7 +444,7 @@
             
             const rawKeywords = document.getElementById('doc_keywords').value;
             const ocrKeywords = rawKeywords 
-                ? rawKeywords.split(',').map(kw => kw.trim()).filter(kw => kw.length > 0)
+                ? rawKeywords.split(/[,،]/).map(kw => kw.trim()).filter(kw => kw.length > 0)
                 : [];
 
             // جلب مسار ملف الإكسل المخزن في ذاكرة متصفح الموظف لإجراء التزامن

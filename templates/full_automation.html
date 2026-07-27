@@ -102,7 +102,7 @@
     <div class="table-scroll" id="logTableWrap" style="display:none">
       <table>
         <thead><tr>
-          <th>#</th><th>الملف</th><th>الاسم المستخرَج</th><th>نوع الوثيقة</th><th>الطالب المطابَق</th><th>الحالة</th><th>التفاصيل</th>
+          <th>#</th><th>الملف</th><th>الاسم المستخرَج</th><th>نوع الوثيقة</th><th>الطالب المطابَق</th><th>الحالة</th><th>التفاصيل</th><th></th>
         </tr></thead>
         <tbody id="logBody"></tbody>
       </table>
@@ -326,17 +326,37 @@ async function refreshQueue(){
    ============================================================ */
 async function processSingleFile(entry){
   const file = await entry.handle.getFile();
-  const form = new FormData();
-  form.append('file', file, entry.name);
   const personalKey = localStorage.getItem('gemini_api_key');
-  if (personalKey) form.append('gemini_api_key', personalKey);
+
+  // نداء الاستخراج مع محاولة إضافية واحدة تلقائياً في حال فشل مؤقت/عابر
+  // (انقطاع اتصال، مهلة استجابة على السيرفر...) قبل ما نستسلم ونطلب مراجعة
+  async function callExtraction(){
+    const form = new FormData();
+    form.append('file', file, entry.name);
+    if (personalKey) form.append('gemini_api_key', personalKey);
+    const res = await fetch('/api/extract-document-info', { method: 'POST', body: form });
+    const rawText = await res.text();
+    try {
+      return JSON.parse(rawText);
+    } catch (parseErr) {
+      // فشل تفسير الاستجابة كـJSON — غالباً استجابة فارغة/متقطعة من السيرفر
+      // (مهلة استجابة، أو انقطاع اتصال أثناء التحميل)
+      const snippet = rawText ? rawText.slice(0, 120) : '(استجابة فارغة تماماً)';
+      throw new Error(`استجابة غير صالحة من السيرفر — ${snippet}`);
+    }
+  }
 
   let extractResult;
   try{
-    const res = await fetch('/api/extract-document-info', { method: 'POST', body: form });
-    extractResult = await res.json();
-  }catch(e){
-    return { status: 'review', reason: 'فشل الاتصال بخدمة الاستخراج: ' + e.message, entry, file };
+    extractResult = await callExtraction();
+  }catch(firstErr){
+    // محاولة ثانية بعد مهلة قصيرة قبل اعتباره فشلاً نهائياً
+    await new Promise(r => setTimeout(r, 1500));
+    try{
+      extractResult = await callExtraction();
+    }catch(secondErr){
+      return { status: 'review', reason: `فشل الاتصال بخدمة الاستخراج بعد محاولتين: ${secondErr.message}`, entry, file };
+    }
   }
 
   if (!extractResult.success || !extractResult.name) {
@@ -423,12 +443,62 @@ async function executeAutoAction(result, moveFiles){
   return newName;
 }
 
+// يعالج ملفاً واحداً ويبني صف الجدول الخاص به، مع زر "إعادة محاولة" لو
+// احتاج مراجعة أو فشل — يُستخدم من حلقة الدفعة الرئيسية وأيضاً من زر
+// إعادة المحاولة الفردي بنفس المنطق تماماً
+async function processAndRenderRow(entry, rowNumber){
+  const moveFiles = $('moveFilesToggle').checked;
+  let result;
+  try {
+    result = await processSingleFile(entry);
+  } catch (e) {
+    result = { status: 'error', reason: e.message, entry };
+  }
+
+  let newName = '-';
+  let isAuto = false;
+  if (result.status === 'auto') {
+    try {
+      newName = await executeAutoAction(result, moveFiles);
+      isAuto = true;
+    } catch (e) {
+      result.status = 'review';
+      result.reason = 'فشل تنفيذ الإجراء التلقائي: ' + e.message;
+    }
+  }
+
+  const statusClass = isAuto ? 'status-auto' : (result.status === 'error' ? 'status-error' : 'status-review');
+  const statusLabel = isAuto ? '✅ تلقائي' : (result.status === 'error' ? '❌ خطأ' : '⚠️ يحتاج مراجعة');
+  const row = document.createElement('tr');
+  row.innerHTML = `
+    <td>${rowNumber}</td>
+    <td>${esc(entry.name)}</td>
+    <td>${esc(result.extracted?.name || '—')}</td>
+    <td>${esc(result.docType || result.extracted?.doc_type || '—')}</td>
+    <td>${result.matched ? esc(result.matched.row[S.nameCol]) + ' (' + esc(result.matched.row[S.numCol]) + ')' : '—'}</td>
+    <td class="${statusClass}">${statusLabel}</td>
+    <td style="text-align:right;font-size:11px">${esc(isAuto ? `تمت التسمية: ${newName}` : (result.reason || ''))}</td>
+    <td>${isAuto ? '' : '<button type="button" class="btn btn-white" style="padding:4px 8px;font-size:11px">🔁 إعادة محاولة</button>'}</td>
+  `;
+  if (!isAuto) {
+    row.querySelector('button').addEventListener('click', async () => {
+      const retryResult = await processAndRenderRow(entry, rowNumber);
+      row.replaceWith(retryResult.row);
+      if (retryResult.isAuto) {
+        $('statAuto').textContent = (parseInt($('statAuto').textContent, 10) || 0) + 1;
+        $('statReview').textContent = Math.max(0, (parseInt($('statReview').textContent, 10) || 0) - 1);
+        if (S.excelDirty) { try { await saveExcelData(); S.excelDirty = false; } catch (e) { toast('⚠️ تعذّر حفظ الإكسل: ' + e.message, 'err'); } }
+      }
+    });
+  }
+  return { row, isAuto };
+}
+
 /* ============================================================
    تشغيل دفعة كاملة
    ============================================================ */
 async function runBatch(){
   const batchSize = Math.max(1, parseInt($('batchSizeInput').value, 10) || 10);
-  const moveFiles = $('moveFilesToggle').checked;
   const batch = S.queue.splice(0, batchSize);
   if (!batch.length) { toast('لا توجد ملفات متبقية', 'err'); return; }
 
@@ -444,39 +514,8 @@ async function runBatch(){
   for (let i = 0; i < batch.length; i++) {
     $('progressBar').style.width = Math.round(((i) / batch.length) * 100) + '%';
     const entry = batch[i];
-    let result;
-    try {
-      result = await processSingleFile(entry);
-    } catch (e) {
-      result = { status: 'error', reason: e.message, entry };
-    }
-
-    let newName = '-';
-    if (result.status === 'auto') {
-      try {
-        newName = await executeAutoAction(result, moveFiles);
-        autoCount++;
-      } catch (e) {
-        result.status = 'review';
-        result.reason = 'فشل تنفيذ الإجراء التلقائي: ' + e.message;
-        reviewCount++;
-      }
-    } else {
-      reviewCount++;
-    }
-
-    const statusClass = result.status === 'auto' ? 'status-auto' : (result.status === 'error' ? 'status-error' : 'status-review');
-    const statusLabel = result.status === 'auto' ? '✅ تلقائي' : (result.status === 'error' ? '❌ خطأ' : '⚠️ يحتاج مراجعة');
-    const row = document.createElement('tr');
-    row.innerHTML = `
-      <td>${i+1}</td>
-      <td>${esc(entry.name)}</td>
-      <td>${esc(result.extracted?.name || '—')}</td>
-      <td>${esc(result.docType || result.extracted?.doc_type || '—')}</td>
-      <td>${result.matched ? esc(result.matched.row[S.nameCol]) + ' (' + esc(result.matched.row[S.numCol]) + ')' : '—'}</td>
-      <td class="${statusClass}">${statusLabel}</td>
-      <td style="text-align:right;font-size:11px">${esc(result.status === 'auto' ? `تمت التسمية: ${newName}` : (result.reason || ''))}</td>
-    `;
+    const { row, isAuto } = await processAndRenderRow(entry, i + 1);
+    if (isAuto) autoCount++; else reviewCount++;
     $('logBody').appendChild(row);
   }
 
