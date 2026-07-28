@@ -1,21 +1,26 @@
 {
     "document_types": {
         "صور شخصية": {
+            "name_ar": "صور شخصية",
+            "name_en": "Personal Photos",
+            "code": "PH",
+            "required": true,
+            "order": 4,
+            "storage_path": "PH",
             "allowed_extensions": [
                 "jpg",
                 "jpeg",
                 "png"
             ],
-            "code": "PH",
             "max_size_mb": 2,
-            "name_ar": "صور شخصية",
-            "name_en": "Personal Photos",
             "ocr_keywords": [
-                "صورة وجه انسان"
-            ],
-            "order": 4,
-            "required": true,
-            "storage_path": "PH"
+                "صورة شخصية",
+                "صورة وجه",
+                "صورة الوجه والرقبة",
+                "صورة حديثة",
+                "personal photo",
+                "photo"
+            ]
         },
         "شهادة ميلاد": {
             "name_ar": "شهادة ميلاد",
@@ -97,7 +102,11 @@
             "max_size_mb": 5,
             "ocr_keywords": [
                 "مصدقة",
-                "إستناداً إلى أنظمة الجامعة"
+                "إستناداً إلى أنظمة الجامعة",
+                "قرار مجلس الجامعة",
+                "درجة البكالوريوس",
+                "جامعة القدس المفتوحة",
+                "عمادة القبول والتسجيل والامتحانات"
             ]
         },
         "مصدقة بالانجليزي": {
@@ -112,8 +121,13 @@
             ],
             "max_size_mb": 5,
             "ocr_keywords": [
-                "Certification",
-                "Graduation"
+                "Graduation Certificate",
+                "Deanship of Admission",
+                "Registration and Examination",
+                "Has completed all graduation requirements",
+                "The Degree of Bachelor",
+                "Al-Quds Open University",
+                "Certificate No"
             ]
         },
         "صورة هوية": {
@@ -156,11 +170,12 @@
             ],
             "max_size_mb": 10,
             "ocr_keywords": [
-                "كشف علامات",
-                "كشف درجات",
-                "السجل الأكاديمي",
-                "الدرجات",
-                "المقررات"
+                "كشف علامات بكالوريوس",
+                "جامعة القدس المفتوحة",
+                "عمادة القبول والتسجيل",
+                "الرقم الجامعي",
+                "فصل الالتحاق",
+                "التخصص"
             ]
         },
         "كشف علامات انجليزي": {
