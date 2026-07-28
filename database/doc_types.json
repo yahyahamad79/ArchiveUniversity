@@ -194,7 +194,34 @@
             "ocr_keywords": [
                 "Graduation Certification",
                 "Graduation",
-                "Certification"
+                "Certification",
+                "Student's Transcript",
+                "Cum. Avg",
+                "Semester Avg",
+                "Honor List",
+                "End of Transcript",
+                "Faculty",
+                "Specialization",
+                "Tawjihi Avg",
+                "Tawjihi Branch"
+            ]
+        },
+        "كشف علامات دبلوم التأهيل التربوي": {
+            "name_ar": "كشف علامات دبلوم التأهيل التربوي",
+            "name_en": "Transcript Deploma",
+            "code": "TR-DEPLOMA",
+            "required": false,
+            "order": 9,
+            "storage_path": "TR-DEPLOMA",
+            "allowed_extensions": [
+                "pdf",
+                "jpg",
+                "jpeg"
+            ],
+            "max_size_mb": 5,
+            "ocr_keywords": [
+                "كشف علامات دبلوم التأهيل التربوي",
+                "دبلوم تأهيل تربوي"
             ]
         }
     },
