@@ -100,19 +100,6 @@
                         </div>
                     </div>
 
-                    <div class="grid grid-cols-2 gap-3">
-                        <div>
-                            <label class="block text-[11px] font-bold text-slate-650 mb-1">القسم/الدائرة:</label>
-                            <select id="doc_department" class="w-full text-xs px-3 py-2 border border-slate-300 rounded-lg outline-none focus:ring-2 focus:ring-amber-500"></select>
-                        </div>
-                        <div class="flex items-end pb-1.5">
-                            <label class="flex items-center gap-2 text-[11px] font-bold text-slate-650 cursor-pointer">
-                                <input type="checkbox" id="doc_sync_enabled" checked class="w-4 h-4">
-                                ✅ مفعَّل للمزامنة الشاملة
-                            </label>
-                        </div>
-                    </div>
-
                     <div>
                         <label class="block text-[11px] font-bold text-slate-650 mb-1">الامتدادات المسموحة (مفصولة بفاصلة):</label>
                         <input type="text" id="doc_exts" required placeholder="pdf, jpg, jpeg" 
@@ -146,9 +133,6 @@
                     </h3>
                     <input type="text" id="table_search" placeholder="🔎 بحث بالاسم أو الرمز..."
                            class="text-xs px-3 py-1.5 border border-slate-200 rounded-lg outline-none focus:ring-2 focus:ring-amber-500 flex-1 min-w-[160px] max-w-[240px]">
-                    <select id="department_filter" class="text-xs px-2 py-1.5 border border-slate-200 rounded-lg outline-none focus:ring-2 focus:ring-amber-500">
-                        <option value="">كل الأقسام</option>
-                    </select>
                     <span id="doc_count" class="bg-amber-50 text-amber-700 text-[10px] font-bold px-2 py-1 rounded-full border border-amber-200 whitespace-nowrap">0 وثائق</span>
                     <button id="fullSyncBtn" type="button" onclick="syncEverything()"
                             class="bg-indigo-600 hover:bg-indigo-700 text-white text-[10px] font-bold px-3 py-1.5 rounded-lg whitespace-nowrap transition-all">
@@ -166,8 +150,6 @@
                                     <th class="px-3 py-2.5 text-[10.5px] font-bold text-slate-500">نوع الوثيقة</th>
                                     <th class="px-3 py-2.5 text-[10.5px] font-bold text-slate-500 w-16">الرمز</th>
                                     <th class="px-3 py-2.5 text-[10.5px] font-bold text-slate-500 w-20">الحالة</th>
-                                    <th class="px-3 py-2.5 text-[10.5px] font-bold text-slate-500 w-24">القسم</th>
-                                    <th class="px-3 py-2.5 text-[10.5px] font-bold text-slate-500 w-16">مزامنة</th>
                                     <th class="px-3 py-2.5 text-[10.5px] font-bold text-slate-500">الامتدادات</th>
                                     <th class="px-3 py-2.5 text-[10.5px] font-bold text-slate-500 w-16">الحجم</th>
                                     <th class="px-3 py-2.5 text-[10.5px] font-bold text-slate-500">مسار التخزين</th>
@@ -191,26 +173,6 @@
 
     <script>
         let systemDocuments = {};
-
-        // قائمة الأقسام/الدوائر الثابتة — عدّل هذه القائمة من الكود مباشرة لو
-        // احتجت تضيف/تغيّر قسماً (بقرار مقصود: مفيش إضافة حرة من الواجهة)
-        const DEPARTMENTS = [
-            'قسم القبول والتسجيل',
-            'قسم الخريجين',
-            'قسم شؤون الطلبة',
-            'عام (كل الأقسام)'
-        ];
-
-        function populateDepartmentSelects() {
-            const formSelect = document.getElementById('doc_department');
-            formSelect.innerHTML = DEPARTMENTS.map(d => `<option value="${d}">${d}</option>`).join('');
-
-            const filterSelect = document.getElementById('department_filter');
-            const currentFilter = filterSelect.value;
-            filterSelect.innerHTML = '<option value="">كل الأقسام</option>' +
-                DEPARTMENTS.map(d => `<option value="${d}">${d}</option>`).join('');
-            filterSelect.value = currentFilter;
-        }
 
         // تعقيم أي نص قبل إدراجه في innerHTML — يمنع تنفيذ HTML/JS لو احتوى
         // اسم وثيقة أو أي حقل آخر على علامات مثل < أو > أو " بالخطأ أو قصداً
@@ -296,8 +258,6 @@
         }
 
         window.addEventListener('DOMContentLoaded', async () => {
-            populateDepartmentSelects();
-            document.getElementById('department_filter').addEventListener('change', renderDocumentsTable);
             await loadConstantsFromServer();
 
             // مزامنة شاملة تلقائية — لكن فقط لو مجلد الأرشيف تغيّر فعلاً من
@@ -374,11 +334,6 @@
             let keys = Object.keys(systemDocuments);
             document.getElementById('doc_count').innerText = `${keys.length} وثائق`;
 
-            const deptFilter = document.getElementById('department_filter').value;
-            if (deptFilter) {
-                keys = keys.filter(k => (systemDocuments[k].department || '') === deptFilter);
-            }
-
             if(currentSearchTerm){
                 const term = currentSearchTerm.toLowerCase();
                 keys = keys.filter(k => {
@@ -420,10 +375,6 @@
                         <span class="bg-amber-100 text-amber-800 text-[10px] font-mono font-bold px-2 py-0.5 rounded border border-amber-200 uppercase${codeWarn}" title="${dupCode.has(key) ? 'رمز مكرر مع نوع آخر!' : ''}">${esc(doc.code)}</span>
                     </td>
                     <td class="px-3 py-2.5 align-top">${requiredBadge}</td>
-                    <td class="px-3 py-2.5 align-top text-[10px] text-slate-600">${esc(doc.department || '—')}</td>
-                    <td class="px-3 py-2.5 align-top text-center">
-                        <input type="checkbox" data-action="toggle-sync" data-key="${esc(key)}" ${doc.sync_enabled === false ? '' : 'checked'} class="w-4 h-4 cursor-pointer" title="مفعَّل للمزامنة الشاملة">
-                    </td>
                     <td class="px-3 py-2.5 align-top text-[10px] text-slate-600 font-mono">${esc((doc.allowed_extensions || []).join(', '))}</td>
                     <td class="px-3 py-2.5 align-top text-[10px] text-slate-600 font-mono whitespace-nowrap">${esc(doc.max_size_mb)} MB</td>
                     <td class="px-3 py-2.5 align-top text-[10px] text-slate-600 font-mono truncate max-w-[160px]" title="${esc(doc.storage_path || '')}">${storageWarn}${esc(doc.storage_path || '')}</td>
@@ -452,35 +403,6 @@
             else if (btn.dataset.action === 'delete') deleteDocument(key);
         });
 
-        // تفعيل/تعطيل نوع وثيقة للمزامنة الشاملة مباشرة من الجدول، بدون
-        // الحاجة لفتح نموذج التعديل الكامل — يُحفظ فوراً عند تغيير الخانة
-        document.getElementById('documents_list').addEventListener('change', async (e) => {
-            const chk = e.target.closest('input[data-action="toggle-sync"]');
-            if (!chk) return;
-            const key = chk.dataset.key;
-            const doc = systemDocuments[key];
-            if (!doc) return;
-            const updatedDoc = { ...doc, sync_enabled: chk.checked };
-            try {
-                const response = await fetch('/api/save-constant', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ original_name: key, doc_key: key, doc_data: updatedDoc })
-                });
-                const result = await response.json();
-                if (result.success) {
-                    systemDocuments[key] = updatedDoc;
-                    showAlert(`تم ${chk.checked ? 'تفعيل' : 'تعطيل'} "${doc.name_ar}" للمزامنة الشاملة.`, true);
-                } else {
-                    chk.checked = !chk.checked; // فشل الحفظ — رجّع الخانة لحالتها القديمة
-                    showAlert('تعذّر حفظ التغيير.', false);
-                }
-            } catch (err) {
-                chk.checked = !chk.checked;
-                showAlert('لا يمكن الاتصال بالخادم.', false);
-            }
-        });
-
         document.getElementById('table_search').addEventListener('input', (e) => {
             currentSearchTerm = e.target.value;
             renderDocumentsTable();
@@ -499,8 +421,6 @@
             document.getElementById('doc_storage').value = doc.storage_path;
             document.getElementById('doc_size').value = doc.max_size_mb;
             document.getElementById('doc_required').value = doc.required.toString();
-            document.getElementById('doc_department').value = doc.department || DEPARTMENTS[0];
-            document.getElementById('doc_sync_enabled').checked = doc.sync_enabled !== false;
             document.getElementById('doc_exts').value = doc.allowed_extensions.join(', ');
             document.getElementById('storage_status').innerHTML =
                 `المسار الحالي المخزَّن: <span class="font-mono">${esc(doc.storage_path)}</span> — اضغط "تحقق/أنشئ" لتحديثه وربطه بمجلد الأرشيف الفعلي.`;
@@ -520,8 +440,6 @@
             const storage = document.getElementById('doc_storage').value.trim();
             const size = parseInt(document.getElementById('doc_size').value);
             const required = document.getElementById('doc_required').value === "true";
-            const department = document.getElementById('doc_department').value;
-            const syncEnabled = document.getElementById('doc_sync_enabled').checked;
             const allowedExtensions = document.getElementById('doc_exts').value.split(',').map(ext => ext.trim().toLowerCase());
             
             const rawKeywords = document.getElementById('doc_keywords').value;
@@ -566,9 +484,7 @@
                 storage_path: storage,
                 allowed_extensions: allowedExtensions,
                 max_size_mb: size,
-                ocr_keywords: ocrKeywords,
-                department: department,
-                sync_enabled: syncEnabled
+                ocr_keywords: ocrKeywords
             };
 
             try {
@@ -797,9 +713,7 @@
         // ولا إضافة أي مجلد غير معرَّف مسبقاً كنوع وثيقة جديد إطلاقاً
         async function syncDocTypesToFolders() {
             const created = [];
-            const sortedDocs = Object.values(systemDocuments)
-                .filter(d => d.sync_enabled !== false)
-                .sort((a, b) => (Number(a.order) || 0) - (Number(b.order) || 0));
+            const sortedDocs = Object.values(systemDocuments).sort((a, b) => (Number(a.order) || 0) - (Number(b.order) || 0));
             for (const doc of sortedDocs) {
                 const code = (doc.code || '').trim().toUpperCase();
                 if (!code) continue;
@@ -877,9 +791,7 @@
                 }
             });
 
-            const sortedDocsForExcel = Object.values(systemDocuments)
-                .filter(d => d.sync_enabled !== false)
-                .sort((a, b) => (Number(a.order) || 0) - (Number(b.order) || 0));
+            const sortedDocsForExcel = Object.values(systemDocuments).sort((a, b) => (Number(a.order) || 0) - (Number(b.order) || 0));
 
             // خريطة: رمز نوع الوثيقة → اسم العمود المطابق له فعلياً في الإكسل (إن وُجد)
             const codeToColumn = {};
