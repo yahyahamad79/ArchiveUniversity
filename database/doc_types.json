@@ -4,7 +4,7 @@
             "name_ar": "صور شخصية",
             "name_en": "Personal Photos",
             "code": "PH",
-            "required": true,
+            "required": false,
             "order": 4,
             "storage_path": "PH",
             "allowed_extensions": [
@@ -20,7 +20,9 @@
                 "صورة حديثة",
                 "personal photo",
                 "photo"
-            ]
+            ],
+            "department": "قسم القبول والتسجيل",
+            "sync_enabled": false
         },
         "شهادة ميلاد": {
             "name_ar": "شهادة ميلاد",
@@ -48,7 +50,9 @@
                 "تاريخ الميلاد",
                 "مكان الميلاد",
                 "وزارة الصحة"
-            ]
+            ],
+            "department": "عام (كل الأقسام)",
+            "sync_enabled": true
         },
         "شهادة ثانوية عامة": {
             "name_ar": "شهادة ثانوية عامة",
@@ -83,7 +87,9 @@
                 "الصناعي",
                 "الزراعي",
                 "علوم إنسانية"
-            ]
+            ],
+            "department": "عام (كل الأقسام)",
+            "sync_enabled": true
         },
         "مصدقة بالعربي": {
             "name_ar": "مصدقة بالعربي",
@@ -107,7 +113,9 @@
                 "درجة البكالوريوس",
                 "جامعة القدس المفتوحة",
                 "عمادة القبول والتسجيل والامتحانات"
-            ]
+            ],
+            "department": "قسم الخريجين",
+            "sync_enabled": true
         },
         "مصدقة بالانجليزي": {
             "name_ar": "مصدقة بالانجليزي",
@@ -128,7 +136,9 @@
                 "The Degree of Bachelor",
                 "Al-Quds Open University",
                 "Certificate No"
-            ]
+            ],
+            "department": "قسم الخريجين",
+            "sync_enabled": true
         },
         "صورة هوية": {
             "name_ar": "صورة هوية",
@@ -154,7 +164,9 @@
                 "صدرت في",
                 "تاريخ الاصدار",
                 "الحالة الاجتماعية"
-            ]
+            ],
+            "department": "عام (كل الأقسام)",
+            "sync_enabled": true
         },
         "كشف علامات عربي": {
             "name_ar": "كشف علامات عربي",
@@ -176,7 +188,9 @@
                 "الرقم الجامعي",
                 "فصل الالتحاق",
                 "التخصص"
-            ]
+            ],
+            "department": "قسم الخريجين",
+            "sync_enabled": true
         },
         "كشف علامات انجليزي": {
             "name_ar": "كشف علامات انجليزي",
@@ -204,7 +218,9 @@
                 "Specialization",
                 "Tawjihi Avg",
                 "Tawjihi Branch"
-            ]
+            ],
+            "department": "قسم الخريجين",
+            "sync_enabled": true
         },
         "كشف علامات دبلوم التأهيل التربوي": {
             "name_ar": "كشف علامات دبلوم التأهيل التربوي",
@@ -222,7 +238,9 @@
             "ocr_keywords": [
                 "كشف علامات دبلوم التأهيل التربوي",
                 "دبلوم تأهيل تربوي"
-            ]
+            ],
+            "department": "قسم الخريجين",
+            "sync_enabled": true
         }
     },
     "ignored_codes": []
