@@ -312,14 +312,19 @@ def extract_document_info_route():
         # محاولة إضافية اختيارية: قص الصورة الشخصية (وجه وكتفين) من نفس
         # الملف لو كانت وثيقة تحتوي صورة شخصية فعلية (بطاقة هوية مثلاً) —
         # لا تُفشل الطلب أبداً لو تعذّرت (أغلب الوثائق مالهاش صورة شخصية
-        # واضحة أصلاً، زي كشف العلامات أو شهادة الميلاد النصية)
+        # واضحة أصلاً، زي كشف العلامات أو شهادة الميلاد النصية)، لكن سبب
+        # الفشل يُسجَّل دائماً في الـ Logs للتشخيص بدل الابتلاع الصامت
         try:
             image_path_for_photo = prepare_image(tmp_path)
             photo_bytes, photo_info = extract_id_photo_bytes(image_path_for_photo)
             if photo_bytes and photo_info.get('looks_like_skin'):
                 result['id_photo_base64'] = base64.b64encode(photo_bytes).decode('ascii')
-        except Exception:
-            pass  # لا صورة شخصية مكتشَفة — طبيعي لمعظم أنواع الوثائق
+            else:
+                print(f"[id_photo] لم يتم اعتماد صورة شخصية للملف {file.filename}: {photo_info}")
+        except Exception as photo_err:
+            import traceback
+            print(f"[id_photo] خطأ أثناء محاولة قص الصورة الشخصية للملف {file.filename}: {photo_err}")
+            traceback.print_exc()
 
         return jsonify({"success": True, **result})
     except Exception as e:
