@@ -324,6 +324,15 @@ async function refreshQueue(){
 /* ============================================================
    معالجة ملف واحد: استخراج ← تصنيف ← مطابقة ← قرار
    ============================================================ */
+// يحدد رمز نوع "صور شخصية" ديناميكياً من الثوابت المعرَّفة (بدل افتراض
+// "PH" ثابتاً)، لو المستخدم غيّر الرمز أو الاسم من شاشة "أنواع الوثائق"
+function getPersonalPhotoCode(){
+  const doc = Object.values(S.systemDocuments).find(d =>
+    (d.code || '').toUpperCase() === 'PH' || (d.name_ar || '').trim() === 'صور شخصية'
+  );
+  return doc ? (doc.code || 'PH').toUpperCase() : 'PH';
+}
+
 async function processSingleFile(entry){
   const file = await entry.handle.getFile();
   const personalKey = localStorage.getItem('gemini_api_key');
@@ -371,12 +380,31 @@ async function processSingleFile(entry){
     }
   }
 
+  let usedFilenameFallback = false;
   if (!extractResult.success || !extractResult.name) {
-    return { status: 'review', reason: extractResult.error || extractResult.message || 'تعذّر استخراج اسم واضح', entry, file, extracted: extractResult };
+    // لا يوجد اسم من قراءة النص — طبيعي جداً لصورة شخصية بحتة (مفيش أي
+    // نص عليها أصلاً). لو السيرفر أكّد وجود صورة شخصية فعلية مقصوصة
+    // (id_photo_base64)، ده دليل قوي إن الملف ده فعلاً "صورة شخصية"،
+    // فنعتمد اسم الملف نفسه كبديل للمطابقة (اصطلاح تسمية شائع فعلياً في
+    // ملفاتك الحقيقية) بدل ما نستسلم مباشرة لحالة "يحتاج مراجعة"
+    if (extractResult.id_photo_base64) {
+      const dotIdx = entry.name.lastIndexOf('.');
+      const baseName = dotIdx > 0 ? entry.name.slice(0, dotIdx) : entry.name;
+      const filenameCandidate = cleanNameForMatch(baseName);
+      if (filenameCandidate.split(' ').length >= 3) {
+        extractResult = { ...extractResult, name: filenameCandidate, doc_type: 'صور شخصية' };
+        usedFilenameFallback = true;
+      }
+    }
+    if (!usedFilenameFallback) {
+      return { status: 'review', reason: extractResult.error || extractResult.message || 'تعذّر استخراج اسم واضح', entry, file, extracted: extractResult };
+    }
   }
 
   const rawDocType = extractResult.doc_type;
-  const matchedDoc = Object.values(S.systemDocuments).find(d => d.name_ar === rawDocType || d.code === rawDocType);
+  const matchedDoc = usedFilenameFallback
+    ? Object.values(S.systemDocuments).find(d => (d.code || '').toUpperCase() === 'PH' || (d.name_ar || '').trim() === 'صور شخصية')
+    : Object.values(S.systemDocuments).find(d => d.name_ar === rawDocType || d.code === rawDocType);
   if (!matchedDoc) {
     return { status: 'review', reason: `نوع الوثيقة "${rawDocType}" غير معرَّف في النظام`, entry, file, extracted: extractResult };
   }
@@ -437,6 +465,33 @@ async function executeAutoAction(result, moveFiles){
     const writable = await destHandle.createWritable();
     await writable.write(buf);
     await writable.close();
+
+    // لو السيرفر قدر يقص صورة شخصية فعلية من نفس الملف (بطاقة هوية غالباً)،
+    // فده مهمّتان منفصلتان على نفس الملف المصدر:
+    //  1) الوثيقة الأصلية (بطاقة الهوية) تترحّل لمجلد نوعها الخاص (subDir)
+    //     زي أي وثيقة عادية — ده أصلاً بيحصل فوق بلا أي تغيير.
+    //  2) الصورة الشخصية المستخرَجة منها تترحّل لمجلد "صور شخصية" (PH)
+    //     بذاته — مش لمجلد نوع الوثيقة الأصلية — وبرقم الطالب مثل باقي
+    //     الأنواع، وبدون استبدال أي ملف موجود بنفس الرقم مسبقاً إطلاقاً
+    //     (لو موجود، تُحفظ بلاحقة رقمية بديلة وتترك القديم كما هو)
+    if (result.extracted && result.extracted.id_photo_base64) {
+      try {
+        const phCode = getPersonalPhotoCode();
+        const phDir = await root.getDirectoryHandle(phCode, { create: true });
+        const photoBytes = Uint8Array.from(atob(result.extracted.id_photo_base64), c => c.charCodeAt(0));
+        let photoName = `${number}.jpg`, pi = 1;
+        while (true) {
+          try { await phDir.getFileHandle(photoName); photoName = `${number}_${pi}.jpg`; pi++; }
+          catch (e) { break; } // لا يوجد ملف بهذا الاسم — آمن للحفظ، والقديم (لو وُجد) لم يُلمَس
+        }
+        const photoHandle = await phDir.getFileHandle(photoName, { create: true });
+        const photoWritable = await photoHandle.createWritable();
+        await photoWritable.write(photoBytes);
+        await photoWritable.close();
+      } catch (photoErr) {
+        console.warn('تعذّر حفظ الصورة الشخصية المقصوصة:', photoErr);
+      }
+    }
 
     const workDir = await getWorkspaceDirHandle();
     await workDir.removeEntry(result.entry.name);

@@ -5,9 +5,7 @@ import io
 import zipfile
 from datetime import datetime
 from flask import Flask, render_template, request, jsonify, send_file
-import base64
-from document_extractor import extract_document_info, SUPPORTED_EXTENSIONS, prepare_image
-from id_photo_extractor import extract_id_photo_bytes
+from document_extractor import extract_document_info, SUPPORTED_EXTENSIONS
 
 app = Flask(__name__)
 
@@ -18,24 +16,20 @@ PATHS_JSON_PATH = os.path.join(DB_DIR, 'paths.json')
 def load_doc_types():
     return load_full_doc_types_file().get("document_types", {})
 
-DEFAULT_DEPARTMENTS = ["قسم القبول والتسجيل", "قسم الخريجين", "قسم شؤون الطلبة", "عام (كل الأقسام)"]
-
 # الملف الكامل يتضمن الآن "document_types" و"ignored_codes" (الرموز المحذوفة
 # صراحة من الشاشة — تُستبعد من "مزامنة شاملة" حتى لا تُعاد من مجلدها الفعلي
-# تلقائياً، مع بقاء المجلد نفسه دون أي حذف أو لمس) و"departments" (قائمة
-# الأقسام/الدوائر القابلة للإضافة من شاشة "أنواع الوثائق" مباشرة)
+# تلقائياً، مع بقاء المجلد نفسه دون أي حذف أو لمس)
 def load_full_doc_types_file():
     if not os.path.exists(JSON_PATH):
-        return {"document_types": {}, "ignored_codes": [], "departments": list(DEFAULT_DEPARTMENTS)}
+        return {"document_types": {}, "ignored_codes": []}
     try:
         with open(JSON_PATH, 'r', encoding='utf-8') as f:
             data = json.load(f)
             data.setdefault("document_types", {})
             data.setdefault("ignored_codes", [])
-            data.setdefault("departments", list(DEFAULT_DEPARTMENTS))
             return data
     except Exception:
-        return {"document_types": {}, "ignored_codes": [], "departments": list(DEFAULT_DEPARTMENTS)}
+        return {"document_types": {}, "ignored_codes": []}
 
 def save_full_doc_types_file(data):
     if not os.path.exists(DB_DIR):
@@ -105,26 +99,8 @@ def get_constants():
         return jsonify({
             "success": True,
             "document_types": full.get("document_types", {}),
-            "ignored_codes": full.get("ignored_codes", []),
-            "departments": full.get("departments", list(DEFAULT_DEPARTMENTS))
+            "ignored_codes": full.get("ignored_codes", [])
         })
-    except Exception as e:
-        return jsonify({"success": False, "message": str(e)}), 500
-
-@app.route('/api/add-department', methods=['POST'])
-def add_department():
-    data = request.json or {}
-    name = (data.get('name') or '').strip()
-    if not name:
-        return jsonify({"success": False, "message": "اسم القسم مطلوب"}), 400
-    try:
-        full = load_full_doc_types_file()
-        departments = full.get("departments", list(DEFAULT_DEPARTMENTS))
-        if name not in departments:
-            departments.append(name)
-        full["departments"] = departments
-        save_full_doc_types_file(full)
-        return jsonify({"success": True, "departments": departments})
     except Exception as e:
         return jsonify({"success": False, "message": str(e)}), 500
 
@@ -308,19 +284,6 @@ def extract_document_info_route():
 
         doc_types = load_doc_types()
         result = extract_document_info(tmp_path, doc_types, api_key=personal_api_key)
-
-        # محاولة إضافية اختيارية: قص الصورة الشخصية (وجه وكتفين) من نفس
-        # الملف لو كانت وثيقة تحتوي صورة شخصية فعلية (بطاقة هوية مثلاً) —
-        # لا تُفشل الطلب أبداً لو تعذّرت (أغلب الوثائق مالهاش صورة شخصية
-        # واضحة أصلاً، زي كشف العلامات أو شهادة الميلاد النصية)
-        try:
-            image_path_for_photo = prepare_image(tmp_path)
-            photo_bytes, photo_info = extract_id_photo_bytes(image_path_for_photo)
-            if photo_bytes and photo_info.get('looks_like_skin'):
-                result['id_photo_base64'] = base64.b64encode(photo_bytes).decode('ascii')
-        except Exception:
-            pass  # لا صورة شخصية مكتشَفة — طبيعي لمعظم أنواع الوثائق
-
         return jsonify({"success": True, **result})
     except Exception as e:
         return jsonify({"success": False, "message": str(e)}), 500
