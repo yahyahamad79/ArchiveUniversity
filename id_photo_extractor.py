@@ -32,6 +32,30 @@ def _correct_orientation(image_path: str) -> Image.Image:
     return ImageOps.exif_transpose(img).convert("RGB")
 
 
+def _detect_face_in_region(bgr: np.ndarray, region=None):
+    """
+    يكشف الوجه داخل منطقة محددة من الصورة (أو الصورة كاملة لو region=None)،
+    ويرجّع إحداثياته بالنسبة للصورة الكاملة (مش المنطقة الفرعية).
+    """
+    if region is not None:
+        rx, ry, rw, rh = region
+        sub = bgr[ry:ry + rh, rx:rx + rw]
+    else:
+        sub = bgr
+        rx, ry = 0, 0
+    if sub.size == 0:
+        return None
+    gray = cv2.cvtColor(sub, cv2.COLOR_BGR2GRAY)
+    cascade_path = cv2.data.haarcascades + "haarcascade_frontalface_default.xml"
+    face_cascade = cv2.CascadeClassifier(cascade_path)
+    faces = face_cascade.detectMultiScale(gray, scaleFactor=1.05, minNeighbors=4, minSize=(40, 40))
+    if len(faces) == 0:
+        return None
+    faces = sorted(faces, key=lambda f: f[2] * f[3], reverse=True)
+    fx, fy, fw, fh = faces[0]
+    return (fx + rx, fy + ry, fw, fh)
+
+
 def _detect_blue_background_box(bgr: np.ndarray):
     """
     يكتشف صندوق الصورة الشخصية عبر الخلفية الزرقاء النمطية لبطاقات الهوية.
@@ -67,25 +91,6 @@ def _detect_blue_background_box(bgr: np.ndarray):
 
     contours.sort(key=cv2.contourArea, reverse=True)
     return cv2.boundingRect(contours[0])
-
-
-def _detect_face_box(bgr: np.ndarray):
-    """احتياطي (fallback) عند غياب خلفية زرقاء واضحة — كشف الوجه مباشرة."""
-    gray = cv2.cvtColor(bgr, cv2.COLOR_BGR2GRAY)
-    cascade_path = cv2.data.haarcascades + "haarcascade_frontalface_default.xml"
-    face_cascade = cv2.CascadeClassifier(cascade_path)
-    faces = face_cascade.detectMultiScale(gray, scaleFactor=1.1, minNeighbors=5, minSize=(80, 80))
-    if len(faces) == 0:
-        return None
-    faces = sorted(faces, key=lambda f: f[2] * f[3], reverse=True)
-    x, y, w, h = faces[0]
-    margin_x, margin_top, margin_bottom = int(w * 0.6), int(h * 0.7), int(h * 1.3)
-    return (
-        max(0, x - margin_x),
-        max(0, y - margin_top),
-        w + 2 * margin_x,
-        h + margin_top + margin_bottom,
-    )
 
 
 def _verify_crop_quality(crop_rgb: np.ndarray) -> dict:
@@ -132,40 +137,55 @@ def _verify_crop_quality(crop_rgb: np.ndarray) -> dict:
     }
 
 
-def extract_id_photo_bytes(image_path: str, inset_x: float = 0.10, inset_top: float = 0.05, inset_bottom: float = 0.10):
+def extract_id_photo_bytes(image_path: str, margin_x: float = 0.55, margin_top: float = 0.65, margin_bottom: float = 0.55,
+                            inset_x: float = 0.10, inset_top: float = 0.05, inset_bottom: float = 0.10):
     """
     يرجّع (photo_bytes, info) — photo_bytes هي بايتات JPEG جاهزة للحفظ أو
     الإرسال، أو None لو تعذّر تحديد الصورة الشخصية. info فيها تفاصيل
     تشخيصية (الطريقة المستخدَمة، وهل القص يبدو صحيحاً إحصائياً أم لا).
 
-    ملاحظة من تجربة فعلية ثالثة: صندوق الخلفية الزرقاء المكتشَف بيحتوي
-    عادة على هامش زائد حوالين الوجه (خلفية زرقاء فاضية فوق الرأس وعلى
-    الجانبين) — القص الأدق مش بإضافة هامش خارجي حوله (padding) زي
-    الإصدارات الأولى، لكن بتقليم هامش داخلي (inset) نسبة من أبعاد الصندوق
-    نفسه، أفقياً ورأسياً. النسب الافتراضية هنا تم التحقق منها عملياً عبر
-    كشف الوجه (Haar Cascade) على القص الناتج والتأكد من بقاء هامش أمان
-    حقيقي حول الوجه المكتشَف على أكثر من بطاقة هوية حقيقية — قيمة أولى
-    أكثر عدوانية لـ inset_bottom (0.18) تم تجربتها لكنها كادت تقصّ ذقن
-    الوجه في إحدى الحالات الحقيقية (هامش 0 بكسل بالظبط)، فتم تخفيضها.
+    ملاحظة من تجربة فعلية رابعة (أهم تصحيح حتى الآن): الاعتماد على صندوق
+    الخلفية الزرقاء كأساس للقص (حتى مع التقليم الداخلي) بيفشل بشكل متكرر
+    لأن أبعاد الصندوق نفسه بتختلف بشكل كبير حسب تصميم البطاقة (المسافة
+    بين الصورة والختم تحتها، حجم الخلفية الفارغة حوالين الرأس...) — في
+    حالتين حقيقيتين طلع أكتر من نص القص فراغ فاضي أسفل الذقن. الحل الأصح:
+    **كشف الوجه نفسه هو أساس القص دائماً** (مش الخلفية الزرقاء)، بهوامش
+    نسبة من *حجم الوجه المكتشَف فعلياً* لا حجم صندوق الخلفية — هذا مستقر
+    ومتسق بغض النظر عن تصميم البطاقة، لأن حجم الوجه هو المتغيّر الحقيقي
+    المهم. صندوق الخلفية الزرقاء يُستخدم فقط (لو موجود) لتضييق منطقة
+    البحث عن الوجه أولاً (تجنّباً لكشف وجه خاطئ في مكان آخر بالصورة لو
+    كانت الصورة الملتقطة تحتوي على أكتر من بطاقة/شخص).
     """
     try:
         pil_img = _correct_orientation(image_path)
         rgb = np.array(pil_img)
         bgr = cv2.cvtColor(rgb, cv2.COLOR_RGB2BGR)
 
-        box = _detect_blue_background_box(bgr)
-        method = "خلفية زرقاء"
-        if box is None:
-            box = _detect_face_box(bgr)
-            method = "كشف الوجه (احتياطي)"
-        if box is None:
+        blue_box = _detect_blue_background_box(bgr)
+        face_box = _detect_face_in_region(bgr, region=blue_box)
+        if face_box is None and blue_box is not None:
+            face_box = _detect_face_in_region(bgr, region=None)  # الصندوق الأزرق ممكن يكون غلط — جرّب الصورة كاملة
+
+        if face_box is not None:
+            fx, fy, fw, fh = face_box
+            mx, mtop, mbot = int(fw * margin_x), int(fh * margin_top), int(fh * margin_bottom)
+            left = max(0, fx - mx)
+            top = max(0, fy - mtop)
+            right = min(pil_img.width, fx + fw + mx)
+            bottom = min(pil_img.height, fy + fh + mbot)
+            method = "كشف الوجه"
+        elif blue_box is not None:
+            # احتياطي أخير: مفيش وجه واضح لكن فيه خلفية زرقاء — نرجع لمنطق
+            # التقليم الداخلي القديم بدل ما نفشل تماماً (أقل دقة، لكن أفضل من لا شيء)
+            x, y, w, h = blue_box
+            left = x + int(w * inset_x)
+            right = x + w - int(w * inset_x)
+            top = y + int(h * inset_top)
+            bottom = y + h - int(h * inset_bottom)
+            method = "خلفية زرقاء (بدون كشف وجه واضح)"
+        else:
             return None, {"error": "تعذّر تحديد موقع الصورة الشخصية"}
 
-        x, y, w, h = box
-        left = x + int(w * inset_x)
-        right = x + w - int(w * inset_x)
-        top = y + int(h * inset_top)
-        bottom = y + h - int(h * inset_bottom)
         crop = pil_img.crop((left, top, right, bottom))
 
         quality = _verify_crop_quality(np.array(crop))
