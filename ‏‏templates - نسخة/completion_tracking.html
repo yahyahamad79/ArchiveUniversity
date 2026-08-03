@@ -1,0 +1,620 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>متابعة اكتمال الوثائق - نظام الأرشفة</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="/static/excel-utils.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=Cairo:wght@300;400;600;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#F8FAFC;
+    --panel:#FFFFFF;
+    --border:#E2E8F0;
+    --text:#1E293B;
+    --text-dim:#64748B;
+    --primary:#4F46E5;
+    --primary-dark:#3730A3;
+    --primary-tint:#EEF2FF;
+    --accent:#B5772E;
+    --danger:#C43D3D;
+    --danger-tint:#FBEAEA;
+    --success:#2C7A4B;
+    --success-tint:#E8F5EC;
+    --warning:#B7791F;
+    --warning-tint:#FFFBEB;
+    --radius:10px;
+    --shadow:0 2px 10px rgba(30,41,59,.06);
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--text);font-family:'Cairo',sans-serif;}
+  header{background:linear-gradient(135deg,var(--primary-dark),var(--primary));color:#fff;padding:12px 20px;box-shadow:var(--shadow);
+    display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px}
+  header h1{margin:0;font-size:16px}
+  header p{margin:2px 0 0;font-size:11px;opacity:.85}
+  .btn{border:none;border-radius:7px;padding:7px 12px;font-family:inherit;font-size:12px;font-weight:700;cursor:pointer;transition:.15s;white-space:nowrap}
+  .btn-primary{background:var(--primary);color:#fff}
+  .btn-primary:hover{background:var(--primary-dark)}
+  .btn-ghost{background:var(--primary-tint);color:var(--primary-dark)}
+  .btn-ghost:hover{background:#dfe3ff}
+  .btn-white{background:#fff;color:var(--primary-dark);border:1px solid var(--border)}
+  .btn-white:hover{background:#f3f4ff}
+  .btn-amber{background:var(--warning-tint);color:var(--warning);border:1px solid #FDE68A}
+  .btn-amber:hover{background:#FEF3C7}
+  .btn:disabled{opacity:.5;cursor:not-allowed}
+  .wrap{max-width:1600px;margin:0 auto;padding:12px 14px}
+  .card{background:var(--panel);border:1px solid var(--border);border-radius:10px;box-shadow:var(--shadow);padding:10px 12px;margin-bottom:10px}
+  .toolbar{display:flex;flex-wrap:wrap;gap:8px;align-items:center;justify-content:space-between}
+  .toolbar-group{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+  input[type="text"], select{font-family:inherit;font-size:12px;padding:6px 9px;border:1px solid var(--border);border-radius:7px;outline:none}
+  input[type="text"]:focus, select:focus{border-color:var(--primary)}
+  #searchInput{font-size:14px;padding:10px 14px;min-width:320px;border-radius:9px;font-weight:600}
+  .switch-label{display:flex;align-items:center;gap:5px;font-size:12px;color:var(--text-dim);cursor:pointer;user-select:none}
+  .stats-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:8px;margin-bottom:10px}
+  .stat-box{background:var(--panel);border:1px solid var(--border);border-radius:10px;box-shadow:var(--shadow);padding:9px 12px;text-align:center}
+  .stat-box .num{font-size:20px;font-weight:800;color:var(--primary-dark)}
+  .stat-box .lbl{font-size:10.5px;color:var(--text-dim);margin-top:1px}
+  .stat-box.success .num{color:var(--success)}
+  .stat-box.danger .num{color:var(--danger)}
+  table{border-collapse:collapse;width:100%;font-size:12px}
+  thead th{position:sticky;top:0;background:var(--primary-tint);z-index:2;padding:5px 5px;border:1px solid var(--border);white-space:nowrap;font-size:11px}
+  thead th.required-col{background:#FFF1F0}
+  thead th.optional-col{background:var(--primary-tint)}
+  thead th .col-head{display:flex;flex-direction:column;align-items:center;gap:2px}
+  thead th .view-folder-btn{background:#fff;border:1px solid var(--border);border-radius:5px;font-size:9.5px;padding:1px 5px;cursor:pointer;color:var(--primary-dark)}
+  thead th .view-folder-btn:hover{background:var(--primary-tint)}
+  thead th.sticky-num{position:sticky;right:0;z-index:4;background:var(--primary-tint)}
+  thead th.sticky-col{position:sticky;right:34px;z-index:3;background:var(--primary-tint)}
+  tbody td{padding:4px 5px;border:1px solid var(--border);text-align:center;white-space:nowrap}
+  tbody td.sticky-num{position:sticky;right:0;background:#fff;font-weight:700;z-index:2;color:var(--text-dim)}
+  tbody td.sticky-col{position:sticky;right:34px;background:#fff;text-align:right;font-weight:700;z-index:1}
+  tbody tr:nth-child(even) td.sticky-col,tbody tr:nth-child(even) td.sticky-num{background:#FAFBFF}
+  .cell-yes{color:var(--success);font-weight:800}
+  .cell-no{color:var(--danger);font-weight:800}
+  .cell-mismatch{position:relative}
+  .cell-mismatch::after{content:'⚠';position:absolute;top:0;left:2px;font-size:9px;color:var(--warning)}
+  .pct-bar-wrap{width:70px;height:8px;background:#F1F5F9;border-radius:4px;overflow:hidden;margin:0 auto 3px}
+  .pct-bar{height:100%;background:var(--success)}
+  .pct-bar.low{background:var(--danger)}
+  .pct-bar.mid{background:var(--warning)}
+  .table-scroll{max-height:70vh;overflow:auto;border:1px solid var(--border);border-radius:var(--radius)}
+  .empty{padding:60px 20px;text-align:center;color:var(--text-dim)}
+  .empty .big{font-size:40px;margin-bottom:10px}
+  .overlay{display:none;position:fixed;inset:0;background:rgba(15,23,42,.55);z-index:1000;align-items:center;justify-content:center;padding:20px}
+  .overlay.show{display:flex}
+  .modal{background:#fff;border-radius:14px;max-width:520px;width:100%;max-height:80vh;overflow:hidden;display:flex;flex-direction:column;box-shadow:0 20px 60px rgba(0,0,0,.3)}
+  .modal-header{padding:16px 20px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center}
+  .modal-header h2{margin:0;font-size:15px}
+  .modal-close{background:none;border:none;font-size:18px;cursor:pointer;color:var(--text-dim)}
+  .modal-body{padding:16px 20px;overflow:auto}
+  .file-row{display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid #F1F5F9;font-size:12.5px}
+  .toast-wrap{position:fixed;bottom:22px;left:22px;z-index:2000;display:flex;flex-direction:column;gap:8px}
+  .toast{background:#26313C;color:#fff;padding:11px 16px;border-radius:8px;font-size:13px;box-shadow:0 6px 18px rgba(0,0,0,.2);max-width:340px}
+  .toast.err{background:var(--danger)}
+  .toast.ok{background:var(--success)}
+  .footer-note{max-width:1500px;margin:20px auto 0;padding:14px 24px;text-align:center;font-size:11px;color:var(--text-dim)}
+</style>
+</head>
+<body>
+
+<header>
+  <div>
+    <h1>📊 متابعة اكتمال الوثائق</h1>
+    <p>مصفوفة شاملة لكل طالب مقابل كل نوع وثيقة، ونسبة التسليم — مصدرها ملف الإكسل المعتمد من شاشة "المسارات".</p>
+  </div>
+  <a href="/" class="btn btn-white">← العودة للبوابة الرئيسية</a>
+</header>
+
+<div class="wrap">
+
+  <div class="card">
+    <div class="toolbar">
+      <div class="toolbar-group">
+        <button class="btn btn-primary" id="refreshBtn">🔄 تحديث البيانات من الإكسل</button>
+        <button class="btn btn-amber" id="verifyFoldersBtn">🔍 تحقق فعلي من كل المجلدات</button>
+        <button class="btn btn-white" id="exportBtn">⬇️ تصدير تقرير Excel</button>
+      </div>
+      <div class="toolbar-group">
+        <input type="text" id="searchInput" placeholder="🔎 بحث بالاسم أو الرقم الجامعي...">
+        <label class="switch-label"><input type="checkbox" id="incompleteOnlyToggle"> عرض غير المكتملين فقط</label>
+        <select id="sortSelect">
+          <option value="percent_desc" selected>الترتيب: نسبة التسليم (الأعلى أولاً)</option>
+          <option value="percent_asc">الترتيب: نسبة التسليم (الأقل أولاً)</option>
+          <option value="number_asc">الترتيب: الرقم الجامعي</option>
+          <option value="name_asc">الترتيب: الاسم</option>
+        </select>
+      </div>
+    </div>
+  </div>
+
+  <div class="stats-row" id="statsRow" style="display:none">
+    <div class="stat-box"><div class="num" id="statTotal">0</div><div class="lbl">إجمالي الطلاب</div></div>
+    <div class="stat-box"><div class="num" id="statAvg">0%</div><div class="lbl">متوسط نسبة التسليم</div></div>
+    <div class="stat-box success"><div class="num" id="statComplete">0</div><div class="lbl">مكتملون 100%</div></div>
+    <div class="stat-box danger"><div class="num" id="statZero">0</div><div class="lbl">لم يبدأوا (0%)</div></div>
+  </div>
+
+  <div class="card" id="mainCard">
+    <div id="loadingState" class="empty" style="display:none">
+      <div class="big">⏳</div><h3>جارٍ التحميل...</h3>
+    </div>
+    <div id="emptyState" class="empty">
+      <div class="big">📄</div>
+      <h3>لم يتم تحميل البيانات بعد</h3>
+      <div>اضغط "🔄 تحديث البيانات من الإكسل" للبدء (يتطلب ملف إكسل معتمَداً من شاشة "المسارات")</div>
+    </div>
+    <div class="table-scroll" id="tableScrollWrap" style="display:none">
+      <table id="matrixTable">
+        <thead><tr id="matrixHeadRow"></tr></thead>
+        <tbody id="matrixBody"></tbody>
+      </table>
+    </div>
+  </div>
+
+</div>
+
+<div class="footer-note">القراءة والتحقق يتمّان محلياً بالكامل من متصفحك — لا يُعدَّل ملف الإكسل ولا أي ملف بالأرشيف من هذه الشاشة إطلاقاً.</div>
+
+<div class="overlay" id="folderOverlay">
+  <div class="modal">
+    <div class="modal-header">
+      <h2 id="folderModalTitle">محتوى المجلد</h2>
+      <button class="modal-close" data-close="folderOverlay">✕</button>
+    </div>
+    <div class="modal-body" id="folderModalBody"></div>
+  </div>
+</div>
+
+<div class="toast-wrap" id="toastWrap"></div>
+
+<script>
+const $ = id => document.getElementById(id);
+
+let systemDocuments = {};
+let archiveRootHandle = null;
+let S = {
+  wb: null, sheetName: '', headerRowIdx: 0,
+  cols: [], numCol: '', nameCol: '',
+  students: [], // {number, name, docs:{code:'نعم'|'لا'|null}, percent, statusText, rowIndex}
+  folderVerify: {}, // code -> Set(numbers of files actually found)
+  filterIncompleteOnly: false,
+  searchTerm: '',
+  sortMode: 'percent_desc'
+};
+
+function toast(msg, type=''){
+  const el = document.createElement('div');
+  el.className = 'toast' + (type ? ' '+type : '');
+  el.textContent = msg;
+  $('toastWrap').appendChild(el);
+  setTimeout(()=>el.remove(), 4500);
+}
+
+function closeModal(id){ $(id).classList.remove('show'); }
+document.querySelectorAll('.overlay').forEach(ov=>{
+  ov.addEventListener('click', e=>{ if(e.target===ov) closeModal(ov.id); });
+});
+document.querySelectorAll('[data-close]').forEach(btn=>{
+  btn.addEventListener('click', ()=> closeModal(btn.dataset.close));
+});
+
+/* ============================================================
+   تحميل مكتبة handle-store.js عند الحاجة فقط (بدون تعليق الشاشة عليها)
+   ============================================================ */
+function loadScriptOnce(src){
+  return new Promise((resolve, reject) => {
+    if(document.querySelector(`script[src="${src}"]`)){ resolve(); return; }
+    const s = document.createElement('script');
+    s.src = src;
+    s.onload = () => resolve();
+    s.onerror = () => reject(new Error(`تعذّر تحميل ${src}`));
+    document.head.appendChild(s);
+  });
+}
+async function ensureHandleStoreLoaded(){
+  if(typeof getHandle === 'undefined'){
+    await loadScriptOnce('/static/handle-store.js');
+  }
+}
+
+/* مجلد الأرشيف الجذري — نفس المرجع الموحّد "archiveFolder" من شاشة
+   "تهيئة مسارات النظام"، بلا أي منتقي مجلد خاص بهذه الشاشة */
+async function getArchiveRootHandle(){
+  await ensureHandleStoreLoaded();
+  if(archiveRootHandle){
+    const perm = await checkHandlePermission(archiveRootHandle, 'readwrite');
+    if(perm === 'granted') return archiveRootHandle;
+  }
+  const saved = await getHandle('archiveFolder');
+  if(!saved){
+    throw new Error('لم يتم تحديد "مجلد الأرشيف الفعلي" بعد من شاشة "تهيئة مسارات النظام"');
+  }
+  let perm = await checkHandlePermission(saved, 'readwrite');
+  if(perm !== 'granted'){
+    perm = await requestHandlePermission(saved, 'readwrite');
+  }
+  if(perm !== 'granted'){
+    throw new Error('لم تُمنح صلاحية الوصول لمجلد الأرشيف — أعد تأكيدها من شاشة "المسارات"');
+  }
+  archiveRootHandle = saved;
+  return archiveRootHandle;
+}
+
+/* ============================================================
+   قراءة أنواع الوثائق
+   ============================================================ */
+async function loadDocTypes(){
+  const res = await fetch('/api/get-constants', {cache:'no-store'});
+  const data = await res.json();
+  if(data.success) systemDocuments = data.document_types || {};
+}
+
+function sortedDocTypes(){
+  return Object.values(systemDocuments).sort((a,b)=>(Number(a.order)||0)-(Number(b.order)||0));
+}
+
+// نفس أنواع الوثائق، لكن مرتبة بحيث تكون كل الأعمدة الإلزامية بجانب بعضها
+// أولاً، ثم الاختيارية بعدها — للعرض في المصفوفة تحديداً
+function docTypesForMatrix(){
+  return sortedDocTypes().slice().sort((a,b)=>{
+    const reqA = a.required ? 0 : 1, reqB = b.required ? 0 : 1;
+    if(reqA !== reqB) return reqA - reqB;
+    return (Number(a.order)||0)-(Number(b.order)||0);
+  });
+}
+
+/* detectHeaderRowIndex(ws) الآن مُعرَّفة مركزياً في /static/excel-utils.js
+   بدل تكرارها هنا */
+
+/* ============================================================
+   تحميل بيانات الإكسل المعتمد وبناء مصفوفة الطلاب
+   ============================================================ */
+async function loadExcelAndBuildMatrix(){
+  $('emptyState').style.display='none';
+  $('tableScrollWrap').style.display='none';
+  $('statsRow').style.display='none';
+  $('loadingState').style.display='block';
+
+  try{
+    await ensureHandleStoreLoaded();
+    await loadDocTypes();
+
+    const excelHandle = await getHandle('excelFile');
+    if(!excelHandle){
+      throw new Error('لم يتم ربط ملف الإكسل بعد من شاشة "تهيئة مسارات النظام"');
+    }
+    let perm = await checkHandlePermission(excelHandle, 'readwrite');
+    if(perm !== 'granted') perm = await requestHandlePermission(excelHandle, 'readwrite');
+    if(perm !== 'granted'){
+      throw new Error('لم تُمنح صلاحية الوصول لملف الإكسل — أعد تأكيدها من شاشة "المسارات"');
+    }
+
+    const username = ensureWorkspaceUsername();
+    const sharedRes = await fetch('/api/get-paths?user=' + encodeURIComponent(username), {cache:'no-store'});
+    const sharedData = await sharedRes.json();
+    const cfg = (sharedData.success ? sharedData.paths : {}).excelFile || {};
+
+    const file = await excelHandle.getFile();
+    const buf = await file.arrayBuffer();
+    const wb = XLSX.read(buf, {type:'array', cellText:true, raw:false});
+    S.wb = wb;
+
+    if(wb.SheetNames.length>1 && !(cfg.sheetName && wb.SheetNames.includes(cfg.sheetName))){
+      throw new Error(`ملف الإكسل يحتوي على ${wb.SheetNames.length} صفحات ولم تُعتمد صفحة محددة بعد — افتح شاشة "المسارات" واختر الصفحة الصحيحة أولاً`);
+    }
+    S.sheetName = cfg.sheetName && wb.SheetNames.includes(cfg.sheetName) ? cfg.sheetName : wb.SheetNames[0];
+    const ws = wb.Sheets[S.sheetName];
+    S.headerRowIdx = typeof cfg.headerRowIdx === 'number' ? cfg.headerRowIdx : detectHeaderRowIndex(ws);
+
+    const rows = XLSX.utils.sheet_to_json(ws, {range:S.headerRowIdx, defval:'', raw:false, rawNumbers:false});
+    const cols = rows.length ? Object.keys(rows[0]) : [];
+    if(!cols.length){
+      throw new Error('تعذّر قراءة أعمدة ملف الإكسل (الملف فارغ أو غير صالح)');
+    }
+    S.cols = cols;
+    S.numCol = cols[0];
+    S.nameCol = cols[1];
+
+    // خريطة: رمز نوع الوثيقة → اسم العمود المطابق له فعلياً في الإكسل (إن وُجد)
+    const codeToColumn = {};
+    sortedDocTypes().forEach(doc=>{
+      const code=(doc.code||'').toUpperCase();
+      if(!code) return;
+      const match = cols.find(c=>String(c).trim().toUpperCase()===code && c!==S.numCol && c!==S.nameCol);
+      if(match) codeToColumn[code]=match;
+    });
+
+    const statusCol = cols.find(c=>String(c).trim()==='الحالة');
+
+    S.students = rows.map((r,idx)=>{
+      const docs = {};
+      sortedDocTypes().forEach(doc=>{
+        const code=(doc.code||'').toUpperCase();
+        const col = codeToColumn[code];
+        docs[code] = col ? String(r[col]||'').trim() : null; // null = لا يوجد عمود مطابق أصلاً
+      });
+      const mandatoryCodes = sortedDocTypes().filter(d=>d.required && codeToColumn[(d.code||'').toUpperCase()]).map(d=>(d.code||'').toUpperCase());
+      const delivered = mandatoryCodes.filter(code=>docs[code]==='نعم').length;
+      const percent = mandatoryCodes.length ? Math.round((delivered/mandatoryCodes.length)*100) : 0;
+      return {
+        number: String(r[S.numCol]||'').trim(),
+        name: String(r[S.nameCol]||'').trim(),
+        docs, percent,
+        statusText: statusCol ? String(r[statusCol]||'').trim() : '',
+        rowIndex: idx
+      };
+    }).filter(s=>s.name || s.number);
+
+    S.folderVerify = {}; // إعادة تصفير أي نتائج تحقق سابقة عند تحديث البيانات
+    renderMatrix();
+    toast(`✅ تم تحميل بيانات ${S.students.length} طالب من الصفحة "${S.sheetName}"`, 'ok');
+  }catch(e){
+    $('loadingState').style.display='none';
+    $('emptyState').style.display='block';
+    $('emptyState').innerHTML = `<div class="big">⚠️</div><h3>تعذّر تحميل البيانات</h3><div>${esc(e.message)}</div>`;
+    toast('⚠️ ' + e.message, 'err');
+  }
+}
+
+function esc(s){ return String(s??'').replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+
+/* ============================================================
+   رسم المصفوفة (يُعاد استدعاؤها عند أي تغيير في البحث/الفلتر/الترتيب)
+   ============================================================ */
+function renderMatrix(){
+  $('loadingState').style.display='none';
+
+  if(!S.students.length){
+    $('emptyState').style.display='block';
+    $('emptyState').innerHTML = '<div class="big">📄</div><h3>لا توجد بيانات طلاب في الإكسل</h3>';
+    $('tableScrollWrap').style.display='none';
+    return;
+  }
+
+  const docs = docTypesForMatrix();
+  const term = S.searchTerm.trim().toLowerCase();
+
+  let list = S.students.filter(s=>{
+    if(term && !(s.name.toLowerCase().includes(term) || s.number.toLowerCase().includes(term))) return false;
+    if(S.filterIncompleteOnly && s.percent>=100) return false;
+    return true;
+  });
+
+  list = list.slice().sort((a,b)=>{
+    switch(S.sortMode){
+      case 'percent_desc': return b.percent-a.percent;
+      case 'number_asc': return a.number.localeCompare(b.number, 'ar');
+      case 'name_asc': return a.name.localeCompare(b.name, 'ar');
+      default: return a.percent-b.percent; // percent_asc
+    }
+  });
+
+  // شريط الإحصائيات دائماً محسوب من كل الطلاب (بدون فلترة)، لإعطاء صورة شاملة
+  const total = S.students.length;
+  const avg = total ? Math.round(S.students.reduce((sum,s)=>sum+s.percent,0)/total) : 0;
+  const complete = S.students.filter(s=>s.percent>=100).length;
+  const zero = S.students.filter(s=>s.percent===0).length;
+  $('statTotal').textContent = total;
+  $('statAvg').textContent = avg+'%';
+  $('statComplete').textContent = complete;
+  $('statZero').textContent = zero;
+  $('statsRow').style.display = 'grid';
+
+  // رأس الجدول
+  const headCells = ['<th class="sticky-num">#</th>', '<th class="sticky-col">الطالب</th>'];
+  docs.forEach(doc=>{
+    const code = (doc.code||'').toUpperCase();
+    const cls = doc.required ? 'required-col' : 'optional-col';
+    headCells.push(`<th class="${cls}"><div class="col-head">
+      <span>${esc(doc.name_ar||code)}</span>
+      <span style="font-size:9.5px;color:var(--text-dim)">${doc.required?'إلزامي':'اختياري'} (${esc(code)})</span>
+      <button type="button" class="view-folder-btn" onclick="viewFolderContents('${esc(code)}')">👁 عرض المجلد</button>
+    </div></th>`);
+  });
+  headCells.push('<th>نسبة التسليم</th>', '<th>الحالة</th>');
+  $('matrixHeadRow').innerHTML = headCells.join('');
+
+  // صفوف الطلاب
+  $('matrixBody').innerHTML = list.map((s,idx)=>{
+    const cells = docs.map(doc=>{
+      const code=(doc.code||'').toUpperCase();
+      const val = s.docs[code];
+      const verifySet = S.folderVerify[code];
+      let mismatch = false;
+      if(verifySet){
+        const foundPhysically = verifySet.has(s.number);
+        if((val==='نعم') !== foundPhysically) mismatch = true;
+      }
+      if(val===null) return `<td style="color:var(--text-dim)">—</td>`;
+      const cls = val==='نعم' ? 'cell-yes' : 'cell-no';
+      return `<td class="${mismatch?'cell-mismatch':''}"><span class="${cls}">${val==='نعم'?'✅':'❌'}</span></td>`;
+    }).join('');
+
+    const barCls = s.percent>=100?'':(s.percent>=50?'mid':'low');
+    return `<tr>
+      <td class="sticky-num">${idx+1}</td>
+      <td class="sticky-col">${esc(s.name)}<div style="font-size:10.5px;color:var(--text-dim);font-weight:400">${esc(s.number)}</div></td>
+      ${cells}
+      <td><div class="pct-bar-wrap"><div class="pct-bar ${barCls}" style="width:${s.percent}%"></div></div>${s.percent}%</td>
+      <td>${esc(s.statusText||'قيد المراجعة')}</td>
+    </tr>`;
+  }).join('');
+
+  $('tableScrollWrap').style.display = 'block';
+}
+
+/* ============================================================
+   عرض محتوى مجلد نوع وثيقة معيّن (تحقق بصري يدوي) — المتصفح لا يقدر
+   يفتح مستكشف الملفات الفعلي لأسباب أمنية، فبدل ذلك نعرض قائمة
+   الملفات الحقيقية الموجودة داخل هذا المجلد مباشرة هنا في الشاشة
+   ============================================================ */
+async function viewFolderContents(code){
+  $('folderModalTitle').textContent = `📁 محتوى مجلد "${code}"`;
+  $('folderModalBody').innerHTML = '<div style="text-align:center;padding:20px;color:var(--text-dim)">جارٍ الفتح...</div>';
+  $('folderOverlay').classList.add('show');
+  try{
+    const root = await getArchiveRootHandle();
+    const sub = await root.getDirectoryHandle(code, {create:false});
+    const fileHandles = [];
+    for await (const [name, handle] of sub.entries()){
+      if(handle.kind==='file') fileHandles.push(handle);
+    }
+    fileHandles.sort((a,b)=>a.name.localeCompare(b.name,'ar'));
+    if(!fileHandles.length){
+      $('folderModalBody').innerHTML = '<div style="text-align:center;padding:20px;color:var(--text-dim)">المجلد فارغ — لا توجد ملفات بداخله حالياً</div>';
+    }else{
+      $('folderModalBody').innerHTML = `<div style="font-size:11.5px;color:var(--text-dim);margin-bottom:8px">عدد الملفات: ${fileHandles.length} — اضغط "فتح" لمعاينة أي ملف فعلياً في تبويب جديد</div>` +
+        fileHandles.map((h,i)=>`<div class="file-row"><span>📄 ${esc(h.name)}</span><button type="button" class="view-folder-btn" onclick="openFolderFile(${i})">↗ فتح</button></div>`).join('');
+      window._folderFileHandles = fileHandles; // للاستخدام من زر "فتح" لكل ملف
+    }
+  }catch(e){
+    $('folderModalBody').innerHTML = `<div style="text-align:center;padding:20px;color:var(--danger)">⚠️ ${esc(e.message)}<br><span style="font-size:11px;color:var(--text-dim)">(هذا طبيعي لو المجلد لسه ما اتنشأش أصلاً لهذا النوع)</span></div>`;
+  }
+}
+
+async function openFolderFile(index){
+  try{
+    const handle = window._folderFileHandles[index];
+    const file = await handle.getFile();
+    const url = URL.createObjectURL(file);
+    window.open(url, '_blank');
+    // لا نُلغي الرابط فوراً حتى يُتاح للتبويب الجديد وقت كافٍ لتحميل الملف بالكامل
+    setTimeout(()=>URL.revokeObjectURL(url), 60000);
+  }catch(e){
+    toast('⚠️ تعذّر فتح الملف: ' + e.message, 'err');
+  }
+}
+
+/* ============================================================
+   تحقق فعلي من كل المجلدات دفعة واحدة — يقارن الملفات الموجودة
+   فعلياً بأرقام الطلاب مقابل علامة "نعم/لا" في الإكسل، ويضع علامة
+   تحذير ⚠ على أي خانة متعارضة. الإكسل يبقى المرجع المعروض دائماً؛
+   هذا فقط تنبيه إضافي، ولا يُعدَّل أي بيانات تلقائياً
+   ============================================================ */
+async function verifyAllFolders(){
+  if(!S.students.length){
+    toast('⚠️ حمّل بيانات الطلاب أولاً قبل التحقق من المجلدات', 'err');
+    return;
+  }
+  const btn = $('verifyFoldersBtn');
+  btn.disabled = true;
+  btn.textContent = '⏳ جارٍ التحقق...';
+  try{
+    const root = await getArchiveRootHandle();
+    const docs = sortedDocTypes();
+    let checkedFolders = 0, totalMismatches = 0;
+
+    for(const doc of docs){
+      const code = (doc.code||'').toUpperCase();
+      if(!code) continue;
+      const foundNumbers = new Set();
+      try{
+        const sub = await root.getDirectoryHandle(code, {create:false});
+        for await (const [name, handle] of sub.entries()){
+          if(handle.kind!=='file') continue;
+          // اسم الملف المتوقع يبدأ برقم الطالب الجامعي (نفس اصطلاح شاشة المطابقة)
+          const match = S.students.find(s => s.number && name.startsWith(s.number));
+          if(match) foundNumbers.add(match.number);
+        }
+        checkedFolders++;
+      }catch(e){ /* المجلد غير موجود أصلاً — يُعتبر فارغاً، لا خطأ يوقف باقي الأنواع */ }
+      S.folderVerify[code] = foundNumbers;
+    }
+
+    S.students.forEach(s=>{
+      docs.forEach(doc=>{
+        const code=(doc.code||'').toUpperCase();
+        const val = s.docs[code];
+        const set = S.folderVerify[code];
+        if(val===null || !set) return;
+        const foundPhysically = set.has(s.number);
+        if((val==='نعم') !== foundPhysically) totalMismatches++;
+      });
+    });
+
+    renderMatrix();
+    toast(`✅ تم فحص ${checkedFolders} مجلد فعلياً. ${totalMismatches ? `⚠ وُجد ${totalMismatches} تعارضاً بين الإكسل والملفات الفعلية (مُعلَّمة بـ ⚠ في الجدول).` : 'لا يوجد أي تعارض — كل شيء مطابق.'}`, totalMismatches ? 'err' : 'ok');
+  }catch(e){
+    toast('⚠️ تعذّر التحقق من المجلدات: ' + e.message, 'err');
+  }finally{
+    btn.disabled = false;
+    btn.textContent = '🔍 تحقق فعلي من كل المجلدات';
+  }
+}
+
+/* ============================================================
+   تصدير تقرير Excel جديد بنفس المصفوفة المعروضة حالياً (مع الفلترة/الترتيب النشطين)
+   — ملف جديد منفصل، لا يلمس ملف الإكسل الأصلي إطلاقاً
+   ============================================================ */
+function exportReport(){
+  if(!S.students.length){
+    toast('⚠️ لا توجد بيانات لتصديرها', 'err');
+    return;
+  }
+  const docs = sortedDocTypes();
+  const term = S.searchTerm.trim().toLowerCase();
+  let list = S.students.filter(s=>{
+    if(term && !(s.name.toLowerCase().includes(term) || s.number.toLowerCase().includes(term))) return false;
+    if(S.filterIncompleteOnly && s.percent>=100) return false;
+    return true;
+  });
+  list = list.slice().sort((a,b)=>{
+    switch(S.sortMode){
+      case 'percent_desc': return b.percent-a.percent;
+      case 'number_asc': return a.number.localeCompare(b.number,'ar');
+      case 'name_asc': return a.name.localeCompare(b.name,'ar');
+      default: return a.percent-b.percent;
+    }
+  });
+
+  const header = ['الرقم الجامعي','اسم الطالب', ...docs.map(d=>d.name_ar||d.code), 'نسبة التسليم','الحالة'];
+  const data = list.map(s=>{
+    const row = [s.number, s.name];
+    docs.forEach(doc=>{
+      const code=(doc.code||'').toUpperCase();
+      const val = s.docs[code];
+      row.push(val===null ? '—' : val);
+    });
+    row.push(s.percent+'%', s.statusText||'قيد المراجعة');
+    return row;
+  });
+
+  const ws = XLSX.utils.aoa_to_sheet([header, ...data]);
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'تقرير الاكتمال');
+  const timestamp = new Date().toISOString().slice(0,16).replace(/[:T]/g,'-');
+  XLSX.writeFile(wb, `تقرير_اكتمال_الوثائق_${timestamp}.xlsx`);
+  toast('✅ تم تصدير التقرير', 'ok');
+}
+
+/* ============================================================
+   ربط عناصر التحكم
+   ============================================================ */
+$('refreshBtn').addEventListener('click', loadExcelAndBuildMatrix);
+$('verifyFoldersBtn').addEventListener('click', verifyAllFolders);
+$('exportBtn').addEventListener('click', exportReport);
+
+let searchDebounce;
+$('searchInput').addEventListener('input', e=>{
+  clearTimeout(searchDebounce);
+  searchDebounce = setTimeout(()=>{
+    S.searchTerm = e.target.value;
+    if(S.students.length) renderMatrix();
+  }, 200);
+});
+$('incompleteOnlyToggle').addEventListener('change', e=>{
+  S.filterIncompleteOnly = e.target.checked;
+  if(S.students.length) renderMatrix();
+});
+$('sortSelect').addEventListener('change', e=>{
+  S.sortMode = e.target.value;
+  if(S.students.length) renderMatrix();
+});
+
+// تحميل تلقائي عند فتح الشاشة، طالما ملف الإكسل ومجلد الأرشيف معتمَدين مسبقاً
+window.addEventListener('DOMContentLoaded', loadExcelAndBuildMatrix);
+</script>
+
+</body>
+</html>

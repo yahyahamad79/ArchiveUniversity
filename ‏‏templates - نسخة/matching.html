@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>مطابقة وترقيم الملفات</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="/static/excel-utils.js"></script>
 <script src="https://cdn.tailwindcss.com"></script>
 <script src="/static/handle-store.js"></script>
 <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@300;400;600;700&display=swap" rel="stylesheet">
@@ -769,9 +770,9 @@
         <div class="field">
           <label>🗂️ نوع الوثيقة (لتحديث حالتها في الإكسل):</label>
           <select id="docTypeSelect">
-            <option value="">— بدون تحديث حالة وثيقة —</option>
+            <option value="" disabled selected>— اختر نوع الوثيقة (إلزامي) —</option>
           </select>
-          <div style="font-size:11px;color:var(--muted);margin-top:4px" id="docTypeColumnInfo">اختر نوع الوثيقة ليتم تحديد عمود الحالة المطابق له تلقائياً في الإكسل</div>
+          <div style="font-size:11px;color:var(--muted);margin-top:4px" id="docTypeColumnInfo">⚠️ اختيار نوع الوثيقة إلزامي — لن يعمل زر "تنفيذ المطابقة" قبل تحديده</div>
         </div>
       </div>
 
@@ -858,6 +859,7 @@
       <table id="resultTable">
         <thead>
           <tr>
+            <th style="width:40px">#</th>
             <th style="width:80px">الحالة</th>
             <th style="min-width:120px">الاسم في الإكسل</th>
             <th style="min-width:100px">الرقم</th>
@@ -1093,20 +1095,8 @@
     return getProtectedColumns().includes(colName);
   }
 
-  // يكتشف صف العناوين الحقيقي بدل افتراض أن الصف الأول دائماً هو العناوين —
-  // بعض الملفات تبدأ بصف عنوان/شعار مدمج (خلية واحدة فقط تحمل نصاً مثل
-  // "لوحة معلومات الطلبة") قبل صف العناوين الفعلي، ما يجعل SheetJS يولّد
-  // مفاتيح وهمية (__EMPTY, __EMPTY_1...) لبقية الأعمدة. الحل: فحص أول 15 صفاً
-  // خاماً واختيار الصف الذي يحوي أكبر عدد من الخلايا غير الفارغة كصف عناوين.
-  function detectHeaderRowIndex(ws) {
-    const raw = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '', raw: false, blankrows: false });
-    let bestIdx = 0, bestCount = -1;
-    for (let i = 0; i < Math.min(raw.length, 15); i++) {
-      const nonEmpty = (raw[i] || []).filter(c => String(c).trim() !== '').length;
-      if (nonEmpty > bestCount) { bestCount = nonEmpty; bestIdx = i; }
-    }
-    return bestIdx;
-  }
+  // detectHeaderRowIndex(ws) الآن مُعرَّفة مركزياً في /static/excel-utils.js
+  // بدل تكرارها هنا — نفس المنطق بالحرف، ملف واحد بدل أربعة
 
   function loadExcelSheet(headerRowOverride) {
     const sheetName = document.getElementById('sheetExcel').value || S.Excel.wb.SheetNames[0];
@@ -1195,7 +1185,7 @@
       if (!data.success) throw new Error(data.message || 'فشل تحميل الثوابت');
       S.docTypes = data.document_types || {};
       const entries = Object.values(S.docTypes).sort((a, b) => (a.order || 0) - (b.order || 0));
-      sel.innerHTML = '<option value="">— بدون تحديث حالة وثيقة —</option>' +
+      sel.innerHTML = '<option value="" disabled selected>— اختر نوع الوثيقة (إلزامي) —</option>' +
         entries.map(d => `<option value="${esc(d.code)}">${esc(d.name_ar || d.code)} (${esc(d.code)})</option>`).join('');
     } catch (err) {
       document.getElementById('docTypeColumnInfo').textContent = '⚠️ تعذّر تحميل أنواع الوثائق من doc_types.json: ' + err.message;
@@ -1242,8 +1232,8 @@
     const infoEl = document.getElementById('docTypeColumnInfo');
 
     if (!code) {
-      infoEl.textContent = 'اختر نوع الوثيقة ليتم تحديد عمود الحالة المطابق له تلقائياً في الإكسل';
-      infoEl.style.color = '';
+      infoEl.textContent = '⚠️ اختيار نوع الوثيقة إلزامي — لن يعمل زر "تنفيذ المطابقة" قبل تحديده';
+      infoEl.style.color = 'var(--warning)';
       return;
     }
 
@@ -1578,6 +1568,7 @@
     const numCol = document.getElementById('numberColumn').value;
     if (!nameCol) { alert('اختر عمود الأسماء في ملف الإكسل'); return; }
     if (!numCol) { alert('اختر عمود الترقيم في ملف الإكسل'); return; }
+    if (!document.getElementById('docTypeSelect').value) { alert('اختيار نوع الوثيقة إلزامي — لتحديث حالتها في ملف الإكسل'); return; }
 
     S.nameColumn = nameCol;
     S.numberColumn = numCol;
@@ -1616,8 +1607,43 @@
       await sleep(20);
     }
 
-    // بناء خريطة الملفات
-    const fileMap = new Map();
+  // كلمات وصفية شائعة بتتلحق باسم الملف بعد اسم الطالب الفعلي (مش جزء من
+  // الاسم) — بتتشال من آخر الاسم فقط، مش من أي مكان فيه، لتفادي حذف أي
+  // جزء حقيقي من الاسم بالغلط
+  const STATIC_SUFFIX_WORDS = new Set([
+    'كشف', 'علامات', 'شهاده', 'مصدقه', 'عربي', 'انجليزي', 'ميلاد', 'هويه',
+    'صحيه', 'بطاقه', 'صوره', 'وثيقه', 'ملف', 'نسخه', 'اصلي', 'مصدق', 'رسمي',
+    'ثانويه', 'عامه', 'دراسي', 'درجات', 'نتيجه', 'تقرير', 'طبي', 'احتساب'
+  ].map(normalizeArabic));
+
+  // كلمات وصفية إضافية مُشتقة تلقائياً من اسم نوع الوثيقة المختار حالياً
+  // (عربي وإنجليزي) — مثلاً لو اخترت "كشف علامات" تُضاف "كشف" و"علامات"
+  // تلقائياً حتى لو مش موجودة بالقائمة الثابتة أعلاه
+  function getDynamicSuffixWords() {
+    const words = new Set();
+    const doc = Object.values(S.docTypes || {}).find(d => d.code === S.docTypeCode);
+    if (doc) {
+      [doc.name_ar, doc.name_en].forEach(label => {
+        if (!label) return;
+        normalizeArabic(label).split(' ').filter(w => w).forEach(w => words.add(w));
+      });
+    }
+    return words;
+  }
+
+  // يقص أي كلمات وصفية (ثابتة أو ديناميكية) من *آخر* الاسم فقط، طالما مطابقة،
+  // مع الإبقاء على 3 كلمات على الأقل كحد أدنى أماناً (اسم+أب+جد على الأقل)
+  function stripTrailingDescriptorWords(normalizedName) {
+    const dynamicWords = getDynamicSuffixWords();
+    const words = normalizedName.split(' ').filter(w => w);
+    while (words.length > 3 && (STATIC_SUFFIX_WORDS.has(words[words.length - 1]) || dynamicWords.has(words[words.length - 1]))) {
+      words.pop();
+    }
+    return words.join(' ');
+  }
+
+  // بناء خريطة الملفات
+  const fileMap = new Map();
     const fileMapNormalized = new Map();
 
     for (const f of filteredFiles) {
@@ -1631,11 +1657,16 @@
         const parts = name.split('.');
         ext = parts.length > 1 ? parts.pop().toLowerCase() : '';
       }
-      const key = S.normalize ? normalizeArabic(name) : name.trim();
+      // تحويل الشرطة السفلية لمسافة (اسم_الطالب_كشف_علامات ← اسم الطالب كشف علامات)
+      // ثم قص أي كلمات وصفية زايدة من آخر الاسم قبل أي مقارنة
+      name = name.replace(/_/g, ' ');
+      const coreName = stripTrailingDescriptorWords(normalizeArabic(name));
+
+      const key = S.normalize ? coreName : name.trim();
       if (!fileMap.has(key)) {
         fileMap.set(key, { fullName: f.name, ext: ext, path: f.webkitRelativePath || f.name, file: f });
       }
-      const normKey = normalizeArabic(name);
+      const normKey = coreName;
       if (!fileMapNormalized.has(normKey)) {
         fileMapNormalized.set(normKey, { fullName: f.name, ext: ext, path: f.webkitRelativePath || f.name, file: f });
       }
@@ -1656,7 +1687,10 @@
       let matchType = 'missing';
       let matchedKey = '';
 
-      const normName = S.normalize ? normalizeArabic(item.name) : item.name.trim();
+      // نفس منطق تنظيف اسم الملف (تحويل الشرطة السفلية لمسافة + قص الكلمات
+      // الوصفية الزايدة) يُطبَّق كمان على اسم الإكسل نفسه، لأن بعض الصفوف
+      // قد تحتوي على الاسم الرباعي مع كلمات زايدة بعده (مثل "... كشف علامات عربي")
+      const normName = S.normalize ? stripTrailingDescriptorWords(normalizeArabic(item.name.replace(/_/g, ' '))) : item.name.trim();
 
       if (S.matchMode === 'exact') {
         const key = S.normalize ? normName : item.name.trim();
@@ -1714,7 +1748,7 @@
             }
           }
           if (!match) {
-            const baseKey = S.normalize ? normalizeArabic(item.name) : item.name.trim();
+            const baseKey = normName;
             for (const [k, v] of fileMap) {
               if (k === baseKey && !usedFiles.has(v.fullName)) {
                 match = v;
@@ -1858,60 +1892,11 @@
   // يفرض النوع النصي الحقيقي (t='s') وتنسيق نص ('@') على أعمدة بعينها داخل
   // ورقة إكسل مبنية حديثاً — يمنع Excel نفسه من إعادة تفسيرها كأرقام لاحقاً
   // (وبالتالي فقدان الأصفار البادئة) حتى لو بدت القيمة رقماً بحتاً
-  function forceTextColumnsInSheet(sheet, colNames, rows) {
-    const idxByName = {};
-    S.Excel.cols.forEach((c, i) => { idxByName[c] = i; });
-    for (const colName of colNames) {
-      const colIdx = idxByName[colName];
-      if (colIdx === undefined) continue;
-      const colLetter = XLSX.utils.encode_col(colIdx);
-      for (let r = 0; r < rows.length; r++) {
-        const addr = colLetter + (r + 2); // +2: صف العناوين رقم 1
-        const cell = sheet[addr];
-        if (cell) {
-          cell.v = String(cell.v);
-          cell.t = 's';
-          cell.z = '@';
-        }
-      }
-    }
-  }
+  // forceTextColumnsInSheet(sheet, colNames, cols, rows) الآن مُعرَّفة مركزياً
+  // في /static/excel-utils.js (بنفس المنطق بالحرف)
 
-  // لو تم تجاوز صف/صفوف بانر (مثل عنوان مدمج) قبل صف العناوين الحقيقي، يجب
-  // الحفاظ عليها كما هي بالملف المحفوظ — بدل فقدانها لأن json_to_sheet يبني
-  // دائماً من الصف 1. يدمج صفوف البانر الأصلية + بيانات الجدول الجديدة بإزاحة.
-  function mergeWithOriginalBannerRows(originalWs, dataSheet, headerRowIdx) {
-    if (!headerRowIdx) return dataSheet; // لا يوجد بانر، لا حاجة لأي دمج
-    const merged = {};
-    const origRange = originalWs['!ref'] ? XLSX.utils.decode_range(originalWs['!ref']) : null;
-    if (origRange) {
-      for (let R = origRange.s.r; R < headerRowIdx; R++) {
-        for (let C = origRange.s.c; C <= origRange.e.c; C++) {
-          const addr = XLSX.utils.encode_cell({ r: R, c: C });
-          if (originalWs[addr]) merged[addr] = originalWs[addr];
-        }
-      }
-    }
-    const dataRange = dataSheet['!ref'] ? XLSX.utils.decode_range(dataSheet['!ref']) : null;
-    let maxR = headerRowIdx - 1;
-    let maxC = origRange ? origRange.e.c : 0;
-    if (dataRange) {
-      for (let R = dataRange.s.r; R <= dataRange.e.r; R++) {
-        for (let C = dataRange.s.c; C <= dataRange.e.c; C++) {
-          const srcAddr = XLSX.utils.encode_cell({ r: R, c: C });
-          if (dataSheet[srcAddr]) {
-            const dstAddr = XLSX.utils.encode_cell({ r: R + headerRowIdx, c: C });
-            merged[dstAddr] = dataSheet[srcAddr];
-          }
-        }
-      }
-      maxR = Math.max(maxR, dataRange.e.r + headerRowIdx);
-      maxC = Math.max(maxC, dataRange.e.c);
-    }
-    merged['!ref'] = XLSX.utils.encode_range({ s: { r: 0, c: 0 }, e: { r: maxR, c: maxC } });
-    if (originalWs['!merges']) merged['!merges'] = originalWs['!merges'];
-    return merged;
-  }
+  // mergeWithOriginalBannerRows(originalWs, dataSheet, headerRowIdx) الآن
+  // مُعرَّفة مركزياً في /static/excel-utils.js (بنفس المنطق بالحرف)
 
   async function autoSaveDocStatusToOriginalFile() {
     const info = document.getElementById('saveDocStatusInfo');
@@ -1935,7 +1920,7 @@
 
       // حماية إلزامية: فرض النوع النصي على العمودين المحميين (رقم الطالب واسمه)
       // في الملف المكتوب فعلياً على القرص، بغض النظر عن أي شيء آخر
-      forceTextColumnsInSheet(newSheet, getProtectedColumns(), S.Excel.rows);
+      forceTextColumnsInSheet(newSheet, getProtectedColumns(), S.Excel.cols, S.Excel.rows);
 
       // الحفاظ على أي صف/صفوف بانر أعلى صف العناوين الفعلي (لا تُفقد أبداً)
       newSheet = mergeWithOriginalBannerRows(originalWs, newSheet, S.Excel.headerRowIdx || 0);
@@ -2031,7 +2016,7 @@
 
     const tbody = document.querySelector('#resultTable tbody');
     if (!filtered.length) {
-      tbody.innerHTML = '<tr><td colspan="6"><div class="empty">لا توجد نتائج مطابقة للمرشّح</div></td></tr>';
+      tbody.innerHTML = '<tr><td colspan="7"><div class="empty">لا توجد نتائج مطابقة للمرشّح</div></td></tr>';
       return;
     }
 
@@ -2042,13 +2027,14 @@
       'renamed': { class: 'r-renamed', tag: 'tag-renamed', label: '🔄 مرقّم' }
     };
 
-    tbody.innerHTML = filtered.map(r => {
+    tbody.innerHTML = filtered.map((r, idx) => {
       const st = statusMap[r.status] || statusMap.missing;
       const newNameDisplay = r.newName || '—';
       const extDisplay = r.ext || '—';
       const numDisplay = r.number || '—';
       const label = r.migrated ? `${st.label} 🚚` : st.label;
       return `<tr class="${st.class}">
+        <td>${idx + 1}</td>
         <td><span class="tag ${st.tag}">${label}</span></td>
         <td>${esc(r.excelName || '—')}</td>
         <td>${esc(numDisplay)}</td>
@@ -2328,6 +2314,12 @@
       return;
     }
 
+    if (!S.docTypeCode) {
+      migrateInfo.innerHTML = '⚠️ اختيار "نوع الوثيقة" إلزامي قبل الترحيل — الملفات تُنقل داخل مجلده الفرعي المخصص ضمن مسار الوجهة.';
+      migrateInfo.style.color = 'var(--warning)';
+      return;
+    }
+
     if (!S.Folder.dirHandle) {
       migrateInfo.innerHTML = '⚠️ لم يعد المجلد المصدر متاحاً.';
       migrateInfo.style.color = 'var(--warning)';
@@ -2347,7 +2339,21 @@
     migrateInfo.style.color = 'var(--muted)';
 
     const srcDir = S.Folder.dirHandle;
-    const destDir = S.Destination.dirHandle;
+
+    // مجلد الوجهة الفعلي للترحيل هو مجلد فرعي باسم رمز نوع الوثيقة المختار
+    // (نفس اسم/رمز المجلد الذي تديره شاشة "أنواع الوثائق")، داخل مسار
+    // الوجهة الجذري المحدَّد من شاشة "المسارات" — وليس الجذر مباشرة
+    let destDir;
+    try {
+      destDir = await S.Destination.dirHandle.getDirectoryHandle(S.docTypeCode, { create: true });
+    } catch (dirErr) {
+      migrateInfo.innerHTML = `⚠️ تعذّر الوصول لمجلد نوع الوثيقة "${esc(S.docTypeCode)}" داخل مسار الوجهة (${esc(dirErr.message)}) — لم يُنقل أي ملف.`;
+      migrateInfo.style.color = 'var(--warning)';
+      migrateBtn.disabled = false;
+      migrateBtn.textContent = '🚚 الترحيل والنقل';
+      return;
+    }
+
     let migratedCount = 0;
     let renamedDueToConflict = 0;
     const errors = [];
@@ -2388,7 +2394,7 @@
       S.migratedCount = (S.migratedCount || 0) + migratedCount;
       remainingPending = S.results.filter(r => r.status === 'renamed' && !r.migrated).length;
 
-      let msg = `✅ تم نقل <strong>${migratedCount}</strong> ملف بنجاح إلى مسار الوجهة.`;
+      let msg = `✅ تم نقل <strong>${migratedCount}</strong> ملف بنجاح إلى مجلد "<strong>${esc(S.docTypeCode)}</strong>" داخل مسار الوجهة.`;
       if (renamedDueToConflict) {
         msg += ` منها <strong>${renamedDueToConflict}</strong> ملف تم تعديل اسمه (بإضافة _1, _2...) بسبب وجود اسم مطابق مسبقاً في الوجهة، مع الإبقاء على الملف القديم دون استبدال.`;
       }
