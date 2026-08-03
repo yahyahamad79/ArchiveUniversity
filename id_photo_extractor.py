@@ -137,24 +137,22 @@ def _verify_crop_quality(crop_rgb: np.ndarray) -> dict:
     }
 
 
-def extract_id_photo_bytes(image_path: str, margin_x: float = 0.55, margin_top: float = 0.65, margin_bottom: float = 0.55,
+def extract_id_photo_bytes(image_path: str, height_ratio: float = 1.3, top_fraction: float = 0.22,
                             inset_x: float = 0.10, inset_top: float = 0.05, inset_bottom: float = 0.10):
     """
     يرجّع (photo_bytes, info) — photo_bytes هي بايتات JPEG جاهزة للحفظ أو
     الإرسال، أو None لو تعذّر تحديد الصورة الشخصية. info فيها تفاصيل
     تشخيصية (الطريقة المستخدَمة، وهل القص يبدو صحيحاً إحصائياً أم لا).
 
-    ملاحظة من تجربة فعلية رابعة (أهم تصحيح حتى الآن): الاعتماد على صندوق
-    الخلفية الزرقاء كأساس للقص (حتى مع التقليم الداخلي) بيفشل بشكل متكرر
-    لأن أبعاد الصندوق نفسه بتختلف بشكل كبير حسب تصميم البطاقة (المسافة
-    بين الصورة والختم تحتها، حجم الخلفية الفارغة حوالين الرأس...) — في
-    حالتين حقيقيتين طلع أكتر من نص القص فراغ فاضي أسفل الذقن. الحل الأصح:
-    **كشف الوجه نفسه هو أساس القص دائماً** (مش الخلفية الزرقاء)، بهوامش
-    نسبة من *حجم الوجه المكتشَف فعلياً* لا حجم صندوق الخلفية — هذا مستقر
-    ومتسق بغض النظر عن تصميم البطاقة، لأن حجم الوجه هو المتغيّر الحقيقي
-    المهم. صندوق الخلفية الزرقاء يُستخدم فقط (لو موجود) لتضييق منطقة
-    البحث عن الوجه أولاً (تجنّباً لكشف وجه خاطئ في مكان آخر بالصورة لو
-    كانت الصورة الملتقطة تحتوي على أكتر من بطاقة/شخص).
+    ملاحظة من تجربة فعلية خامسة: الناتج الآن بمقاس ثابت **4×6** (نسبة
+    عرض:ارتفاع = 4:6) بدل نسبة متغيّرة حسب أبعاد الوجه — وده بتركيز أكبر
+    على الوجه (الوجه بيملأ نسبة أكبر من الإطار). الارتفاع الكلي = ارتفاع
+    الوجه المكتشَف × height_ratio، والعرض = الارتفاع × (4/6) دائماً (مش
+    مرتبط بعرض الوجه نفسه، فيضمن نسبة العرض:الارتفاع الصحيحة تماماً في كل
+    مرة). القيم الافتراضية هنا (1.3 وtop_fraction=0.22) تم اختبارها فعلياً
+    على 4 بطاقات حقيقية مختلفة والتحقق من عدم قص الوجه في أي منها — قيمة
+    أكثر عدوانية (1.2) جُرِّبت لكنها سبّبت عدم استقرار في إعادة اكتشاف
+    الوجه على القص الناتج في إحدى الحالات، فتم التراجع عنها.
     """
     try:
         pil_img = _correct_orientation(image_path)
@@ -168,12 +166,19 @@ def extract_id_photo_bytes(image_path: str, margin_x: float = 0.55, margin_top: 
 
         if face_box is not None:
             fx, fy, fw, fh = face_box
-            mx, mtop, mbot = int(fw * margin_x), int(fh * margin_top), int(fh * margin_bottom)
-            left = max(0, fx - mx)
-            top = max(0, fy - mtop)
-            right = min(pil_img.width, fx + fw + mx)
-            bottom = min(pil_img.height, fy + fh + mbot)
-            method = "كشف الوجه"
+            total_h = fh * height_ratio
+            total_w = total_h * (4 / 6)
+            top = fy - fh * top_fraction
+            bottom = top + total_h
+            cx = fx + fw / 2
+            left = cx - total_w / 2
+            right = cx + total_w / 2
+            left, top, right, bottom = int(left), int(top), int(right), int(bottom)
+            left = max(0, left)
+            top = max(0, top)
+            right = min(pil_img.width, right)
+            bottom = min(pil_img.height, bottom)
+            method = "كشف الوجه (4×6)"
         elif blue_box is not None:
             # احتياطي أخير: مفيش وجه واضح لكن فيه خلفية زرقاء — نرجع لمنطق
             # التقليم الداخلي القديم بدل ما نفشل تماماً (أقل دقة، لكن أفضل من لا شيء)
