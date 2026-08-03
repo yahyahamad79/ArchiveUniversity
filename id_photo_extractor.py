@@ -159,10 +159,25 @@ def extract_id_photo_bytes(image_path: str, height_ratio: float = 1.3, top_fract
         rgb = np.array(pil_img)
         bgr = cv2.cvtColor(rgb, cv2.COLOR_RGB2BGR)
 
+        # لا نفترض أي موقع ثابت للصورة على الوثيقة (يمين/شمال) — نبحث عن
+        # الوجه في كل الصورة دائماً، وأيضاً داخل صندوق الخلفية الزرقاء (لو
+        # وُجد) لتضييق البحث، ثم نختار الأكبر من بين كل المرشحين المكتشَفين.
+        # ملاحظة من تجربة فعلية سادسة: تصميمات بطاقات مختلفة (بطاقة شخصية
+        # مؤقتة مثلاً) ممكن يكتشف فيها صندوق أزرق غلط تماماً (الختم الرسمي
+        # تحت الصورة له حبر أزرق كمان)، فيقيّد البحث عن الوجه بمنطقة غلط
+        # ويكتشف شكلاً صغيراً مضلِّلاً بدل الوجه الحقيقي الأكبر. الاعتماد
+        # على "الأكبر حجماً بين كل المرشحين" (بدل "أول ما يُكتشف") يتجاوز
+        # هذه المشكلة تلقائياً، لأن الوجه الحقيقي يكون عادة أكبر بكثير من
+        # أي اكتشاف زائف.
         blue_box = _detect_blue_background_box(bgr)
-        face_box = _detect_face_in_region(bgr, region=blue_box)
-        if face_box is None and blue_box is not None:
-            face_box = _detect_face_in_region(bgr, region=None)  # الصندوق الأزرق ممكن يكون غلط — جرّب الصورة كاملة
+        candidates = []
+        face_in_blue = _detect_face_in_region(bgr, region=blue_box)
+        if face_in_blue is not None:
+            candidates.append(face_in_blue)
+        face_in_full = _detect_face_in_region(bgr, region=None)
+        if face_in_full is not None:
+            candidates.append(face_in_full)
+        face_box = max(candidates, key=lambda f: f[2] * f[3]) if candidates else None
 
         if face_box is not None:
             fx, fy, fw, fh = face_box
