@@ -300,6 +300,18 @@ async function saveExcelData(){
 async function refreshQueue(){
   $('queueInfo').textContent = 'جارٍ التحميل...';
   $('startBatchBtn').disabled = true;
+
+  // إعادة تصفير كل حالة العرض القديمة — قبل كده كان "تحديث قائمة الملفات"
+  // بيحدّث عدد الملفات المتبقية بس، ويسيب إحصائيات الدفعة السابقة وجدول
+  // السجل القديم ظاهرين على الشاشة وكأنهم لسه ساريين
+  $('statAuto').textContent = '0';
+  $('statReview').textContent = '0';
+  $('logBody').innerHTML = '';
+  $('logTableWrap').style.display = 'none';
+  $('logEmpty').style.display = 'block';
+  $('progressWrap').style.display = 'none';
+  $('progressBar').style.width = '0%';
+
   try{
     await loadDocTypes();
     await loadExcelData();
@@ -444,10 +456,28 @@ async function processSingleFile(entry){
 /* ============================================================
    تنفيذ الإجراء التلقائي: نقل الملف لمجلد النوع + تحديث صف الإكسل
    ============================================================ */
+
+// يعلّم عمود نوع وثيقة معيّن بـ"نعم" لصف طالب معيّن، ويحدّث "الحالة"/"نسبة
+// التسليم" معه — دالة مشتركة تُستخدم لعمود الوثيقة الأصلية ولعمود "صور
+// شخصية" (PH) معاً، بدل تكرار نفس المنطق مرتين
+function markColumnDelivered(rowIdx, colName){
+  if (!colName) return;
+  const row = S.excelRows[rowIdx];
+  row[colName] = 'نعم';
+  if (!String(row[S.statusCol] || '').trim() && S.statusCol) row[S.statusCol] = STATUS_DEFAULT_VALUE;
+  if (S.deliveryCol) {
+    const delivered = S.mandatoryCols.filter(c => String(row[c] || '').trim() === 'نعم').length;
+    const percent = S.mandatoryCols.length ? Math.round((delivered / S.mandatoryCols.length) * 100) : 0;
+    row[S.deliveryCol] = percent + '%';
+  }
+  S.excelDirty = true;
+}
+
 async function executeAutoAction(result, moveFiles){
   const number = String(result.matched.row[S.numCol] || '').trim();
   const ext = (result.entry.name.split('.').pop() || '').toLowerCase();
   let newName = `${number}.${ext}`;
+  let photoSaved = false;
 
   if (moveFiles) {
     const root = await getArchiveRootHandle();
@@ -488,6 +518,7 @@ async function executeAutoAction(result, moveFiles){
         const photoWritable = await photoHandle.createWritable();
         await photoWritable.write(photoBytes);
         await photoWritable.close();
+        photoSaved = true;
       } catch (photoErr) {
         console.warn('تعذّر حفظ الصورة الشخصية المقصوصة:', photoErr);
       }
@@ -498,15 +529,21 @@ async function executeAutoAction(result, moveFiles){
   }
 
   // تحديث صف الإكسل (بالذاكرة — الحفظ الفعلي مرة واحدة بعد الدفعة كلها)
-  const row = S.excelRows[result.matched.idx];
-  row[result.excelCol] = 'نعم';
-  if (!String(row[S.statusCol] || '').trim() && S.statusCol) row[S.statusCol] = STATUS_DEFAULT_VALUE;
-  if (S.deliveryCol) {
-    const delivered = S.mandatoryCols.filter(c => String(row[c] || '').trim() === 'نعم').length;
-    const percent = S.mandatoryCols.length ? Math.round((delivered / S.mandatoryCols.length) * 100) : 0;
-    row[S.deliveryCol] = percent + '%';
+  markColumnDelivered(result.matched.idx, result.excelCol);
+
+  // لو اتحفظت صورة شخصية فعلياً، لازم عمود "صور شخصية" (PH) بالإكسل
+  // يتعلّم "نعم" هو كمان لنفس الطالب — ده كان ناقصاً قبل كده (كان بيتحفظ
+  // الملف بس من غير ما يتحدّث عمود الإكسل بتاعه إطلاقاً)
+  if (photoSaved) {
+    const phCode = getPersonalPhotoCode();
+    const phCol = S.codeToColumn[phCode];
+    if (phCol) {
+      markColumnDelivered(result.matched.idx, phCol);
+    } else {
+      console.warn(`لا يوجد عمود بالإكسل لنوع "صور شخصية" (${phCode}) — شغّل "مزامنة شاملة" لإنشائه`);
+    }
   }
-  S.excelDirty = true;
+
   return newName;
 }
 
