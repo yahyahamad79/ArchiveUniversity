@@ -6,4 +6,4 @@ anthropic>=0.40.0
 google-genai>=0.3.0
 Pillow
 opencv-python-headless==4.9.0.80
-numpy
+numpy<2
