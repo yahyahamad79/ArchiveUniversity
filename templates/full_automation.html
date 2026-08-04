@@ -416,7 +416,13 @@ async function processSingleFile(entry){
       if (attempt >= maxAttempts) {
         return { status: 'review', reason: `فشل الاتصال بخدمة الاستخراج بعد ${attempt} محاولات: ${err.message}`, entry, file };
       }
-      await new Promise(r => setTimeout(r, 1500));
+      // احتمال قوي: الخادم كان "نائماً" (خطط Render المجانية توقف الخدمة
+      // بعد فترة خمول، وإفاقتها ممكن تاخد 50 ثانية أو أكتر) — خصوصاً لو
+      // ده أول ملف في الدفعة. انتظار قصير (كان 1.5 ثانية بس) مش كافٍ
+      // خالص لإفاقة كاملة، فبيفشل 3 مرات متتالية وهو لسه بيصحى. الانتظار
+      // هنا بيزيد تدريجياً (15، 30 ثانية) ليغطي هذا السيناريو فعلياً
+      const waitMs = attempt === 1 ? 15000 : 30000;
+      await new Promise(r => setTimeout(r, waitMs));
     }
   }
 
